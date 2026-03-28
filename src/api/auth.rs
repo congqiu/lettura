@@ -128,3 +128,16 @@ async fn issue_tokens(
         expires_in: 900,
     }))
 }
+
+#[derive(Serialize)]
+pub struct FeedTokenResponse {
+    pub feed_token: String,
+}
+
+pub async fn regenerate_feed_token(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<FeedTokenResponse>, ApiError> {
+    let new_token = user::regenerate_feed_token(&state.pool, auth.user_id).await?;
+    Ok(Json(FeedTokenResponse { feed_token: new_token }))
+}

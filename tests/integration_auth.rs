@@ -112,3 +112,37 @@ async fn short_password_rejected() {
     assert_eq!(res.status(), 400);
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn regenerate_feed_token() {
+    let app = common::TestApp::new().await;
+
+    // Register
+    let res = app.client.post(app.url("/api/auth/register"))
+        .json(&serde_json::json!({
+            "username": "feeduser",
+            "email": "feed@example.com",
+            "password": "password123"
+        }))
+        .send().await.unwrap();
+    let auth: serde_json::Value = res.json().await.unwrap();
+    let token = auth["access_token"].as_str().unwrap();
+
+    // Get old feed token from DB
+    let old_token: (String,) = sqlx::query_as("SELECT feed_token FROM users WHERE email = 'feed@example.com'")
+        .fetch_one(&app.pool).await.unwrap();
+
+    // Regenerate
+    let res = app.client.post(app.url("/api/auth/regenerate-feed-token"))
+        .header("Authorization", format!("Bearer {token}"))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let body: serde_json::Value = res.json().await.unwrap();
+    let new_token = body["feed_token"].as_str().unwrap();
+
+    // Verify changed and correct length
+    assert_ne!(old_token.0, new_token);
+    assert_eq!(new_token.len(), 64);
+
+    app.cleanup().await;
+}

@@ -120,3 +120,22 @@ pub async fn delete_refresh_token(pool: &PgPool, token_hash: &str) -> Result<(),
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(())
 }
+
+pub async fn regenerate_feed_token(pool: &PgPool, user_id: Uuid) -> Result<String, ApiError> {
+    let new_token = generate_feed_token();
+    let row: (String,) = sqlx::query_as(
+        "UPDATE users SET feed_token = $1 WHERE id = $2 RETURNING feed_token",
+    )
+    .bind(&new_token)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    Ok(row.0)
+}
+
+fn generate_feed_token() -> String {
+    use rand::Rng;
+    let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen::<u8>()).collect();
+    hex::encode(bytes)
+}

@@ -48,6 +48,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/refresh", post(auth::refresh))
         .route("/api/auth/logout", post(auth::logout))
+        .route("/api/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
         // Entries
         .route(
             "/api/entries",
