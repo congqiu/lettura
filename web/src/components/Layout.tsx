@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth';
 import { logout as apiLogout } from '../api/auth';
 import ErrorBoundary from './ErrorBoundary';
 import ThemeToggle from './ThemeToggle';
+import NetworkStatus from './NetworkStatus';
 
 export default function Layout() {
   const { logout } = useAuthStore();
@@ -26,6 +27,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
+      <NetworkStatus />
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-1">
