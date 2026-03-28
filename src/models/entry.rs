@@ -160,7 +160,7 @@ pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Resu
 }
 
 pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ApiError> {
-    let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2")
+    let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     if result.rows_affected() == 0 {

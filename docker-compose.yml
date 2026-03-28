@@ -5,7 +5,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgres://lettura:lettura@postgres:5432/lettura
-      JWT_SECRET: change-me-in-production
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
       LISTEN_ADDR: 0.0.0.0:3000
       INDEX_PATH: /data/tantivy
     volumes:

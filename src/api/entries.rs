@@ -27,6 +27,7 @@ pub struct CreateEntryRequest {
     pub url: String,
 }
 
+#[tracing::instrument(skip(state, req), err)]
 pub async fn create_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -48,6 +49,7 @@ pub async fn get_entry(
     Ok(Json(found))
 }
 
+#[tracing::instrument(skip(state), err)]
 pub async fn list_entries(
     State(state): State<AppState>,
     auth: AuthUser,

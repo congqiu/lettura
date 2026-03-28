@@ -46,6 +46,7 @@ pub struct MessageResponse {
     pub message: String,
 }
 
+#[tracing::instrument(skip(state, req), err)]
 pub async fn register(
     State(state): State<AppState>,
     ValidatedJson(req): ValidatedJson<RegisterRequest>,
@@ -60,6 +61,7 @@ pub async fn register(
     issue_tokens(&state, new_user.id, new_user.is_admin).await
 }
 
+#[tracing::instrument(skip(state, req), err)]
 pub async fn login(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,

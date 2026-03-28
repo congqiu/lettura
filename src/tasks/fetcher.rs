@@ -25,7 +25,10 @@ pub struct FetchQueue {
 impl FetchQueue {
     pub async fn send(&self, job: FetchJob) -> Result<(), String> {
         self.queue_depth.fetch_add(1, Ordering::Relaxed);
-        self.tx.send(job).await.map_err(|e| e.to_string())
+        self.tx.send(job).await.map_err(|e| {
+            self.queue_depth.fetch_sub(1, Ordering::Relaxed);
+            e.to_string()
+        })
     }
 }
 

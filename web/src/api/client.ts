@@ -17,6 +17,7 @@ let refreshPromise: Promise<string> | null = null;
 let refreshFailedAt: number = 0;
 const REFRESH_COOLDOWN_MS = 5000;
 
+// Uses raw axios (not the `api` instance) to avoid triggering the 401 interceptor on refresh requests
 async function doRefresh(): Promise<string> {
   const refreshToken = localStorage.getItem('refresh_token');
   if (!refreshToken) {

@@ -76,15 +76,24 @@ async fn find_user_by_feed_token(
     .ok_or_else(|| ApiError::NotFound("invalid feed token".to_string()))
 }
 
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn build_rss(channel_title: &str, entries: &[FeedEntry]) -> Response {
     let mut items = String::new();
     for entry in entries {
         let title = entry.title.as_deref().unwrap_or("Untitled");
         let content = entry.content.as_deref().unwrap_or("");
         let date = entry.created_at.to_rfc2822();
+        let escaped_url = xml_escape(&entry.url);
         items.push_str(&format!(
             "<item><title><![CDATA[{}]]></title><link>{}</link><guid>{}</guid><pubDate>{}</pubDate><description><![CDATA[{}]]></description></item>",
-            title, entry.url, entry.id, date, content
+            title, escaped_url, entry.id, date, content
         ));
     }
 
