@@ -2,6 +2,7 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::api::error::ApiError;
 use crate::auth::jwt;
@@ -9,10 +10,15 @@ use crate::auth::middleware::{AppState, AuthUser};
 use crate::auth::password;
 use crate::models::user;
 
-#[derive(Deserialize)]
+use super::validate::ValidatedJson;
+
+#[derive(Deserialize, Validate)]
 pub struct RegisterRequest {
+    #[validate(length(min = 1, message = "username is required"))]
     pub username: String,
+    #[validate(email(message = "invalid email format"))]
     pub email: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
 }
 
@@ -42,14 +48,8 @@ pub struct MessageResponse {
 
 pub async fn register(
     State(state): State<AppState>,
-    Json(req): Json<RegisterRequest>,
+    ValidatedJson(req): ValidatedJson<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
-    if req.username.is_empty() || req.email.is_empty() || req.password.len() < 8 {
-        return Err(ApiError::BadRequest(
-            "username, email required; password must be >= 8 chars".to_string(),
-        ));
-    }
-
     // First user becomes admin
     let user_count = user::count_users(&state.pool).await?;
     let is_admin = user_count == 0;

@@ -1,27 +1,37 @@
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::error::ApiError;
 use crate::auth::middleware::{AppState, AuthUser};
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
 use crate::tasks::fetcher::FetchJob;
 
+<<<<<<< HEAD
 #[derive(serde::Deserialize)]
+pub struct ListQueryParams {
+    #[serde(flatten)]
+    pub inner: ListParams,
+    pub deleted: Option<bool>,
+}
+
+#[derive(serde::Deserialize)]
+=======
+use super::validate::ValidatedJson;
+
+#[derive(serde::Deserialize, Validate)]
+>>>>>>> 86673bc (feat: add ValidatedJson extractor with validator crate for centralized request validation)
 pub struct CreateEntryRequest {
+    #[validate(url(message = "invalid URL format"))]
     pub url: String,
 }
 
 pub async fn create_entry(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<CreateEntryRequest>,
+    ValidatedJson(req): ValidatedJson<CreateEntryRequest>,
 ) -> Result<Json<entry::Entry>, ApiError> {
-    if req.url.is_empty() {
-        return Err(ApiError::BadRequest("url is required".to_string()));
-    }
-    url::Url::parse(&req.url)
-        .map_err(|_| ApiError::BadRequest("invalid URL".to_string()))?;
     let new_entry = entry::create_entry(&state.pool, auth.user_id, &req.url).await?;
     let _ = state.fetch_queue.send(FetchJob { entry_id: new_entry.id, url: new_entry.url.clone() }).await;
     Ok(Json(new_entry))
@@ -41,10 +51,16 @@ pub async fn get_entry(
 pub async fn list_entries(
     State(state): State<AppState>,
     auth: AuthUser,
-    Query(params): Query<ListParams>,
+    Query(params): Query<ListQueryParams>,
 ) -> Result<Json<Vec<entry::EntrySummary>>, ApiError> {
+    // If deleted=true, return soft-deleted entries
+    if params.deleted == Some(true) {
+        let entries = entry::list_deleted_entries(&state.pool, auth.user_id).await?;
+        return Ok(Json(entries));
+    }
+
     // If search query provided, use tantivy to get matching IDs first
-    if let Some(ref query) = params.search {
+    if let Some(ref query) = params.inner.search {
         if !query.is_empty() {
             let ids = state
                 .search_index
@@ -57,7 +73,7 @@ pub async fn list_entries(
             return Ok(Json(entries));
         }
     }
-    let entries = entry::list_entries(&state.pool, auth.user_id, &params).await?;
+    let entries = entry::list_entries(&state.pool, auth.user_id, &params.inner).await?;
     Ok(Json(entries))
 }
 
@@ -80,7 +96,39 @@ pub async fn delete_entry(
     if !deleted {
         return Err(ApiError::NotFound("entry not found".to_string()));
     }
+    // Remove from search index on soft delete
+    let _ = state.search_index.delete(entry_id).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
+}
+
+pub async fn restore_entry(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(entry_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    entry::restore_entry(&state.pool, entry_id, auth.user_id).await?;
+    // Re-index restored entry
+    if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await {
+        let _ = state.search_index.upsert(
+            restored.id,
+            restored.title.as_deref().unwrap_or(""),
+            restored.text_content.as_deref().unwrap_or(""),
+            &restored.url,
+            restored.domain_name.as_deref().unwrap_or(""),
+        ).await;
+    }
+    Ok(Json(serde_json::json!({"message": "restored"})))
+}
+
+pub async fn permanently_delete_entry(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(entry_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    entry::permanently_delete_entry(&state.pool, entry_id, auth.user_id).await?;
+    // Ensure removed from search index
+    let _ = state.search_index.delete(entry_id).await;
+    Ok(Json(serde_json::json!({"message": "permanently deleted"})))
 }
 
 pub async fn refetch_entry(

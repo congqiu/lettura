@@ -2,7 +2,7 @@ mod common;
 use serde_json::json;
 
 async fn get_token(app: &common::TestApp) -> String {
-    let res = app.client.post(app.url("/api/auth/register"))
+    let res = app.client.post(app.url("/api/v1/auth/register"))
         .json(&json!({"username":"testuser","email":"test@example.com","password":"password123"}))
         .send().await.unwrap();
     let body: serde_json::Value = res.json().await.unwrap();
@@ -14,7 +14,7 @@ async fn import_wallabag_json() {
     let app = common::TestApp::new().await;
     let token = get_token(&app).await;
 
-    let res = app.client.post(app.url("/api/import/wallabag"))
+    let res = app.client.post(app.url("/api/v1/import/wallabag"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!([
             {"url": "https://example.com/article1", "title": "Article 1", "is_archived": 1, "is_starred": 0},
@@ -42,7 +42,7 @@ async fn import_browser_bookmarks() {
 <DT><A HREF="https://example.com/bookmark2">Bookmark 2</A>
 </DL>"#;
 
-    let res = app.client.post(app.url("/api/import/browser"))
+    let res = app.client.post(app.url("/api/v1/import/browser"))
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "text/html")
         .body(html.to_string())
@@ -61,12 +61,12 @@ async fn export_all_entries() {
     let token = get_token(&app).await;
 
     // Create an entry first
-    app.client.post(app.url("/api/entries"))
+    app.client.post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/exported"}))
         .send().await.unwrap();
 
-    let res = app.client.get(app.url("/api/export"))
+    let res = app.client.get(app.url("/api/v1/export"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 
@@ -85,7 +85,7 @@ async fn rss_feed_with_valid_token() {
     let token = get_token(&app).await;
 
     // Create an entry
-    app.client.post(app.url("/api/entries"))
+    app.client.post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/rss-test"}))
         .send().await.unwrap();
@@ -122,7 +122,7 @@ async fn admin_list_users() {
     let app = common::TestApp::new().await;
     let token = get_token(&app).await; // First user = admin
 
-    let res = app.client.get(app.url("/api/admin/users"))
+    let res = app.client.get(app.url("/api/v1/admin/users"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 
@@ -141,7 +141,7 @@ async fn admin_reindex() {
     let app = common::TestApp::new().await;
     let token = get_token(&app).await;
 
-    let res = app.client.post(app.url("/api/admin/reindex"))
+    let res = app.client.post(app.url("/api/v1/admin/reindex"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 

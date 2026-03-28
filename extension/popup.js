@@ -142,7 +142,7 @@
     }
 
     try {
-      const resp = await apiRequest("POST", "/api/auth/refresh", {
+      const resp = await apiRequest("POST", "/api/v1/auth/refresh", {
         refresh_token,
       });
 
@@ -192,7 +192,7 @@
     try {
       await setLocalStorage({ server_url: normalizeUrl(serverUrl) });
 
-      const resp = await apiRequest("POST", "/api/auth/login", {
+      const resp = await apiRequest("POST", "/api/v1/auth/login", {
         email,
         password,
       });
@@ -238,7 +238,7 @@
         return;
       }
 
-      const resp = await authenticatedRequest("POST", "/api/entries", {
+      const resp = await authenticatedRequest("POST", "/api/v1/entries", {
         url: tab.url,
       });
 

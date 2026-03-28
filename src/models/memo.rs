@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::error::ApiError;
 
@@ -15,8 +16,9 @@ pub struct Memo {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct CreateMemo {
+    #[validate(length(min = 1, message = "content is required"))]
     pub content: String,
     pub source_url: Option<String>,
 }

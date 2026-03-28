@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::error::ApiError;
 
@@ -18,8 +19,9 @@ pub struct Annotation {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct CreateAnnotation {
+    #[validate(length(min = 1, message = "quote is required"))]
     pub quote: String,
     pub text: Option<String>,
     pub ranges: serde_json::Value,

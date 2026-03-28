@@ -24,9 +24,24 @@ pub mod memos;
 pub mod site_rules;
 pub mod tagging_rules;
 pub mod tags;
+pub mod validate;
 
 pub fn router(pool: PgPool, config: Config) -> Router {
     router_with_search(pool, config, None)
+}
+
+/// Redirect handler for legacy `/api/{path}` routes.
+/// Returns 301 Moved Permanently to `/api/v1/{path}`, preserving query string.
+async fn api_redirect(
+    axum::extract::Path(path): axum::extract::Path<String>,
+    req: axum::extract::Request,
+) -> impl axum::response::IntoResponse {
+    let query = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+    let location = format!("/api/v1/{path}{query}");
+    (
+        axum::http::StatusCode::MOVED_PERMANENTLY,
+        [(axum::http::header::LOCATION, location)],
+    )
 }
 
 pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> Router {
@@ -46,81 +61,86 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
     };
 
     Router::new()
-        // Health (no auth required)
+        // Health (no auth required, no version prefix)
         .route("/api/health", get(health::health_check))
         // Auth
-        .route("/api/auth/register", post(auth::register))
-        .route("/api/auth/login", post(auth::login))
-        .route("/api/auth/refresh", post(auth::refresh))
-        .route("/api/auth/logout", post(auth::logout))
-        .route("/api/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
+        .route("/api/v1/auth/register", post(auth::register))
+        .route("/api/v1/auth/login", post(auth::login))
+        .route("/api/v1/auth/refresh", post(auth::refresh))
+        .route("/api/v1/auth/logout", post(auth::logout))
+        .route("/api/v1/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
         // Entries
         .route(
-            "/api/entries",
+            "/api/v1/entries",
             get(entries::list_entries).post(entries::create_entry),
         )
         .route(
-            "/api/entries/{id}",
+            "/api/v1/entries/{id}",
             get(entries::get_entry)
                 .patch(entries::update_entry)
                 .delete(entries::delete_entry),
         )
-        .route("/api/entries/{id}/refetch", post(entries::refetch_entry))
+        .route("/api/v1/entries/{id}/refetch", post(entries::refetch_entry))
+        .route("/api/v1/entries/{id}/restore", post(entries::restore_entry))
+        .route("/api/v1/entries/{id}/permanent", delete(entries::permanently_delete_entry))
         // Tags
-        .route("/api/tags", get(tags::list_tags))
-        .route("/api/entries/{id}/tags", post(tags::add_tag_to_entry))
+        .route("/api/v1/tags", get(tags::list_tags))
+        .route("/api/v1/entries/{id}/tags", post(tags::add_tag_to_entry))
         .route(
-            "/api/entries/{entry_id}/tags/{tag_id}",
+            "/api/v1/entries/{entry_id}/tags/{tag_id}",
             delete(tags::remove_tag_from_entry),
         )
-        .route("/api/tags/{id}", delete(tags::delete_tag))
+        .route("/api/v1/tags/{id}", delete(tags::delete_tag))
         // Annotations
         .route(
-            "/api/entries/{id}/annotations",
+            "/api/v1/entries/{id}/annotations",
             get(annotations::list_annotations).post(annotations::create_annotation),
         )
         .route(
-            "/api/annotations/{id}",
+            "/api/v1/annotations/{id}",
             patch(annotations::update_annotation).delete(annotations::delete_annotation),
         )
         // Memos
         .route(
-            "/api/memos",
+            "/api/v1/memos",
             get(memos::list_memos).post(memos::create_memo),
         )
-        .route("/api/memos/{id}", delete(memos::delete_memo))
-        .route("/api/memos/{id}/promote", post(memos::promote_memo))
+        .route("/api/v1/memos/{id}", delete(memos::delete_memo))
+        .route("/api/v1/memos/{id}/promote", post(memos::promote_memo))
         // Tagging Rules
         .route(
-            "/api/tagging-rules",
+            "/api/v1/tagging-rules",
             get(tagging_rules::list_rules).post(tagging_rules::create_rule),
         )
         .route(
-            "/api/tagging-rules/{id}",
+            "/api/v1/tagging-rules/{id}",
             patch(tagging_rules::update_rule).delete(tagging_rules::delete_rule),
         )
         // Site Rules
         .route(
-            "/api/site-rules",
+            "/api/v1/site-rules",
             get(site_rules::list_rules).post(site_rules::create_rule),
         )
         .route(
-            "/api/site-rules/{id}",
+            "/api/v1/site-rules/{id}",
             patch(site_rules::update_rule).delete(site_rules::delete_rule),
         )
         // Import/Export
-        .route("/api/import/wallabag", post(import::import_wallabag))
-        .route("/api/import/browser", post(import::import_browser))
-        .route("/api/export", get(export::export_all))
+        .route("/api/v1/import/wallabag", post(import::import_wallabag))
+        .route("/api/v1/import/browser", post(import::import_browser))
+        .route("/api/v1/export", get(export::export_all))
         // RSS Feeds (no auth - uses feed token)
         .route("/feed/{user_token}/unread", get(feed::feed_unread))
         .route("/feed/{user_token}/starred", get(feed::feed_starred))
         .route("/feed/{user_token}/archive", get(feed::feed_archive))
         // Admin
-        .route("/api/admin/users", get(admin::list_users))
-        .route("/api/admin/reindex", post(admin::reindex))
+        .route("/api/v1/admin/users", get(admin::list_users))
+        .route("/api/v1/admin/reindex", post(admin::reindex))
         // Local storage file serving
         .route("/storage/{*path}", get(serve_storage))
+        // Legacy API redirect: /api/{path} -> /api/v1/{path} (301)
+        // Note: /api/health is a more specific route and takes priority over this catch-all
+        .route("/api/{*path}", get(api_redirect).post(api_redirect).patch(api_redirect).delete(api_redirect))
         // SPA fallback
         .fallback(crate::spa::spa_handler)
         .with_state(state)

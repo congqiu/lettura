@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::error::ApiError;
 
@@ -16,9 +17,11 @@ pub struct SiteRule {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct CreateSiteRule {
+    #[validate(length(min = 1, message = "domain is required"))]
     pub domain: String,
+    #[validate(length(min = 1, message = "content_selector is required"))]
     pub content_selector: String,
     pub title_selector: Option<String>,
     pub strip_selectors: Option<Vec<String>>,

@@ -9,7 +9,7 @@ pub async fn export_all(
     auth: AuthUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let entries: Vec<crate::models::entry::Entry> = sqlx::query_as(
-        "SELECT * FROM entries WHERE user_id = $1 ORDER BY created_at",
+        "SELECT * FROM entries WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at",
     )
     .bind(auth.user_id)
     .fetch_all(&state.pool)

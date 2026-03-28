@@ -6,6 +6,8 @@ use crate::api::error::ApiError;
 use crate::auth::middleware::{AppState, AuthUser};
 use crate::models::tagging_rule::{self, CreateTaggingRule, UpdateTaggingRule};
 
+use super::validate::ValidatedJson;
+
 pub async fn list_rules(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -17,11 +19,8 @@ pub async fn list_rules(
 pub async fn create_rule(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(params): Json<CreateTaggingRule>,
+    ValidatedJson(params): ValidatedJson<CreateTaggingRule>,
 ) -> Result<Json<tagging_rule::TaggingRule>, ApiError> {
-    if params.tags.is_empty() {
-        return Err(ApiError::BadRequest("tags must not be empty".to_string()));
-    }
     let rule = tagging_rule::create_rule(&state.pool, auth.user_id, &params).await?;
     Ok(Json(rule))
 }

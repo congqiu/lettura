@@ -58,7 +58,7 @@ pub async fn reindex(
 
     let entries: Vec<(uuid::Uuid, Option<String>, Option<String>, String, Option<String>)> =
         sqlx::query_as(
-            "SELECT id, title, text_content, url, domain_name FROM entries",
+            "SELECT id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
         )
         .fetch_all(&state.pool)
         .await

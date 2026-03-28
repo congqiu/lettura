@@ -2,19 +2,19 @@ mod common;
 use serde_json::json;
 
 async fn setup_with_entries(app: &common::TestApp) -> String {
-    let res = app.client.post(app.url("/api/auth/register"))
+    let res = app.client.post(app.url("/api/v1/auth/register"))
         .json(&json!({"username":"testuser","email":"test@example.com","password":"password123"}))
         .send().await.unwrap();
     let body: serde_json::Value = res.json().await.unwrap();
     let token = body["access_token"].as_str().unwrap().to_string();
 
     // Create entries with known URLs
-    app.client.post(app.url("/api/entries"))
+    app.client.post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/rust-ownership"}))
         .send().await.unwrap();
 
-    app.client.post(app.url("/api/entries"))
+    app.client.post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/python-guide"}))
         .send().await.unwrap();
@@ -45,7 +45,7 @@ async fn search_finds_matching_entry() {
     let app = common::TestApp::new().await;
     let token = setup_with_entries(&app).await;
 
-    let res = app.client.get(app.url("/api/entries?search=ownership"))
+    let res = app.client.get(app.url("/api/v1/entries?search=ownership"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 
@@ -62,7 +62,7 @@ async fn search_returns_empty_for_no_match() {
     let app = common::TestApp::new().await;
     let token = setup_with_entries(&app).await;
 
-    let res = app.client.get(app.url("/api/entries?search=nonexistent"))
+    let res = app.client.get(app.url("/api/v1/entries?search=nonexistent"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 
@@ -78,7 +78,7 @@ async fn empty_search_returns_all() {
     let app = common::TestApp::new().await;
     let token = setup_with_entries(&app).await;
 
-    let res = app.client.get(app.url("/api/entries"))
+    let res = app.client.get(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
 

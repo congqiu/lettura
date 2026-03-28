@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::error::ApiError;
 
@@ -15,9 +16,10 @@ pub struct TaggingRule {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct CreateTaggingRule {
     pub rule: serde_json::Value,
+    #[validate(length(min = 1, message = "tags must not be empty"))]
     pub tags: Vec<String>,
     pub priority: Option<i32>,
 }

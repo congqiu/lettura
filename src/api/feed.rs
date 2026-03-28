@@ -11,7 +11,7 @@ pub async fn feed_unread(
 ) -> Result<Response, ApiError> {
     let user = find_user_by_feed_token(&state, &user_token).await?;
     let entries: Vec<FeedEntry> = sqlx::query_as(
-        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_archived = false ORDER BY created_at DESC LIMIT 50",
+        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_archived = false AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50",
     )
     .bind(user.id)
     .fetch_all(&state.pool)
@@ -27,7 +27,7 @@ pub async fn feed_starred(
 ) -> Result<Response, ApiError> {
     let user = find_user_by_feed_token(&state, &user_token).await?;
     let entries: Vec<FeedEntry> = sqlx::query_as(
-        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_starred = true ORDER BY starred_at DESC LIMIT 50",
+        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_starred = true AND deleted_at IS NULL ORDER BY starred_at DESC LIMIT 50",
     )
     .bind(user.id)
     .fetch_all(&state.pool)
@@ -43,7 +43,7 @@ pub async fn feed_archive(
 ) -> Result<Response, ApiError> {
     let user = find_user_by_feed_token(&state, &user_token).await?;
     let entries: Vec<FeedEntry> = sqlx::query_as(
-        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_archived = true ORDER BY archived_at DESC LIMIT 50",
+        "SELECT id, url, title, content, created_at FROM entries WHERE user_id = $1 AND is_archived = true AND deleted_at IS NULL ORDER BY archived_at DESC LIMIT 50",
     )
     .bind(user.id)
     .fetch_all(&state.pool)

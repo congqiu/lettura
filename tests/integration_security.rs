@@ -6,7 +6,7 @@ async fn responses_include_security_headers() {
     // POST to a real endpoint to get a response with headers
     let res = app
         .client
-        .post(app.url("/api/auth/login"))
+        .post(app.url("/api/v1/auth/login"))
         .json(&serde_json::json!({"email": "x@x.com", "password": "wrong"}))
         .send()
         .await

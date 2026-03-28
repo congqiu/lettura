@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '/api/v1',
 });
 
 api.interceptors.request.use((config) => {
@@ -22,7 +22,7 @@ async function doRefresh(): Promise<string> {
   if (!refreshToken) {
     throw new Error('no refresh token');
   }
-  const res = await axios.post('/api/auth/refresh', {
+  const res = await axios.post('/api/v1/auth/refresh', {
     refresh_token: refreshToken,
   });
   const { access_token, refresh_token } = res.data;

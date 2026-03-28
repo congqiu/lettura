@@ -72,7 +72,7 @@ async function refreshToken() {
   }
 
   try {
-    const resp = await apiRequest("POST", "/api/auth/refresh", {
+    const resp = await apiRequest("POST", "/api/v1/auth/refresh", {
       refresh_token,
     });
 
@@ -169,7 +169,7 @@ async function handleSavePage(info, tab) {
   }
 
   try {
-    const resp = await authenticatedRequest("POST", "/api/entries", { url });
+    const resp = await authenticatedRequest("POST", "/api/v1/entries", { url });
 
     if (resp.ok) {
       chrome.action.setBadgeText({ text: "OK" });
@@ -205,7 +205,7 @@ async function handleSaveMemo(info, tab) {
   const sourceUrl = (tab && tab.url) || "";
 
   try {
-    const resp = await authenticatedRequest("POST", "/api/memos", {
+    const resp = await authenticatedRequest("POST", "/api/v1/memos", {
       content: selectedText,
       source_url: sourceUrl,
     });

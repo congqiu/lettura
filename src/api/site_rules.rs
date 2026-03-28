@@ -6,6 +6,8 @@ use crate::api::error::ApiError;
 use crate::auth::middleware::{AppState, AuthUser};
 use crate::models::site_rule::{self, CreateSiteRule, UpdateSiteRule};
 
+use super::validate::ValidatedJson;
+
 pub async fn list_rules(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -17,13 +19,8 @@ pub async fn list_rules(
 pub async fn create_rule(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(params): Json<CreateSiteRule>,
+    ValidatedJson(params): ValidatedJson<CreateSiteRule>,
 ) -> Result<Json<site_rule::SiteRule>, ApiError> {
-    if params.domain.is_empty() || params.content_selector.is_empty() {
-        return Err(ApiError::BadRequest(
-            "domain and content_selector required".to_string(),
-        ));
-    }
     let rule = site_rule::create_rule(&state.pool, auth.user_id, &params).await?;
     Ok(Json(rule))
 }

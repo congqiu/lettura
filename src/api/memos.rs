@@ -7,6 +7,8 @@ use crate::auth::middleware::{AppState, AuthUser};
 use crate::models::{entry, memo};
 use crate::tasks::fetcher::FetchJob;
 
+use super::validate::ValidatedJson;
+
 pub async fn list_memos(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -18,11 +20,8 @@ pub async fn list_memos(
 pub async fn create_memo(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(params): Json<memo::CreateMemo>,
+    ValidatedJson(params): ValidatedJson<memo::CreateMemo>,
 ) -> Result<Json<memo::Memo>, ApiError> {
-    if params.content.is_empty() {
-        return Err(ApiError::BadRequest("content is required".to_string()));
-    }
     let m = memo::create_memo(&state.pool, auth.user_id, &params).await?;
     Ok(Json(m))
 }

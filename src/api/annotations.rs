@@ -6,6 +6,8 @@ use crate::api::error::ApiError;
 use crate::auth::middleware::{AppState, AuthUser};
 use crate::models::{annotation, entry};
 
+use super::validate::ValidatedJson;
+
 pub async fn list_annotations(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -22,7 +24,7 @@ pub async fn create_annotation(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(entry_id): Path<Uuid>,
-    Json(params): Json<annotation::CreateAnnotation>,
+    ValidatedJson(params): ValidatedJson<annotation::CreateAnnotation>,
 ) -> Result<Json<annotation::Annotation>, ApiError> {
     entry::find_entry_by_id(&state.pool, auth.user_id, entry_id)
         .await?

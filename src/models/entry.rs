@@ -20,6 +20,7 @@ pub struct Entry {
     pub is_starred: bool, pub starred_at: Option<DateTime<Utc>>,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -29,6 +30,7 @@ pub struct EntrySummary {
     pub reading_time: Option<i32>, pub preview_picture: Option<String>,
     pub domain_name: Option<String>, pub published_by: Option<String>,
     pub is_archived: bool, pub is_starred: bool, pub created_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 pub fn hash_url(url: &str) -> String {
@@ -55,7 +57,7 @@ pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Resu
 }
 
 pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ApiError> {
-    sqlx::query_as::<_, Entry>("SELECT * FROM entries WHERE id = $1 AND user_id = $2")
+    sqlx::query_as::<_, Entry>("SELECT * FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(entry_id).bind(user_id).fetch_optional(pool).await
         .map_err(|e| ApiError::Internal(e.to_string()))
 }
@@ -72,7 +74,7 @@ pub async fn list_entries(pool: &PgPool, user_id: Uuid, params: &ListParams) -> 
     let offset = (params.page.unwrap_or(1) - 1).max(0) * per_page;
 
     let mut sql = String::from(
-        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at FROM entries WHERE user_id = $1"
+        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NULL"
     );
     let mut param_idx = 2u32;
     if params.is_archived.is_some() { sql.push_str(&format!(" AND is_archived = ${}", param_idx)); param_idx += 1; }
@@ -121,7 +123,7 @@ pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> 
         return Ok(vec![]);
     }
     sqlx::query_as::<_, EntrySummary>(
-        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at FROM entries WHERE user_id = $1 AND id = ANY($2) ORDER BY created_at DESC"
+        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND id = ANY($2) AND deleted_at IS NULL ORDER BY created_at DESC"
     )
     .bind(user_id)
     .bind(ids)
@@ -131,10 +133,40 @@ pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> 
 }
 
 pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<bool, ApiError> {
-    let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2")
+    let result = sqlx::query("UPDATE entries SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn list_deleted_entries(pool: &PgPool, user_id: Uuid) -> Result<Vec<EntrySummary>, ApiError> {
+    sqlx::query_as::<_, EntrySummary>(
+        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))
+}
+
+pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ApiError> {
+    let result = sqlx::query("UPDATE entries SET deleted_at = NULL WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
+        .bind(entry_id).bind(user_id).execute(pool).await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound("entry not found or not deleted".to_string()));
+    }
+    Ok(())
+}
+
+pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ApiError> {
+    let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2")
+        .bind(entry_id).bind(user_id).execute(pool).await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound("entry not found".to_string()));
+    }
+    Ok(())
 }
 
 pub async fn update_entry_content(
