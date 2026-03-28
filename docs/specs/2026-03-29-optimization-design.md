@@ -8,7 +8,7 @@
 
 基于对当前项目（Plan 1-3b 已完成）的全面架构审查，识别出 20 项优化机会。按优先级分为两个 Plan 分批实施：
 
-- **Plan A（P0+P1）**: 8 项关键优化 — 安全、性能、稳定性
+- **Plan A（P0+P1）**: 7 项关键优化 — 安全、性能、稳定性
 - **Plan B（P2+P3）**: 12 项改进优化 — 架构演进、可观测性、开发者体验
 
 两个 Plan 之间跑完整测试确认无回归，再继续。
@@ -25,7 +25,7 @@
 
 ---
 
-## Plan A: P0+P1 关键优化（8 项）
+## Plan A: P0+P1 关键优化（7 项）
 
 ### A1. 更新 CLAUDE.md 项目状态 [P0, DevX]
 
@@ -45,13 +45,14 @@
 **问题**: 如果 JWT_SECRET 太短或使用 docker-compose 默认值，系统会静默运行，存在安全隐患。
 
 **变更**:
-- `src/config.rs` 中 `Config` 构建时加入校验逻辑
+- `src/config.rs` 中将 `Config::from_env()` 改为返回 `Result<Self, ConfigError>`
+- 定义 `ConfigError` 枚举（或用 `String`），包含校验失败原因
 - 校验规则：
-  - 长度 >= 32 字符，否则 panic 并提示
-  - 值等于 `change-me-in-production` 时 panic 并提示
-- 使用 `panic!` 而非 `tracing::warn`（安全问题不应该只是警告）
+  - 长度 >= 32 字符，否则返回错误
+  - 值等于 `change-me-in-production` 时返回错误
+- `src/main.rs` 中用 `.expect("JWT_SECRET validation failed")` 处理，确保 panic 前有 eprintln 输出（容器环境中 panic 信息可能被吞）
 
-**文件**: `src/config.rs`
+**文件**: `src/config.rs`, `src/main.rs`
 
 ---
 
@@ -62,6 +63,7 @@
 **变更**:
 - 在 Axum 路由上添加全局中间件层
 - 使用 `tower-http::set_header::SetResponseHeaderLayer` 或在自定义 middleware 中设置
+- `Cargo.toml` 中 `tower-http` 添加 `"set-header"` feature（当前只有 `["cors", "trace"]`）
 - 添加的头：
   - `X-Content-Type-Options: nosniff`
   - `X-Frame-Options: DENY`
@@ -69,9 +71,7 @@
   - `Referrer-Policy: strict-origin-when-cross-origin`
 - 不添加 CSP 和 HSTS（依赖部署环境）
 
-**依赖**: 检查 `tower-http` 已有 feature 是否覆盖，可能需要加 feature flag
-
-**文件**: `src/main.rs`（路由构建处）
+**文件**: `Cargo.toml`, `src/main.rs`（路由构建处）
 
 ---
 
@@ -80,35 +80,22 @@
 **问题**: 并发请求同时收到 401 时，会触发多次 refresh token 请求，可能导致 token 被多次轮换使第一次之后的全部失败。
 
 **变更**:
-- `web/src/api/client.ts` 中引入模块级变量 `let refreshPromise: Promise<string> | null = null`
+- `web/src/api/client.ts` 中引入模块级变量：
+  - `let refreshPromise: Promise<string> | null = null` — refresh 去重锁
+  - `let refreshFailedAt: number = 0` — refresh 失败时间戳（冷却期）
 - 401 拦截器逻辑改为：
-  1. 如果 `refreshPromise` 不为 null，await 它并用新 token 重试
-  2. 如果为 null，创建 refresh Promise 赋值给 `refreshPromise`
-  3. refresh 完成后（成功或失败）将 `refreshPromise` 重置为 null
-  4. 成功：所有等待的请求用新 token 重试
-  5. 失败：所有等待的请求统一跳转 login
+  1. 检查冷却期：如果距上次 refresh 失败不到 5 秒，直接跳转 login（防止 token 也过期时的连锁 refresh）
+  2. 如果 `refreshPromise` 不为 null，await 它并用新 token 重试
+  3. 如果为 null，创建 refresh Promise 赋值给 `refreshPromise`
+  4. refresh 完成后（成功或失败）将 `refreshPromise` 重置为 null
+  5. 成功：所有等待的请求用新 token 重试
+  6. 失败：记录 `refreshFailedAt = Date.now()`，所有等待的请求统一跳转 login
 
 **文件**: `web/src/api/client.ts`
 
 ---
 
-### A5. Entry 列表查询优化 [P1, 性能]
-
-**问题**: `list_entries` SQL 用 `SELECT *` 返回完整 content 和 text_content，列表页不需要这些大字段。
-
-**变更**:
-- 后端:
-  - `src/models/entry.rs` 新增 `EntrySummary` 结构体，只含列表所需字段：`id, url, title, domain_name, reading_time, language, published_by, preview_picture, is_archived, is_starred, extract_method, http_status, created_at, archived_at, starred_at`
-  - `list_entries()` SQL 改为显式 SELECT 这些字段
-  - `src/api/entries.rs` 的列表 handler 返回类型改为 `Vec<EntrySummary>`
-- 前端: 无需变更（`EntryCard` 已只用摘要字段）
-- 详情 API `get_entry` 保持返回完整 `Entry`
-
-**文件**: `src/models/entry.rs`, `src/api/entries.rs`
-
----
-
-### A6. 前端 ErrorBoundary [P1, 前端]
+### A5. 前端 ErrorBoundary [P1, 前端]
 
 **问题**: 任何组件的渲染错误会导致整个应用白屏，没有恢复手段。
 
@@ -125,7 +112,7 @@
 
 ---
 
-### A7. 健康检查端点 [P1, 运维]
+### A6. 健康检查端点 [P1, 运维]
 
 **问题**: 没有专门的健康检查 API，docker-compose healthcheck 无法可靠判断服务状态。
 
@@ -134,7 +121,7 @@
   - `GET /api/health` — 无需认证
   - 检查项：
     - DB: 执行 `SELECT 1` 验证连接
-    - Search: 尝试获取 tantivy reader（`index.reader()` 成功即正常）
+    - Search: 执行一次空搜索（如 `search("", 1)`）验证 searcher 正常工作。仅检查 `index.reader()` 不够——reader 在启动时已创建，不能反映索引实际状态
   - 响应格式：`{"status": "ok"|"degraded"|"error", "db": "ok"|"error: ...", "search": "ok"|"error: ..."}`
   - DB 或 search 任一失败返回 503，全部正常返回 200
 - `docker-compose.yml` 的 healthcheck 改为 `curl -f http://localhost:3000/api/health`
@@ -144,7 +131,7 @@
 
 ---
 
-### A8. RSS Feed Token 轮换 [P1, 安全]
+### A7. RSS Feed Token 轮换 [P1, 安全]
 
 **问题**: feed_token 一旦生成无法更换，如果泄露只能注销账号。
 
@@ -177,6 +164,7 @@
 - 前端 `client.ts` baseURL 从 `/api` 改为 `/api/v1`
 - 浏览器扩展中所有 API 路径加 `/v1` 前缀
 - Vite proxy 规则无需改动（`/api` 前缀不变）
+- 添加过渡期 301 重定向：旧路径 `/api/{path}` → `/api/v1/{path}`（方便旧版扩展或书签过渡）
 
 **文件**: `src/main.rs`（或 `src/api/mod.rs`，视路由组织方式）, `web/src/api/client.ts`, `extension/background.js`, `extension/popup.js`
 
@@ -247,11 +235,12 @@
 **变更**:
 - `src/api/error.rs` 中 `From<sqlx::Error>` 实现改进：
   - 匹配 `sqlx::Error::Database(e)` 并检查 `e.constraint()`
-  - 已知约束映射表：
+  - 已知约束映��表（名称来自 migration SQL 和现有代码）：
     - `users_email_key` → `Conflict("email already exists")`
     - `users_username_key` → `Conflict("username already exists")`
-    - `entries_user_id_hashed_url_key` → `Conflict("URL already saved")`
+    - `idx_entries_user_hashed_url` → `Conflict("URL already saved")`（注意：这是 `CREATE UNIQUE INDEX` 创建的索引名，不是约束名）
     - 其他约束 → `Conflict("duplicate record")`
+  - 注意：`create_entry()` 中已有对 `idx_entries_user_hashed_url` 的处理（entry.rs:59-67），B5 主要是将此模式从各 model 函数提升到统一的 `From<sqlx::Error>` 实现中，并扩展到 users 表
   - 非约束 DB 错误仍为 `Internal`，但用 `tracing::error!` 记录完整错误链
 - 给高频 handler 添加 `#[tracing::instrument(skip(state), err)]`：
   - `create_entry`, `register`, `login`, `list_entries`
@@ -302,7 +291,7 @@
 **变更**:
 - 新建 `web/src/components/NetworkStatus.tsx`
   - 监听 `window` 的 `online`/`offline` 事件
-  - 离线时渲染顶部红色提示条："网络连接已断开，部分功能可能不可用"
+  - 离线时渲染顶部红色提示条："网络连接已断开，请检查网络后重试"
   - 恢复时自动隐藏（加 1 秒延迟显示"已恢复"绿色提示后消失）
   - 使用 fixed 定位，不影响页面布局
 - `Layout.tsx` 中在最顶层添加 `<NetworkStatus />`
@@ -321,6 +310,8 @@
   - `CREATE INDEX idx_entries_deleted ON entries (deleted_at) WHERE deleted_at IS NOT NULL`
 - `src/models/entry.rs`:
   - `list_entries()` 加 `WHERE deleted_at IS NULL`（默认不显示已删除）
+  - `find_entry_by_id()` 加 `AND deleted_at IS NULL`（防止通过 ID 直接访问已删除条目）
+  - `list_entries_by_ids()` 加 `AND deleted_at IS NULL`（搜索结果过滤）
   - `delete_entry()` 改为 `UPDATE entries SET deleted_at = now()`
   - 新增 `list_deleted_entries(pool, user_id)` — 回收站列表
   - 新增 `restore_entry(pool, entry_id, user_id)` — `SET deleted_at = NULL`
@@ -330,10 +321,25 @@
   - `GET /api/v1/entries?deleted=true` — 查看回收站
   - `POST /api/v1/entries/{id}/restore` — 恢复
   - `DELETE /api/v1/entries/{id}/permanent` — 永久删除
+- `src/api/feed.rs` — 三个 feed 查询（unread/starred/archive）加 `AND deleted_at IS NULL`
+- `src/api/export.rs` — `export_all` 的 entries 查询加 `AND deleted_at IS NULL`
+- `src/api/admin.rs` — reindex 时跳过 `deleted_at IS NOT NULL` 的条目
 - tantivy 索引：软删除时从索引中删除，恢复时重新索引
 - 不实现自动过期清理（YAGNI，用户手动永久删除即可）
 
-**文件**: `migrations/009_soft_delete.sql`（新建）, `src/models/entry.rs`, `src/api/entries.rs`
+**受影响的完整查询清单**（必须逐一验证）：
+| 函数 | 文件 | 需要加过滤 |
+|------|------|-----------|
+| `find_entry_by_id` | models/entry.rs | `AND deleted_at IS NULL` |
+| `list_entries` | models/entry.rs | `AND deleted_at IS NULL` |
+| `list_entries_by_ids` | models/entry.rs | `AND deleted_at IS NULL` |
+| `feed_unread` | api/feed.rs | `AND deleted_at IS NULL` |
+| `feed_starred` | api/feed.rs | `AND deleted_at IS NULL` |
+| `feed_archive` | api/feed.rs | `AND deleted_at IS NULL` |
+| `export_all` (entries) | api/export.rs | `AND deleted_at IS NULL` |
+| admin reindex | api/admin.rs | `WHERE deleted_at IS NULL` |
+
+**文件**: `migrations/009_soft_delete.sql`（新建）, `src/models/entry.rs`, `src/api/entries.rs`, `src/api/feed.rs`, `src/api/export.rs`, `src/api/admin.rs`
 
 ---
 
@@ -360,18 +366,25 @@
 **变更**:
 - 新增 migration `011_composite_indexes.sql`：
   ```sql
+  -- 先删除 003 migration 中的旧索引（被新 partial index 替代）
+  DROP INDEX IF EXISTS idx_entries_user_created;
+  DROP INDEX IF EXISTS idx_entries_user_archived;
+  DROP INDEX IF EXISTS idx_entries_user_starred;
+
   -- 未读列表（最高频查询）
   CREATE INDEX idx_entries_user_unread ON entries (user_id, created_at DESC)
       WHERE deleted_at IS NULL AND is_archived = false;
 
   -- 归档列表
-  CREATE INDEX idx_entries_user_archived ON entries (user_id, archived_at DESC)
+  CREATE INDEX idx_entries_user_archived_v2 ON entries (user_id, archived_at DESC)
       WHERE deleted_at IS NULL AND is_archived = true;
 
   -- 收藏列表
-  CREATE INDEX idx_entries_user_starred ON entries (user_id, starred_at DESC)
+  CREATE INDEX idx_entries_user_starred_v2 ON entries (user_id, starred_at DESC)
       WHERE deleted_at IS NULL AND is_starred = true;
   ```
+- 必须 DROP 旧索引：旧索引不含 `deleted_at IS NULL` 条件，B9 之后会返回已删除数据，且与新索引覆盖范围重叠导致索引膨胀
+- 新索引使用 `_v2` 后缀避免与旧索引同名
 - 使用 partial index（WHERE 条件）减少索引大小
 - 依赖 B9（deleted_at 字段），必须在 B9 之后
 
@@ -394,6 +407,9 @@
     - `http_request_duration_seconds{method, path}` — histogram
 - `src/tasks/fetcher.rs`:
   - `fetch_queue_depth` — gauge（队列当前深度）
+  - 注意：`mpsc::Sender` 没有 `len()` 方法，需在 `FetchQueue` 中新增 `Arc<AtomicUsize>` 字段跟踪深度
+  - `send()` 时 `fetch_add(1)`，worker 消费时 `fetch_sub(1)`
+  - metrics middleware 定期读取该值上报
 - `src/search.rs`:
   - `search_index_documents` — gauge（索引文档数，reindex 时更新）
 - 路径标准化：将 UUID 参数替换为 `{id}` 防止高基数
@@ -413,7 +429,6 @@ Plan A（全部独立，可并行开发）:
   A5 ─── 无依赖
   A6 ─── 无依赖
   A7 ─── 无依赖
-  A8 ─── 无依赖
 
 Plan B:
   B1 ─── 依赖 Plan A 完成（路由结构变更）
@@ -426,7 +441,7 @@ Plan B:
   B8 ─── 无依赖
   B9 ─── 依赖 B1（API 路径已迁移）
   B10 ── 无依赖
-  B11 ── 依赖 B9（需要 deleted_at 字段）
+  B11 ── 依赖 B9（需要 deleted_at 字段，且必须 DROP 旧索引）
   B12 ── 无依赖
 ```
 
@@ -441,7 +456,8 @@ Plan B:
 
 | 风险 | 影响 | 缓解 |
 |------|------|------|
-| B1 API 版本迁移遗漏路径 | 前端/扩展 404 | 全文搜索 `/api/` 确认无遗漏 |
-| B9 软删除影响现有查询 | 已删除数据仍出现在列表 | 所有 entry 查询加 `WHERE deleted_at IS NULL` |
+| B1 API 版本迁移遗漏路径 | 前端/扩展 404 | 全文搜索 `/api/` 确认无遗漏 + 301 重定向兜底 |
+| B9 软删除遗漏查询过滤 | 已删除数据通过搜索/feed/export 泄漏 | 按受影响查询清单逐一验证，集成测试覆盖 |
+| B11 DROP 旧索引影响查询性能 | 过渡期查询变慢 | 在同一 migration 中先 DROP 再 CREATE，原子执行 |
 | B2 validator 与现有 handler 签名冲突 | 编译错误 | 逐个 handler 替换，每次替换后 `cargo check` |
 | B12 metrics 高基数路径 | Prometheus 内存膨胀 | UUID 参数标准化为 `{id}` |
