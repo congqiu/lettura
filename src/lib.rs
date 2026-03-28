@@ -5,6 +5,7 @@ pub mod db;
 pub mod extract;
 pub mod metrics;
 pub mod models;
+pub mod rate_limit;
 pub mod search;
 pub mod spa;
 pub mod storage;

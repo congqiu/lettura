@@ -8,6 +8,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::auth::middleware::AppState;
 use crate::config::Config;
+use crate::rate_limit::{rate_limit_middleware, GlobalRateLimit};
 use crate::search::SearchIndex;
 use crate::tasks::fetcher;
 
@@ -159,6 +160,13 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::HeaderName::from_static("referrer-policy"),
             HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        // Global rate limiting: 100 requests per minute.
+        // Applied as the outermost layer so rate-limited requests are rejected
+        // early without consuming downstream resources.
+        .layer(axum::middleware::from_fn_with_state(
+            GlobalRateLimit::new(100),
+            rate_limit_middleware,
         ))
 }
 
