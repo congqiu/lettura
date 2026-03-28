@@ -91,6 +91,8 @@
   5. 成功：所有等待的请求用新 token 重试
   6. 失败：记录 `refreshFailedAt = Date.now()`，所有等待的请求统一跳转 login
 
+**注意**: 浏览器扩展（`background.js`, `popup.js`）中也有 token refresh 逻辑，存在类似竞态问题，但不在本次范围内（扩展端 TypeScript 迁移时统一处理）。
+
 **文件**: `web/src/api/client.ts`
 
 ---
@@ -102,11 +104,10 @@
 **变更**:
 - 新建 `web/src/components/ErrorBoundary.tsx`
   - React class component（getDerivedStateFromError + componentDidCatch）
-  - 渲染：错误信息 + "重新加载页面" 按钮（调用 `window.location.reload()`）
   - 支持 dark mode 样式
-- `App.tsx` 中：
-  - 在 `<BrowserRouter>` 外层包裹顶级 ErrorBoundary（捕获路由级崩溃）
-  - 在 `<Layout>` 的 `<Outlet />` 外层包裹页面级 ErrorBoundary（隔离单页面崩溃，不影响导航）
+- **两层策略，行为不同**：
+  - **顶级 ErrorBoundary**（`<BrowserRouter>` 外层，在 `<QueryClientProvider>` 外）：捕获路由级崩溃，渲染"重新加载页面"按钮（`window.location.reload()`）——此时应用状态已不可恢复
+  - **页面级 ErrorBoundary**（`<Layout>` 中 `<Outlet />` 外层）：隔离单页面崩溃，不影响导航。渲染错误信息 + "回到首页"按钮（用 `<a href="/">`导航，不是全页刷新），保留 QueryClient 缓存和导航栏
 
 **文件**: `web/src/components/ErrorBoundary.tsx`（新建）, `web/src/App.tsx`, `web/src/components/Layout.tsx`
 
@@ -121,7 +122,7 @@
   - `GET /api/health` — 无需认证
   - 检查项：
     - DB: 执行 `SELECT 1` 验证连接
-    - Search: 执行一次空搜索（如 `search("", 1)`）验证 searcher 正常工作。仅检查 `index.reader()` 不够——reader 在启动时已创建，不能反映索引实际状态
+    - Search: 通过 `reader.searcher()` 获取 searcher 后调用 `searcher.num_docs()` 返回索引文档数。空搜索不可行（tantivy QueryParser 对空字符串行为不确定），直接获取 doc count 既轻量又能验证索引可读
   - 响应格式：`{"status": "ok"|"degraded"|"error", "db": "ok"|"error: ...", "search": "ok"|"error: ..."}`
   - DB 或 search 任一失败返回 503，全部正常返回 200
 - `docker-compose.yml` 的 healthcheck 改为 `curl -f http://localhost:3000/api/health`
@@ -164,7 +165,7 @@
 - 前端 `client.ts` baseURL 从 `/api` 改为 `/api/v1`
 - 浏览器扩展中所有 API 路径加 `/v1` 前缀
 - Vite proxy 规则无需改动（`/api` 前缀不变）
-- 添加过渡期 301 重定向：旧路径 `/api/{path}` → `/api/v1/{path}`（方便旧版扩展或书签过渡）
+- 添加过渡期 301 重定向：旧路径 `/api/{path}` → `/api/v1/{path}`（方便旧版扩展或书签过渡），排除 `/api/health`（不走版本）
 
 **文件**: `src/main.rs`（或 `src/api/mod.rs`，视路由组织方式）, `web/src/api/client.ts`, `extension/background.js`, `extension/popup.js`
 
@@ -258,9 +259,8 @@
 - `App.tsx` 中对低频页面用 `React.lazy()`:
   - `const SettingsPage = lazy(() => import('./pages/SettingsPage'))`
   - `const MemosPage = lazy(() => import('./pages/MemosPage'))`
-  - `const EntryDetailPage = lazy(() => import('./pages/EntryDetailPage'))`
 - 在路由外层包裹 `<Suspense fallback={<div className="p-8 text-center">Loading...</div>}>`
-- 保持同步加载：`EntryListPage`, `LoginPage`, `RegisterPage`（首屏核心路径）
+- 保持同步加载：`EntryListPage`, `EntryDetailPage`, `LoginPage`, `RegisterPage`（`EntryDetailPage` 是列表→详情的高频路径，lazy 加载会导致点击闪烁）
 
 **文件**: `web/src/App.tsx`
 
@@ -339,6 +339,8 @@
 | `export_all` (entries) | api/export.rs | `AND deleted_at IS NULL` |
 | admin reindex | api/admin.rs | `WHERE deleted_at IS NULL` |
 
+注：tags 和 annotations 的 API 都先通过 `find_entry_by_id` 验证 entry 归属，该函数已加 `deleted_at IS NULL` 过滤，因此间接受保护，无需单独修改。
+
 **文件**: `migrations/009_soft_delete.sql`（新建）, `src/models/entry.rs`, `src/api/entries.rs`, `src/api/feed.rs`, `src/api/export.rs`, `src/api/admin.rs`
 
 ---
@@ -351,8 +353,9 @@
 - 新增 migration `010_gin_indexes.sql`：
   ```sql
   CREATE INDEX idx_entries_metadata ON entries USING GIN (metadata);
-  CREATE INDEX idx_tagging_rules_conditions ON tagging_rules USING GIN (conditions);
+  CREATE INDEX idx_tagging_rules_rule ON tagging_rules USING GIN (rule);
   ```
+- 注意：tagging_rules 的 JSONB 列名是 `rule`（不是 `conditions`，见 007 migration）
 - 纯 DDL 变更，不影响应用代码
 
 **文件**: `migrations/010_gin_indexes.sql`（新建）
@@ -398,9 +401,10 @@
 
 **变更**:
 - 新增依赖：`metrics`, `metrics-exporter-prometheus` (Cargo.toml，使用最新稳定版)
+- `src/config.rs`: 新增 `metrics_enabled: bool`（环境变量 `METRICS_ENABLED`，默认 `false`）
 - `src/main.rs`:
-  - 初始化 Prometheus recorder
-  - 注册 `GET /metrics` 端点（无需认证，建议生产环境网络限制）
+  - 仅当 `config.metrics_enabled == true` 时初始化 Prometheus recorder 和注册 `/metrics` 路由
+  - `GET /metrics` 端点无需认证
 - 新建 `src/middleware/metrics.rs`（或内联在 main.rs）:
   - Axum middleware layer，记录每个请求的：
     - `http_requests_total{method, path, status}` — counter
@@ -414,7 +418,7 @@
   - `search_index_documents` — gauge（索引文档数，reindex 时更新）
 - 路径标准化：将 UUID 参数替换为 `{id}` 防止高基数
 
-**文件**: `Cargo.toml`, `src/main.rs`, `src/tasks/fetcher.rs`, `src/search.rs`
+**文件**: `Cargo.toml`, `src/config.rs`, `src/main.rs`, `src/tasks/fetcher.rs`, `src/search.rs`
 
 ---
 
