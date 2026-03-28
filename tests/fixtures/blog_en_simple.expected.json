@@ -1,0 +1,14 @@
+{
+  "title": "Understanding Rust Ownership",
+  "textContent_contains": [
+    "ownership system is one of its most distinctive",
+    "Every value in Rust has a single owner",
+    "shared references",
+    "mutable references"
+  ],
+  "textContent_excludes": [
+    "Related Posts",
+    "Copyright 2026",
+    "analytics"
+  ]
+}

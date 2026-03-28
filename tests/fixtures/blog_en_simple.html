@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta property="og:title" content="Understanding Rust Ownership">
+    <meta name="author" content="Jane Smith">
+    <meta name="description" content="A deep dive into Rust's ownership system.">
+    <meta property="og:image" content="https://example.com/rust.jpg">
+    <title>Understanding Rust Ownership - Tech Blog</title>
+</head>
+<body>
+    <header>
+        <nav><a href="/">Home</a> <a href="/about">About</a></nav>
+    </header>
+    <main>
+        <article class="post-content">
+            <h1>Understanding Rust Ownership</h1>
+            <p class="meta">Published on Jan 1, 2026 by Jane Smith</p>
+            <p>Rust's ownership system is one of its most distinctive features. It enables memory safety without garbage collection, making Rust programs both fast and safe. In this article, we will explore the three rules of ownership and how they work together to prevent common bugs.</p>
+            <h2>The Three Rules</h2>
+            <p>Every value in Rust has a single owner. When the owner goes out of scope, the value is dropped. Ownership can be transferred through moves or shared through references. These simple rules eliminate entire categories of bugs at compile time, including use-after-free, double-free, and data races.</p>
+            <h2>Borrowing and References</h2>
+            <p>Instead of transferring ownership, you can create references to values. References come in two flavors: shared references (&amp;T) which allow multiple readers, and mutable references (&amp;mut T) which allow a single writer. The borrow checker enforces these rules at compile time, ensuring thread safety without runtime overhead.</p>
+            <p>Understanding these concepts is essential for writing idiomatic Rust code. While the learning curve can be steep, the safety guarantees are well worth the investment.</p>
+        </article>
+    </main>
+    <aside class="sidebar">
+        <h3>Related Posts</h3>
+        <ul>
+            <li><a href="/post1">Rust for Beginners</a></li>
+            <li><a href="/post2">Async Rust Guide</a></li>
+            <li><a href="/post3">Error Handling in Rust</a></li>
+        </ul>
+    </aside>
+    <footer>
+        <p>Copyright 2026 Tech Blog. All rights reserved.</p>
+    </footer>
+    <script>console.log('analytics');</script>
+</body>
+</html>
