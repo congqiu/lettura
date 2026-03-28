@@ -1,5 +1,6 @@
 use sqlx::PgPool;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{mpsc, Mutex};
@@ -18,10 +19,12 @@ pub struct FetchJob {
 #[derive(Clone)]
 pub struct FetchQueue {
     tx: mpsc::Sender<FetchJob>,
+    pub queue_depth: Arc<AtomicUsize>,
 }
 
 impl FetchQueue {
     pub async fn send(&self, job: FetchJob) -> Result<(), String> {
+        self.queue_depth.fetch_add(1, Ordering::Relaxed);
         self.tx.send(job).await.map_err(|e| e.to_string())
     }
 }
@@ -29,12 +32,14 @@ impl FetchQueue {
 pub fn start_fetch_worker(pool: PgPool, concurrency: usize, image_storage: Arc<dyn ImageStorage>) -> FetchQueue {
     let (tx, rx) = mpsc::channel::<FetchJob>(5000);
     let rx = Arc::new(Mutex::new(rx));
+    let queue_depth = Arc::new(AtomicUsize::new(0));
 
     for _ in 0..concurrency {
         let rx = rx.clone();
         let pool = pool.clone();
         let storage = image_storage.clone();
         let rate_limiter = Arc::new(Mutex::new(DomainRateLimiter::new()));
+        let depth = queue_depth.clone();
 
         tokio::spawn(async move {
             loop {
@@ -43,14 +48,17 @@ pub fn start_fetch_worker(pool: PgPool, concurrency: usize, image_storage: Arc<d
                     rx.recv().await
                 };
                 match job {
-                    Some(job) => { process_job(&pool, &rate_limiter, &storage, &job).await; }
+                    Some(job) => {
+                        process_job(&pool, &rate_limiter, &storage, &job).await;
+                        depth.fetch_sub(1, Ordering::Relaxed);
+                    }
                     None => break,
                 }
             }
         });
     }
 
-    FetchQueue { tx }
+    FetchQueue { tx, queue_depth }
 }
 
 async fn process_job(

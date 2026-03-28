@@ -47,6 +47,8 @@ chrono = { version = "0.4", features = ["serde"] }
 # Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
 
 # Storage (S3-compatible OSS)
 rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustls-tls"] }
