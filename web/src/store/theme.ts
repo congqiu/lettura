@@ -14,10 +14,19 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle('dark', isDark);
 }
 
-export const useThemeStore = create<ThemeState>((set) => {
+export const useThemeStore = create<ThemeState>((set, get) => {
   const saved = (localStorage.getItem('theme') as Theme) || 'system';
-  // Apply on load
   applyTheme(saved);
+
+  if (typeof window !== 'undefined') {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (get().theme === 'system') {
+        applyTheme('system');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+  }
 
   return {
     theme: saved,
