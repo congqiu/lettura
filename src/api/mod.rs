@@ -1,8 +1,10 @@
 use axum::{
+    http::HeaderValue,
     routing::{delete, get, patch, post},
     Router,
 };
 use sqlx::PgPool;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::auth::middleware::AppState;
 use crate::config::Config;
@@ -122,6 +124,22 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // SPA fallback
         .fallback(crate::spa::spa_handler)
         .with_state(state)
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("x-frame-options"),
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("x-xss-protection"),
+            HeaderValue::from_static("1; mode=block"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
 }
 
 async fn serve_storage(
