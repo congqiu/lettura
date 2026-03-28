@@ -7,7 +7,10 @@ async fn main() {
         .init();
 
     dotenvy::dotenv().ok();
-    let config = lettura::config::Config::from_env();
+    let config = lettura::config::Config::from_env().unwrap_or_else(|e| {
+        eprintln!("Configuration error: {e}");
+        std::process::exit(1);
+    });
 
     let pool = lettura::db::create_pool(&config.database_url).await;
     lettura::db::run_migrations(&pool).await;
