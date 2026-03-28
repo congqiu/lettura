@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=360, initial-scale=1.0">
+  <title>Lettura</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Lettura</h1>
+    </header>
+
+    <!-- Login Form -->
+    <div id="login-section" class="section hidden">
+      <div class="form-group">
+        <label for="server-url">Server URL</label>
+        <input type="url" id="server-url" placeholder="https://lettura.example.com" />
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="user@example.com" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Password" />
+      </div>
+      <button id="login-btn" class="btn btn-primary">Login</button>
+      <div id="login-error" class="message error hidden"></div>
+    </div>
+
+    <!-- Logged-in Section -->
+    <div id="main-section" class="section hidden">
+      <div id="server-info" class="server-info"></div>
+      <button id="save-btn" class="btn btn-primary">Save this page</button>
+      <div id="save-status" class="message hidden"></div>
+      <button id="logout-btn" class="btn btn-secondary">Logout</button>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading-section" class="section">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
