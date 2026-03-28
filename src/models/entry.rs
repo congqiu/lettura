@@ -47,17 +47,11 @@ pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Resu
     let hashed_given_url = hash_url(given_url);
     let domain_name = extract_domain(&url);
 
-    sqlx::query_as::<_, Entry>(
+    Ok(sqlx::query_as::<_, Entry>(
         "INSERT INTO entries (user_id, url, given_url, hashed_url, hashed_given_url, domain_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *"
     )
     .bind(user_id).bind(&url).bind(given_url).bind(&hashed_url).bind(&hashed_given_url).bind(&domain_name)
-    .fetch_one(pool).await
-    .map_err(|e| match e {
-        sqlx::Error::Database(ref db_err) if db_err.constraint() == Some("idx_entries_user_hashed_url") => {
-            ApiError::Conflict("URL already saved".to_string())
-        }
-        _ => ApiError::Internal(e.to_string()),
-    })
+    .fetch_one(pool).await?)
 }
 
 pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ApiError> {

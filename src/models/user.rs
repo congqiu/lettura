@@ -36,7 +36,7 @@ pub async fn create_user(
     let password_hash =
         password::hash_password(raw_password).map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    sqlx::query_as::<_, User>(
+    Ok(sqlx::query_as::<_, User>(
         r#"
         INSERT INTO users (username, email, password_hash, is_admin)
         VALUES ($1, $2, $3, $4)
@@ -48,13 +48,7 @@ pub async fn create_user(
     .bind(&password_hash)
     .bind(is_admin)
     .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::Database(ref db_err) if db_err.constraint().is_some() => {
-            ApiError::Conflict("username or email already exists".to_string())
-        }
-        _ => ApiError::Internal(e.to_string()),
-    })
+    .await?)
 }
 
 pub async fn find_user_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, ApiError> {

@@ -47,6 +47,24 @@ impl IntoResponse for ApiError {
 
 impl From<sqlx::Error> for ApiError {
     fn from(e: sqlx::Error) -> Self {
-        ApiError::Internal(e.to_string())
+        match &e {
+            sqlx::Error::Database(db_err) => {
+                if let Some(constraint) = db_err.constraint() {
+                    let msg = match constraint {
+                        "users_email_key" => "email already exists",
+                        "users_username_key" => "username already exists",
+                        "idx_entries_user_hashed_url" => "URL already saved",
+                        _ => "duplicate record",
+                    };
+                    return ApiError::Conflict(msg.to_string());
+                }
+                tracing::error!("database error: {e}");
+                ApiError::Internal("internal server error".to_string())
+            }
+            _ => {
+                tracing::error!("database error: {e}");
+                ApiError::Internal("internal server error".to_string())
+            }
+        }
     }
 }
