@@ -12,7 +12,7 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let pool = lettura::db::create_pool(&config.database_url).await;
+    let pool = lettura::db::create_pool(&config).await;
     lettura::db::run_migrations(&pool).await;
 
     let app = lettura::api::router(pool.clone(), config.clone());

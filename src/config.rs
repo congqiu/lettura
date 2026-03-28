@@ -16,6 +16,10 @@ pub struct Config {
     pub oss_access_key: String,
     pub oss_secret_key: String,
     pub oss_public_url: String,         // custom public URL prefix (optional)
+    // DB connection pool
+    pub db_max_connections: u32,
+    pub db_min_connections: u32,
+    pub db_acquire_timeout_secs: u64,
 }
 
 impl Config {
@@ -47,6 +51,9 @@ impl Config {
             oss_access_key: env::var("OSS_ACCESS_KEY").unwrap_or_default(),
             oss_secret_key: env::var("OSS_SECRET_KEY").unwrap_or_default(),
             oss_public_url: env::var("OSS_PUBLIC_URL").unwrap_or_default(),
+            db_max_connections: env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
+            db_min_connections: env::var("DB_MIN_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
+            db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
         })
     }
 }
@@ -81,6 +88,9 @@ mod tests {
             env::remove_var("OSS_ACCESS_KEY");
             env::remove_var("OSS_SECRET_KEY");
             env::remove_var("OSS_PUBLIC_URL");
+            env::remove_var("DB_MAX_CONNECTIONS");
+            env::remove_var("DB_MIN_CONNECTIONS");
+            env::remove_var("DB_ACQUIRE_TIMEOUT");
         }
     }
 

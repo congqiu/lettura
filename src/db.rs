@@ -1,10 +1,14 @@
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-pub async fn create_pool(database_url: &str) -> PgPool {
+use crate::config::Config;
+
+pub async fn create_pool(config: &Config) -> PgPool {
     PgPoolOptions::new()
-        .max_connections(10)
-        .connect(database_url)
+        .max_connections(config.db_max_connections)
+        .min_connections(config.db_min_connections)
+        .acquire_timeout(std::time::Duration::from_secs(config.db_acquire_timeout_secs))
+        .connect(&config.database_url)
         .await
         .expect("failed to connect to database")
 }

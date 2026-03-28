@@ -46,6 +46,9 @@ impl TestApp {
             oss_access_key: String::new(),
             oss_secret_key: String::new(),
             oss_public_url: String::new(),
+            db_max_connections: 10,
+            db_min_connections: 2,
+            db_acquire_timeout_secs: 30,
         };
 
         let app = lettura::api::router_with_search(
