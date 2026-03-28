@@ -16,6 +16,7 @@ pub mod entries;
 pub mod error;
 pub mod export;
 pub mod feed;
+pub mod health;
 pub mod import;
 pub mod memos;
 pub mod site_rules;
@@ -43,6 +44,8 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
     };
 
     Router::new()
+        // Health (no auth required)
+        .route("/api/health", get(health::health_check))
         // Auth
         .route("/api/auth/register", post(auth::register))
         .route("/api/auth/login", post(auth::login))

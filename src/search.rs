@@ -149,6 +149,12 @@ impl SearchIndex {
         Ok(ids)
     }
 
+    /// Return the number of documents in the index (for health checks)
+    pub fn doc_count(&self) -> Result<u64, tantivy::TantivyError> {
+        let searcher = self.reader.searcher();
+        Ok(searcher.num_docs())
+    }
+
     /// Clear index and rebuild from scratch
     pub async fn clear(&self) -> Result<(), tantivy::TantivyError> {
         let mut writer = self.writer.lock().await;
