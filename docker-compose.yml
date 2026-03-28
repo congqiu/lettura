@@ -1,0 +1,35 @@
+services:
+  lettura:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://lettura:lettura@postgres:5432/lettura
+      JWT_SECRET: change-me-in-production
+      LISTEN_ADDR: 0.0.0.0:3000
+      INDEX_PATH: /data/tantivy
+    volumes:
+      - lettura_data:/data/tantivy
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lettura
+      POSTGRES_PASSWORD: lettura
+      POSTGRES_DB: lettura
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lettura"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  lettura_data:
+  postgres_data:

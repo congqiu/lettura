@@ -1,0 +1,9 @@
+/target
+.env
+.syncthing.*
+*.sync-conflict-*
+web/node_modules
+web/dist/*
+!web/dist/.gitkeep
+.claude/worktrees/
+lettura-bin*
