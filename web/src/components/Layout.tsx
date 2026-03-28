@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { logout as apiLogout } from '../api/auth';
+import ErrorBoundary from './ErrorBoundary';
 import ThemeToggle from './ThemeToggle';
 
 export default function Layout() {
@@ -44,7 +45,9 @@ export default function Layout() {
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-6">
-        <Outlet />
+        <ErrorBoundary level="page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );
