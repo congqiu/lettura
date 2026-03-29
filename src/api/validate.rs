@@ -3,11 +3,13 @@ use axum::extract::FromRequest;
 use axum::http::Request;
 use axum::Json;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use validator::Validate;
 
 use super::error::ApiError;
 
 /// Axum extractor that deserializes JSON and validates with the `validator` crate.
+/// Returns structured field-level errors via `ApiError::Validation`.
 pub struct ValidatedJson<T>(pub T);
 
 impl<S, T> FromRequest<S> for ValidatedJson<T>
@@ -27,22 +29,20 @@ where
             .map_err(|e| ApiError::BadRequest(e.body_text()))?;
 
         value.validate().map_err(|e| {
-            let messages: Vec<String> = e
-                .field_errors()
-                .into_iter()
-                .map(|(field, errors)| {
-                    let msgs: Vec<String> = errors
-                        .iter()
-                        .filter_map(|err| err.message.as_ref().map(|m| m.to_string()))
-                        .collect();
-                    if msgs.is_empty() {
-                        format!("{field}: validation failed")
-                    } else {
-                        format!("{field}: {}", msgs.join(", "))
-                    }
-                })
-                .collect();
-            ApiError::BadRequest(messages.join("; "))
+            let mut fields: HashMap<String, Vec<String>> = HashMap::new();
+            for (field, errors) in e.field_errors() {
+                let msgs: Vec<String> = errors
+                    .iter()
+                    .map(|err| {
+                        err.message
+                            .as_ref()
+                            .map(|m| m.to_string())
+                            .unwrap_or_else(|| "validation failed".to_string())
+                    })
+                    .collect();
+                fields.insert(field.to_string(), msgs);
+            }
+            ApiError::Validation(fields)
         })?;
 
         Ok(ValidatedJson(value))

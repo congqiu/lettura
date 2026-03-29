@@ -130,6 +130,6 @@ pub async fn regenerate_feed_token(pool: &PgPool, user_id: Uuid) -> Result<Strin
 
 fn generate_feed_token() -> String {
     use rand::Rng;
-    let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen::<u8>()).collect();
+    let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().r#gen::<u8>()).collect();
     hex::encode(bytes)
 }

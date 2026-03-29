@@ -51,7 +51,7 @@ impl TestApp {
             db_acquire_timeout_secs: 30,
         };
 
-        let app = lettura::api::router_with_search(
+        let (app, _, _) = lettura::api::router_with_search(
             pool.clone(),
             config.clone(),
             Some(search_index.clone()),

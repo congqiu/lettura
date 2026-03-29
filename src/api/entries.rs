@@ -9,7 +9,13 @@ use crate::models::entry::{self, ListParams, UpdateEntryParams};
 use crate::tasks::fetcher::FetchJob;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #[derive(serde::Deserialize)]
+=======
+use super::validate::ValidatedJson;
+
+#[derive(Debug, serde::Deserialize)]
+>>>>>>> 90aaa72 (fix: compilation fixes from Docker test run)
 pub struct ListQueryParams {
     #[serde(flatten)]
     pub inner: ListParams,

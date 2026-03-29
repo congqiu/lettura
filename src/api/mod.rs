@@ -28,7 +28,13 @@ pub mod tags;
 pub mod validate;
 
 pub fn router(pool: PgPool, config: Config) -> Router {
-    router_with_search(pool, config, None)
+    router_with_search(pool, config, None).0
+}
+
+/// Build router and return handles to internal components for metrics/monitoring.
+pub fn router_with_handles(pool: PgPool, config: Config) -> (Router, SearchIndex, fetcher::FetchQueue) {
+    let (router, search, fq) = router_with_search(pool, config, None);
+    (router, search, fq)
 }
 
 /// Redirect handler for legacy `/api/{path}` routes.
@@ -45,13 +51,16 @@ async fn api_redirect(
     )
 }
 
-pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> Router {
+pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> (Router, SearchIndex, fetcher::FetchQueue) {
     let search_index = search.unwrap_or_else(|| {
         SearchIndex::open(std::path::Path::new(&config.index_path))
             .expect("failed to open search index")
     });
     let storage: std::sync::Arc<dyn crate::storage::ImageStorage> = std::sync::Arc::from(crate::storage::create_storage(&config));
     let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone());
+
+    let search_clone = search_index.clone();
+    let fq_clone = fetch_queue.clone();
 
     let state = AppState {
         pool,
@@ -61,15 +70,25 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         storage,
     };
 
-    Router::new()
-        // Health (no auth required, no version prefix)
-        .route("/api/health", get(health::health_check))
-        // Auth
+    // Auth routes with strict rate limiting (10 req/min for brute-force protection)
+    let auth_public = Router::new()
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/login", post(auth::login))
+        .with_state(state.clone())
+        .layer(axum::middleware::from_fn_with_state(
+            GlobalRateLimit::new(10),
+            rate_limit_middleware,
+        ));
+
+    let router = Router::new()
+        // Health (no auth required, no version prefix)
+        .route("/api/health", get(health::health_check))
+        // Auth (other endpoints — normal rate limit)
         .route("/api/v1/auth/refresh", post(auth::refresh))
         .route("/api/v1/auth/logout", post(auth::logout))
         .route("/api/v1/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
+        // Merge auth public routes with strict rate limit
+        .merge(auth_public)
         // Entries
         .route(
             "/api/v1/entries",
@@ -167,7 +186,9 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .layer(axum::middleware::from_fn_with_state(
             GlobalRateLimit::new(100),
             rate_limit_middleware,
-        ))
+        ));
+
+    (router, search_clone, fq_clone)
 }
 
 async fn serve_storage(
