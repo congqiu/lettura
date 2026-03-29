@@ -23,3 +23,18 @@ async fn responses_include_security_headers() {
     );
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn cors_headers_present() {
+    let app = common::TestApp::new().await;
+    let res = app
+        .client
+        .request(reqwest::Method::OPTIONS, app.url("/api/v1/entries"))
+        .header("Origin", "http://example.com")
+        .header("Access-Control-Request-Method", "GET")
+        .send()
+        .await
+        .unwrap();
+    assert!(res.headers().get("access-control-allow-origin").is_some());
+    app.cleanup().await;
+}

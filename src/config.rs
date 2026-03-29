@@ -20,6 +20,8 @@ pub struct Config {
     pub db_max_connections: u32,
     pub db_min_connections: u32,
     pub db_acquire_timeout_secs: u64,
+    // CORS
+    pub cors_origins: String,
     // Metrics
     pub metrics_enabled: bool,
 }
@@ -56,6 +58,7 @@ impl Config {
             oss_access_key: env::var("OSS_ACCESS_KEY").unwrap_or_default(),
             oss_secret_key: env::var("OSS_SECRET_KEY").unwrap_or_default(),
             oss_public_url: env::var("OSS_PUBLIC_URL").unwrap_or_default(),
+<<<<<<< HEAD
             db_max_connections: env::var("DB_MAX_CONNECTIONS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -72,6 +75,13 @@ impl Config {
                 .ok()
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
+=======
+            db_max_connections: env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
+            db_min_connections: env::var("DB_MIN_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
+            db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
+            cors_origins: env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string()),
+            metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
+>>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
         })
     }
 }
@@ -109,6 +119,11 @@ mod tests {
             env::remove_var("DB_MAX_CONNECTIONS");
             env::remove_var("DB_MIN_CONNECTIONS");
             env::remove_var("DB_ACQUIRE_TIMEOUT");
+<<<<<<< HEAD
+=======
+            env::remove_var("CORS_ORIGINS");
+            env::remove_var("METRICS_ENABLED");
+>>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
         }
     }
 

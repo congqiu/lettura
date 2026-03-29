@@ -1,9 +1,10 @@
 use axum::{
-    http::HeaderValue,
+    http::{HeaderValue, Method},
     routing::{delete, get, patch, post},
     Router,
 };
 use sqlx::PgPool;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::auth::middleware::AppState;
@@ -164,6 +165,21 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // SPA fallback
         .fallback(crate::spa::spa_handler)
         .with_state(state)
+        // CORS
+        .layer({
+            let cors = CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::OPTIONS])
+                .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]);
+            if config.cors_origins == "*" {
+                cors.allow_origin(Any)
+            } else {
+                let origins: Vec<HeaderValue> = config.cors_origins
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                cors.allow_origin(origins)
+            }
+        })
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::HeaderName::from_static("x-content-type-options"),
             HeaderValue::from_static("nosniff"),
