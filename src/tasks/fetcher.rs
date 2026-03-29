@@ -70,8 +70,11 @@ async fn process_job(
     image_storage: &Arc<dyn ImageStorage>,
     job: &FetchJob,
 ) {
+    tracing::debug!(entry_id = %job.entry_id, url = %job.url, "fetch job started");
+
     if let Some(domain) = entry::extract_domain(&job.url) {
         let mut rl = rate_limiter.lock().await;
+        tracing::debug!(domain = %domain, "rate limiting domain");
         rl.wait_if_needed(&domain).await;
     }
 
@@ -99,8 +102,10 @@ async fn process_job(
                             result.author.as_deref(), Some(result.reading_time as i32),
                             status, "readability",
                         ).await.ok();
+                        tracing::debug!(entry_id = %job.entry_id, "fetch job completed");
                     }
                     Err(_) => {
+                        tracing::warn!(entry_id = %job.entry_id, "content extraction failed");
                         entry::update_entry_content(pool, job.entry_id, None, None, None, None, None, None, None, status, "failed").await.ok();
                     }
                 },
@@ -110,6 +115,7 @@ async fn process_job(
             }
         }
         Err(_) => {
+            tracing::warn!(entry_id = %job.entry_id, url = %job.url, "fetch HTTP error");
             entry::update_entry_content(pool, job.entry_id, None, None, None, None, None, None, None, 0, "failed").await.ok();
         }
     }

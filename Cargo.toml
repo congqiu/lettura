@@ -67,6 +67,7 @@ mime_guess = "2"
 # Search
 tantivy = "0.22"
 tempfile = "3"
+zip = "2"
 
 # Config
 dotenvy = "0.15"

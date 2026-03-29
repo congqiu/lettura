@@ -61,4 +61,18 @@ impl ImageStorage for OssStorage {
             .map_err(|e| StorageError::Upload(e.to_string()))?;
         Ok(())
     }
+
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        match self.bucket.get_object(key).await {
+            Ok(data) => Ok(Some(data.to_vec())),
+            Err(e) => {
+                let msg = e.to_string().to_lowercase();
+                if msg.contains("no such key") || msg.contains("not found") || msg.contains("404") {
+                    Ok(None)
+                } else {
+                    Err(StorageError::Io(e.to_string()))
+                }
+            }
+        }
+    }
 }

@@ -58,6 +58,7 @@ pub async fn register(
     let new_user =
         user::create_user(&state.pool, &req.username, &req.email, &req.password, is_admin).await?;
 
+    tracing::info!(user_id = %new_user.id, "user registered");
     issue_tokens(&state, new_user.id, new_user.is_admin).await
 }
 
@@ -73,6 +74,7 @@ pub async fn login(
     password::verify_password(&req.password, &found.password_hash)
         .map_err(|_| ApiError::Unauthorized("invalid credentials".to_string()))?;
 
+    tracing::info!(user_id = %found.id, "user logged in");
     issue_tokens(&state, found.id, found.is_admin).await
 }
 

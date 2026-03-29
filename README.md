@@ -1,43 +1,79 @@
 # Lettura
 
-> 意大利语"阅读" — 一个轻量级自托管 read-it-later 应用
+> 一个轻量级、自托管的 read-it-later 应用，受 wallabag 启发。Rust 后端 + React 前端，单容器部署。
 
-受 [wallabag](https://github.com/wallabag/wallabag) 启发，用 Rust 重新构建核心功能，追求极低资源占用和简单部署。
+## Features
 
-## 项目状态
+- 保存网页文章，自动提取正文内容
+- 全文搜索（tantivy 引擎）
+- 标签管理和自动标签规则
+- 文章高亮标注
+- 快速收集（Memo）并可提升为文章
+- 浏览器扩展一键保存
+- Wallabag/浏览器书签导入
+- RSS 订阅输出
+- 响应式 Web 界面 + 内容编辑器
+- 管理员备份/恢复
+- Prometheus 指标（可选）
 
-🚧 **早期开发中** — 目前处于内容提取引擎 PoC 验证阶段
+## Quick Start
 
-## 核心功能（规划中）
+### Docker Compose (推荐)
 
-- URL 保存 + 智能内容提取（多层兜底策略）
-- 文章内容可编辑
-- 归档 / 收藏 / 标签管理
-- 注释与高亮
-- 全文搜索（tantivy）
-- 快速捕获收集箱（Memo）
-- 自动打标签规则
-- RSS Feed 输出
-- wallabag 数据导入 / 导出
-- 浏览器扩展（Chrome/Firefox）
-- PWA 移动端适配
-
-## 技术架构
-
-```
-Rust (Axum) 单体服务
-├── REST API
-├── 内嵌 React SPA
-├── 后台抓取队列
-├── tantivy 全文搜索
-└── PostgreSQL
+1. 创建 `.env` 文件：
+```bash
+JWT_SECRET=your-secret-key-at-least-32-characters-long
 ```
 
-## 文档
+2. 启动：
+```bash
+docker compose up -d
+```
 
-- [设计规格](docs/specs/2026-03-28-lettura-design.md)
-- [实施计划 1: 内容提取 PoC](docs/plans/2026-03-28-plan1-extraction-poc.md)
+3. 访问 http://localhost:3000，注册第一个用户（自动成为管理员）
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `DATABASE_URL` | 必填 | PostgreSQL 连接字符串 |
+| `JWT_SECRET` | 必填 | JWT 签名密钥（至少 32 字符） |
+| `LISTEN_ADDR` | `0.0.0.0:3000` | HTTP 监听地址 |
+| `STORAGE_TYPE` | `local` | 图片存储类型（local/oss） |
+| `CORS_ORIGINS` | `*` | CORS 允许来源（逗号分隔或 *） |
+| `METRICS_ENABLED` | `false` | 启用 Prometheus 指标 |
+| `DB_MAX_CONNECTIONS` | `10` | 数据库最大连接数 |
+
+更多配置见 `.env.example`。
+
+## Browser Extension
+
+支持 Chrome 和 Firefox（Manifest V3）。在 `extension/` 目录中加载为开发扩展，配置服务器地址后即可使用。
+
+## API
+
+所有 API 路径以 `/api/v1/` 为前缀，使用 JWT Bearer 认证。
+
+详细 API 文档见 [docs/api.md](docs/api.md)。
+
+## Development
+
+```bash
+# 后端
+cargo test
+
+# 前端
+cd web && npm install && npm run dev
+
+# Docker 构建
+docker build -t lettura .
+```
+
+## Tech Stack
+
+**后端:** Rust, Axum, SQLx, PostgreSQL, tantivy, scraper, ammonia
+**前端:** React 19, TypeScript, Vite, Tailwind CSS, Tiptap, TanStack Query
 
 ## License
 
-MIT
+[MIT](LICENSE)

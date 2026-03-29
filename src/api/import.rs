@@ -70,6 +70,7 @@ pub async fn import_wallabag(
         }
     }
 
+    tracing::info!(imported = imported, skipped = skipped, total = entries.len(), "wallabag import completed");
     Ok(Json(serde_json::json!({
         "imported": imported,
         "skipped": skipped,
@@ -124,6 +125,7 @@ pub async fn import_browser(
         }
     }
 
+    tracing::info!(imported = imported, skipped = skipped, "browser import completed");
     Ok(Json(serde_json::json!({
         "imported": imported,
         "skipped": skipped

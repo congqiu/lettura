@@ -16,6 +16,7 @@ use crate::tasks::fetcher;
 pub mod admin;
 pub mod annotations;
 pub mod auth;
+pub mod backup;
 pub mod entries;
 pub mod error;
 pub mod export;
@@ -26,6 +27,8 @@ pub mod memos;
 pub mod site_rules;
 pub mod tagging_rules;
 pub mod tags;
+pub mod pages;
+pub mod pages_public;
 pub mod validate;
 
 pub fn router(pool: PgPool, config: Config) -> Router {
@@ -88,6 +91,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/auth/refresh", post(auth::refresh))
         .route("/api/v1/auth/logout", post(auth::logout))
         .route("/api/v1/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
+        .route("/api/v1/auth/change-password", post(auth::change_password))
         // Merge auth public routes with strict rate limit
         .merge(auth_public)
         // Entries
@@ -106,6 +110,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/entries/{id}/permanent", delete(entries::permanently_delete_entry))
         // Tags
         .route("/api/v1/tags", get(tags::list_tags))
+        .route("/api/v1/entries/{id}/tags", get(tags::list_tags_for_entry))
         .route("/api/v1/entries/{id}/tags", post(tags::add_tag_to_entry))
         .route(
             "/api/v1/entries/{entry_id}/tags/{tag_id}",
@@ -157,12 +162,30 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // Admin
         .route("/api/v1/admin/users", get(admin::list_users))
         .route("/api/v1/admin/reindex", post(admin::reindex))
+        .route("/api/v1/admin/backup", get(backup::backup))
+        .route("/api/v1/admin/restore", post(backup::restore))
+        .route("/api/v1/pages/upload", post(pages::upload_files))
+        .route("/api/v1/pages", get(pages::list_pages_handler).post(pages::create_page_handler))
+        .route("/api/v1/pages/{id}", patch(pages::update_page_handler).delete(pages::delete_page_handler))
+        .route("/api/v1/pages/{id}/restore", post(pages::restore_page_handler))
         // Local storage file serving
         .route("/storage/{*path}", get(serve_storage))
         // Legacy API redirect: /api/{path} -> /api/v1/{path} (301)
         // Note: /api/health is a more specific route and takes priority over this catch-all
         .route("/api/{*path}", get(api_redirect).post(api_redirect).patch(api_redirect).delete(api_redirect))
-        // SPA fallback
+        .nest("/p", {
+            let page_router = Router::new()
+                .route("/{slug}", get(pages_public::serve_page))
+                .route("/{slug}/*file", get(pages_public::serve_page_file))
+                .route("/{slug}/auth", post(pages_public::auth_page))
+                .with_state(state.clone());
+            page_router.layer(
+                SetResponseHeaderLayer::overriding(
+                    axum::http::header::HeaderName::from_static("x-frame-options"),
+                    HeaderValue::from_static("SAMEORIGIN"),
+                )
+            )
+        })
         .fallback(crate::spa::spa_handler)
         .with_state(state)
         // CORS
@@ -184,7 +207,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             axum::http::header::HeaderName::from_static("x-content-type-options"),
             HeaderValue::from_static("nosniff"),
         ))
-        .layer(SetResponseHeaderLayer::overriding(
+        .layer(SetResponseHeaderLayer::if_not_present(
             axum::http::header::HeaderName::from_static("x-frame-options"),
             HeaderValue::from_static("DENY"),
         ))

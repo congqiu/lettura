@@ -42,4 +42,36 @@ impl ImageStorage for LocalStorage {
             .map_err(|e| StorageError::Io(e.to_string()))?;
         Ok(())
     }
+
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        let file_path = self.base_path.join(key);
+        match tokio::fs::read(&file_path).await {
+            Ok(data) => Ok(Some(data)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(StorageError::Io(e.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_store_and_get() {
+        let dir = TempDir::new().unwrap();
+        let storage = LocalStorage::new(dir.path().to_str().unwrap());
+        storage.store("test/hello.txt", b"hello world", "text/plain").await.unwrap();
+        let data = storage.get("test/hello.txt").await.unwrap();
+        assert_eq!(data, Some(b"hello world".to_vec()));
+    }
+
+    #[tokio::test]
+    async fn test_get_nonexistent() {
+        let dir = TempDir::new().unwrap();
+        let storage = LocalStorage::new(dir.path().to_str().unwrap());
+        let data = storage.get("nope.txt").await.unwrap();
+        assert!(data.is_none());
+    }
 }

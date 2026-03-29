@@ -39,12 +39,15 @@ pub async fn rate_limit_middleware(
 ) -> Response {
     match rate_limit.limiter.check() {
         Ok(_) => next.run(req).await,
-        Err(_) => (
-            StatusCode::TOO_MANY_REQUESTS,
-            [(axum::http::header::RETRY_AFTER, "60")],
-            "rate limit exceeded",
-        )
-            .into_response(),
+        Err(_) => {
+            tracing::warn!("rate limit exceeded");
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(axum::http::header::RETRY_AFTER, "60")],
+                "rate limit exceeded",
+            )
+                .into_response()
+        }
     }
 }
 

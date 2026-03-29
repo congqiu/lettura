@@ -18,6 +18,7 @@ pub trait ImageStorage: Send + Sync {
     async fn store(&self, key: &str, data: &[u8], content_type: &str) -> Result<String, StorageError>;
     /// Delete a stored image
     async fn delete(&self, key: &str) -> Result<(), StorageError>;
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StorageError>;
 }
 
 /// Create storage backend based on config
@@ -57,23 +58,47 @@ pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError
     Ok((data.to_vec(), content_type))
 }
 
-/// Generate storage key from URL (hash-based)
-pub fn image_key_from_url(url: &str) -> String {
+/// Generate storage key from URL and actual content type.
+/// Prefers actual content_type over URL extension when available.
+pub fn image_key_from_url(url: &str, content_type: Option<&str>) -> String {
     use sha2::{Digest, Sha256};
     let hash = hex::encode(Sha256::digest(url.as_bytes()));
-    let ext = url
-        .rsplit('.')
-        .next()
-        .and_then(|e| {
-            let e = e.split('?').next().unwrap_or(e);
-            if ["jpg", "jpeg", "png", "gif", "webp", "svg", "ico"].contains(&e) {
-                Some(e)
-            } else {
-                None
-            }
-        })
+    // Use content-type derived extension if available, otherwise fall back to URL extension
+    let ext = content_type
+        .and_then(|ct| mime_to_ext(ct))
+        .or_else(|| url_extension(url))
         .unwrap_or("jpg");
     format!("images/{}.{}", &hash[..16], ext)
+}
+
+/// Convert MIME type to file extension
+fn mime_to_ext(content_type: &str) -> Option<&'static str> {
+    match content_type.split(';').next()?.trim() {
+        "image/svg+xml" => Some("svg"),
+        "image/png" => Some("png"),
+        "image/gif" => Some("gif"),
+        "image/webp" => Some("webp"),
+        "image/jpeg" | "image/jpg" => Some("jpg"),
+        "image/avif" => Some("avif"),
+        "image/x-icon" | "image/vnd.microsoft.icon" => Some("ico"),
+        _ => None,
+    }
+}
+
+/// Extract extension from URL
+fn url_extension(url: &str) -> Option<&'static str> {
+    let ext = url.rsplit(|c| c == '?' || c == '#').next()?;
+    let ext = ext.trim_end_matches(|c| c == '/' || c == '.');
+    match ext.to_ascii_lowercase().as_str() {
+        "jpg" | "jpeg" => Some("jpg"),
+        "png" => Some("png"),
+        "gif" => Some("gif"),
+        "webp" => Some("webp"),
+        "svg" => Some("svg"),
+        "ico" => Some("ico"),
+        "avif" => Some("avif"),
+        _ => None,
+    }
 }
 
 /// Process HTML content: download all images and rewrite URLs
@@ -100,7 +125,7 @@ pub async fn process_images(
     for url in &img_urls {
         match download_image(url).await {
             Ok((data, content_type)) => {
-                let key = image_key_from_url(url);
+                let key = image_key_from_url(url, Some(&content_type));
                 match storage.store(&key, &data, &content_type).await {
                     Ok(new_url) => {
                         result = result.replace(url, &new_url);

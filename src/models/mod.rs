@@ -5,3 +5,4 @@ pub mod site_rule;
 pub mod tag;
 pub mod tagging_rule;
 pub mod user;
+pub mod page;

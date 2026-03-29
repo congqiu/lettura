@@ -1,0 +1,85 @@
+import api from './client';
+
+export interface PageSummary {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  has_password: boolean;
+  status: string;
+  file_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PageListResponse {
+  items: PageSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UploadResponse {
+  upload_id: string;
+  html_files: string[];
+  default_entry: string;
+  suggested_title: string;
+  file_count: number;
+}
+
+export interface CreatePageResponse {
+  id: string;
+  slug: string;
+  title: string;
+  url: string;
+  created_at: string;
+}
+
+export async function uploadFiles(files: File[]): Promise<UploadResponse> {
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+  const res = await api.post('/pages/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+export async function createPage(data: {
+  upload_id: string;
+  entry_file: string;
+  title: string;
+  description?: string;
+  password?: string;
+}): Promise<CreatePageResponse> {
+  const res = await api.post('/pages', data);
+  return res.data;
+}
+
+export async function listPages(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PageListResponse> {
+  const res = await api.get('/pages', { params });
+  return res.data;
+}
+
+export async function updatePage(
+  id: string,
+  data: {
+    title?: string;
+    description?: string;
+    password?: string | null;
+    status?: string;
+  }
+): Promise<void> {
+  await api.patch(`/pages/${id}`, data);
+}
+
+export async function deletePage(id: string): Promise<void> {
+  await api.delete(`/pages/${id}`);
+}
+
+export async function restorePage(id: string): Promise<void> {
+  await api.post(`/pages/${id}/restore`);
+}

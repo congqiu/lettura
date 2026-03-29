@@ -40,6 +40,7 @@ impl TestApp {
             index_path: "/tmp/lettura-test-index".to_string(),
             storage_type: "local".to_string(),
             storage_local_path: "/tmp/lettura-test-storage".to_string(),
+            pages_storage_path: "/tmp/lettura-test-pages".to_string(),
             oss_endpoint: String::new(),
             oss_region: "auto".to_string(),
             oss_bucket: String::new(),

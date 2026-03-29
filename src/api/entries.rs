@@ -41,6 +41,7 @@ pub async fn create_entry(
 ) -> Result<Json<entry::Entry>, ApiError> {
     let new_entry = entry::create_entry(&state.pool, auth.user_id, &req.url).await?;
     let _ = state.fetch_queue.send(FetchJob { entry_id: new_entry.id, url: new_entry.url.clone() }).await;
+    tracing::info!(entry_id = %new_entry.id, url = %req.url, "entry created");
     Ok(Json(new_entry))
 }
 
@@ -106,6 +107,7 @@ pub async fn delete_entry(
     }
     // Remove from search index on soft delete
     let _ = state.search_index.delete(entry_id).await;
+    tracing::info!(entry_id = %entry_id, "entry soft-deleted");
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 
@@ -125,6 +127,7 @@ pub async fn restore_entry(
             restored.domain_name.as_deref().unwrap_or(""),
         ).await;
     }
+    tracing::info!(entry_id = %entry_id, "entry restored");
     Ok(Json(serde_json::json!({"message": "restored"})))
 }
 
@@ -136,6 +139,7 @@ pub async fn permanently_delete_entry(
     entry::permanently_delete_entry(&state.pool, entry_id, auth.user_id).await?;
     // Ensure removed from search index
     let _ = state.search_index.delete(entry_id).await;
+    tracing::info!(entry_id = %entry_id, "entry permanently deleted");
     Ok(Json(serde_json::json!({"message": "permanently deleted"})))
 }
 

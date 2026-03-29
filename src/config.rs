@@ -7,8 +7,14 @@ pub struct Config {
     pub listen_addr: String,
     pub index_path: String,
     // Storage
+<<<<<<< HEAD
     pub storage_type: String,       // "local" or "oss"
     pub storage_local_path: String, // local storage directory
+=======
+    pub storage_type: String,           // "local" or "oss"
+    pub storage_local_path: String,     // local storage directory
+    pub pages_storage_path: String,
+>>>>>>> 09eed43 (feat: add pages display module — lightweight HTML page hosting)
     // OSS (S3-compatible)
     pub oss_endpoint: String,
     pub oss_region: String,
@@ -50,8 +56,13 @@ impl Config {
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".to_string()),
             index_path: env::var("INDEX_PATH").unwrap_or_else(|_| "/data/tantivy".to_string()),
             storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
+<<<<<<< HEAD
             storage_local_path: env::var("STORAGE_LOCAL_PATH")
                 .unwrap_or_else(|_| "/data/storage".to_string()),
+=======
+            storage_local_path: env::var("STORAGE_LOCAL_PATH").unwrap_or_else(|_| "/data/storage".to_string()),
+            pages_storage_path: env::var("PAGES_STORAGE_PATH").unwrap_or_else(|_| "/data/pages".to_string()),
+>>>>>>> 09eed43 (feat: add pages display module — lightweight HTML page hosting)
             oss_endpoint: env::var("OSS_ENDPOINT").unwrap_or_default(),
             oss_region: env::var("OSS_REGION").unwrap_or_else(|_| "auto".to_string()),
             oss_bucket: env::var("OSS_BUCKET").unwrap_or_default(),
@@ -123,7 +134,11 @@ mod tests {
 =======
             env::remove_var("CORS_ORIGINS");
             env::remove_var("METRICS_ENABLED");
+<<<<<<< HEAD
 >>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
+=======
+            env::remove_var("PAGES_STORAGE_PATH");
+>>>>>>> 09eed43 (feat: add pages display module — lightweight HTML page hosting)
         }
     }
 
