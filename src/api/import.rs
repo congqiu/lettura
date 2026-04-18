@@ -3,7 +3,8 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::entry;
 use crate::tasks::fetcher::FetchJob;
 
@@ -48,6 +49,7 @@ pub async fn import_wallabag(
                     // Queue for fetching
                     let _ = state.fetch_queue.send(FetchJob {
                         entry_id: new_entry.id,
+                        user_id: auth.user_id,
                         url: new_entry.url.clone(),
                     }).await;
                 }
@@ -65,8 +67,10 @@ pub async fn import_wallabag(
 
                 imported += 1;
             }
-            Err(ApiError::Conflict(_)) => { skipped += 1; }
-            Err(_) => { skipped += 1; }
+            Err(e) => {
+                if matches!(e, crate::models::error::ModelError::Conflict(_)) { skipped += 1; }
+                else { skipped += 1; }
+            }
         }
     }
 
@@ -117,6 +121,7 @@ pub async fn import_browser(
                 }
                 let _ = state.fetch_queue.send(FetchJob {
                     entry_id: new_entry.id,
+                    user_id: auth.user_id,
                     url: new_entry.url.clone(),
                 }).await;
                 imported += 1;

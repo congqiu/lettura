@@ -24,7 +24,7 @@ validator = { version = "0.19", features = ["derive"] }
 thiserror = "2"
 
 # Web framework
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "set-header"] }
@@ -40,6 +40,7 @@ argon2 = "0.5"
 jsonwebtoken = "9"
 rand = "0.8"
 sha2 = "0.10"
+hmac = "0.12"
 hex = "0.4"
 
 # HTTP client + hashing

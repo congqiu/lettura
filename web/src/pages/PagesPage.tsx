@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { listPages, type PageSummary } from '../api/pages';
 import PageCard from '../components/PageCard';
 import PageUploadModal from '../components/PageUploadModal';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
 import { Plus, Loader2 } from 'lucide-react';
 
 const TABS = [
@@ -15,7 +17,7 @@ export default function PagesPage() {
   const [tab, setTab] = useState<string>('active');
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pages', tab],
     queryFn: () => listPages({ status: tab }),
   });
@@ -51,6 +53,8 @@ export default function PagesPage() {
         <div className="flex justify-center py-12">
           <Loader2 size={24} className="animate-spin text-gray-400" />
         </div>
+      ) : error ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : data && data.items.length > 0 ? (
         <div className="space-y-3">
           {data.items.map((page: PageSummary) => (
@@ -58,9 +62,7 @@ export default function PagesPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-sm">暂无页面</p>
-        </div>
+        <EmptyState icon="file" title="暂无页面" description="上传 HTML 文件创建可分享的页面" />
       )}
 
       <PageUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />

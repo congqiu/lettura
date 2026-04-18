@@ -75,4 +75,18 @@ impl ImageStorage for OssStorage {
             }
         }
     }
+
+    async fn delete_prefix(&self, prefix: &str) -> Result<(), StorageError> {
+        let results = self.bucket.list(prefix.to_string(), Some("/".to_string()))
+            .await
+            .map_err(|e| StorageError::Io(e.to_string()))?;
+        for list_result in results {
+            for obj in list_result.contents {
+                self.bucket.delete_object(&obj.key)
+                    .await
+                    .map_err(|e| StorageError::Upload(e.to_string()))?;
+            }
+        }
+        Ok(())
+    }
 }

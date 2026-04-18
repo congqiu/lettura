@@ -13,11 +13,32 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let pool = lettura::db::create_pool(&config).await;
-    lettura::db::run_migrations(&pool).await;
+    let pool = lettura::db::create_pool(&config).await.unwrap_or_else(|e| {
+        eprintln!("Database error: {e}");
+        std::process::exit(1);
+    });
+    lettura::db::run_migrations(&pool).await.unwrap_or_else(|e| {
+        eprintln!("Migration error: {e}");
+        std::process::exit(1);
+    });
 
     let (app, search_index, fetch_queue) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
+
+    {
+        let cleanup_pool = pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                match lettura::models::user::cleanup_expired_refresh_tokens(&cleanup_pool).await {
+                    Ok(count) if count > 0 => tracing::info!(removed = count, "cleaned up expired refresh tokens"),
+                    Err(e) => tracing::warn!("refresh token cleanup failed: {e}"),
+                    _ => {}
+                }
+            }
+        });
+    }
 
     let app = if config.metrics_enabled {
         let recorder_handle = metrics_exporter_prometheus::PrometheusBuilder::new()

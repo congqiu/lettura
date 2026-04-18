@@ -4,21 +4,27 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
 use crate::tasks::fetcher::FetchJob;
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 #[derive(serde::Deserialize)]
 =======
 use super::validate::ValidatedJson;
+=======
+use super::validate::{deserialize_bool_from_string, ValidatedJson};
+>>>>>>> 7b9e29d (feat: page reupload, expiry support and UI/UX improvements #none)
 
 #[derive(Debug, serde::Deserialize)]
 >>>>>>> 90aaa72 (fix: compilation fixes from Docker test run)
 pub struct ListQueryParams {
     #[serde(flatten)]
     pub inner: ListParams,
+    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
     pub deleted: Option<bool>,
 }
 
@@ -40,7 +46,7 @@ pub async fn create_entry(
     ValidatedJson(req): ValidatedJson<CreateEntryRequest>,
 ) -> Result<Json<entry::Entry>, ApiError> {
     let new_entry = entry::create_entry(&state.pool, auth.user_id, &req.url).await?;
-    let _ = state.fetch_queue.send(FetchJob { entry_id: new_entry.id, url: new_entry.url.clone() }).await;
+    let _ = state.fetch_queue.send(FetchJob { entry_id: new_entry.id, user_id: auth.user_id, url: new_entry.url.clone() }).await;
     tracing::info!(entry_id = %new_entry.id, url = %req.url, "entry created");
     Ok(Json(new_entry))
 }
@@ -73,7 +79,7 @@ pub async fn list_entries(
         if !query.is_empty() {
             let ids = state
                 .search_index
-                .search(query, 100)
+                .search(query, Some(auth.user_id), 100)
                 .unwrap_or_default();
             if ids.is_empty() {
                 return Ok(Json(vec![]));
@@ -121,6 +127,7 @@ pub async fn restore_entry(
     if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await {
         let _ = state.search_index.upsert(
             restored.id,
+            auth.user_id,
             restored.title.as_deref().unwrap_or(""),
             restored.text_content.as_deref().unwrap_or(""),
             &restored.url,
@@ -154,6 +161,6 @@ pub async fn refetch_entry(
     if found.is_content_edited {
         return Err(ApiError::BadRequest("cannot refetch edited content".to_string()));
     }
-    let _ = state.fetch_queue.send(FetchJob { entry_id: found.id, url: found.url.clone() }).await;
+    let _ = state.fetch_queue.send(FetchJob { entry_id: found.id, user_id: auth.user_id, url: found.url.clone() }).await;
     Ok(Json(serde_json::json!({"message": "refetch queued"})))
 }

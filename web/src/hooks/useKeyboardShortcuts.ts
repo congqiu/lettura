@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface ShortcutHandlers {
@@ -11,58 +11,33 @@ interface ShortcutHandlers {
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
   const navigate = useNavigate();
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore when typing in inputs
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) {
         return;
       }
-
+      const h = handlersRef.current;
       switch (e.key) {
-        case 's':
-          e.preventDefault();
-          handlers.onStar?.();
-          break;
-        case 'a':
-          e.preventDefault();
-          handlers.onArchive?.();
-          break;
-        case 'e':
-          e.preventDefault();
-          handlers.onEdit?.();
-          break;
+        case 's': e.preventDefault(); h.onStar?.(); break;
+        case 'a': e.preventDefault(); h.onArchive?.(); break;
+        case 'e': e.preventDefault(); h.onEdit?.(); break;
         case 'Backspace':
         case 'h':
-          if (!e.metaKey && !e.ctrlKey) {
-            handlers.onBack?.() || navigate(-1);
-          }
+          if (!e.metaKey && !e.ctrlKey) { h.onBack?.() || navigate(-1); }
           break;
-        case 'g':
-          // g then key combos
-          break;
-        case '1':
-          navigate('/');
-          break;
-        case '2':
-          navigate('/archived');
-          break;
-        case '3':
-          navigate('/starred');
-          break;
-        case '4':
-          navigate('/memos');
-          break;
-        case '?':
-          // Could show shortcuts help modal
-          break;
+        case '1': navigate('/'); break;
+        case '2': navigate('/archived'); break;
+        case '3': navigate('/starred'); break;
+        case '4': navigate('/memos'); break;
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate, handlers]);
+  }, [navigate]);
 }
 
 export function useListKeyboardNav(
@@ -71,31 +46,35 @@ export function useListKeyboardNav(
   setSelectedIndex: (i: number) => void,
 ) {
   const navigate = useNavigate();
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  const selectedRef = useRef(selectedIndex);
+  selectedRef.current = selectedIndex;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
+      const currentEntries = entriesRef.current;
+      const currentSelected = selectedRef.current;
       switch (e.key) {
         case 'j':
           e.preventDefault();
-          setSelectedIndex(Math.min(selectedIndex + 1, entries.length - 1));
+          setSelectedIndex(Math.min(currentSelected + 1, currentEntries.length - 1));
           break;
         case 'k':
           e.preventDefault();
-          setSelectedIndex(Math.max(selectedIndex - 1, 0));
+          setSelectedIndex(Math.max(currentSelected - 1, 0));
           break;
         case 'Enter':
         case 'o':
-          if (entries[selectedIndex]) {
-            navigate(`/entry/${entries[selectedIndex].id}`);
+          if (currentEntries[currentSelected]) {
+            navigate(`/entry/${currentEntries[currentSelected].id}`);
           }
           break;
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [entries, selectedIndex, setSelectedIndex, navigate]);
+  }, [setSelectedIndex, navigate]);
 }

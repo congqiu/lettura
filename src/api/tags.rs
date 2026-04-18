@@ -4,7 +4,8 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::{entry, tag};
 
 pub async fn list_tags(
@@ -12,6 +13,18 @@ pub async fn list_tags(
     auth: AuthUser,
 ) -> Result<Json<Vec<tag::Tag>>, ApiError> {
     let tags = tag::list_tags(&state.pool, auth.user_id).await?;
+    Ok(Json(tags))
+}
+
+pub async fn list_tags_for_entry(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(entry_id): Path<Uuid>,
+) -> Result<Json<Vec<tag::Tag>>, ApiError> {
+    entry::find_entry_by_id(&state.pool, auth.user_id, entry_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
+    let tags = tag::list_tags_for_entry(&state.pool, entry_id).await?;
     Ok(Json(tags))
 }
 

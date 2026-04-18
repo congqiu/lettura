@@ -19,6 +19,11 @@ pub trait ImageStorage: Send + Sync {
     /// Delete a stored image
     async fn delete(&self, key: &str) -> Result<(), StorageError>;
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StorageError>;
+    /// Delete all objects under a prefix (e.g. "pages/abc/")
+    async fn delete_prefix(&self, prefix: &str) -> Result<(), StorageError> {
+        let _ = prefix;
+        Ok(())
+    }
 }
 
 /// Create storage backend based on config
@@ -29,7 +34,8 @@ pub fn create_storage(config: &crate::config::Config) -> Box<dyn ImageStorage> {
     }
 }
 
-/// Download an image from URL, return (data, content_type)
+const MAX_IMAGE_SIZE: usize = 10 * 1024 * 1024;
+
 pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -43,6 +49,12 @@ pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError
         .await
         .map_err(|e| StorageError::Io(e.to_string()))?;
 
+    if let Some(len) = resp.content_length() {
+        if len as usize > MAX_IMAGE_SIZE {
+            return Err(StorageError::Io(format!("image too large: {len} bytes")));
+        }
+    }
+
     let content_type = resp
         .headers()
         .get("content-type")
@@ -54,6 +66,10 @@ pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError
         .bytes()
         .await
         .map_err(|e| StorageError::Io(e.to_string()))?;
+
+    if data.len() > MAX_IMAGE_SIZE {
+        return Err(StorageError::Io(format!("image too large: {} bytes", data.len())));
+    }
 
     Ok((data.to_vec(), content_type))
 }

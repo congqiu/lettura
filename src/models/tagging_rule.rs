@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::api::error::ApiError;
+use super::error::ModelError;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct TaggingRule {
@@ -31,21 +31,21 @@ pub struct UpdateTaggingRule {
     pub priority: Option<i32>,
 }
 
-pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>, ApiError> {
+pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>, ModelError> {
     sqlx::query_as::<_, TaggingRule>(
         "SELECT * FROM tagging_rules WHERE user_id = $1 ORDER BY priority",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 pub async fn create_rule(
     pool: &PgPool,
     user_id: Uuid,
     params: &CreateTaggingRule,
-) -> Result<TaggingRule, ApiError> {
+) -> Result<TaggingRule, ModelError> {
     sqlx::query_as::<_, TaggingRule>(
         "INSERT INTO tagging_rules (user_id, rule, tags, priority) VALUES ($1, $2, $3, $4) RETURNING *",
     )
@@ -55,7 +55,7 @@ pub async fn create_rule(
     .bind(params.priority.unwrap_or(0))
     .fetch_one(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 pub async fn update_rule(
@@ -63,7 +63,7 @@ pub async fn update_rule(
     user_id: Uuid,
     rule_id: Uuid,
     params: &UpdateTaggingRule,
-) -> Result<TaggingRule, ApiError> {
+) -> Result<TaggingRule, ModelError> {
     let existing = sqlx::query_as::<_, TaggingRule>(
         "SELECT * FROM tagging_rules WHERE id = $1 AND user_id = $2",
     )
@@ -71,8 +71,8 @@ pub async fn update_rule(
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?
-    .ok_or_else(|| ApiError::NotFound("rule not found".to_string()))?;
+    .map_err(|e| ModelError::Database(e.to_string()))?
+    .ok_or_else(|| ModelError::NotFound("rule not found".to_string()))?;
 
     let rule = params.rule.as_ref().unwrap_or(&existing.rule);
     let tags = params.tags.as_ref().unwrap_or(&existing.tags);
@@ -88,16 +88,16 @@ pub async fn update_rule(
     .bind(priority)
     .fetch_one(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ApiError> {
+pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM tagging_rules WHERE id = $1 AND user_id = $2")
         .bind(rule_id)
         .bind(user_id)
         .execute(pool)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 

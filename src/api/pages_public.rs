@@ -1,20 +1,26 @@
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use sha2::{Digest, Sha256};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use chrono::Utc;
 
-use crate::auth::middleware::AppState;
+use crate::state::AppState;
 use crate::models::page;
 
+type HmacSha256 = Hmac<Sha256>;
+
 fn sign_cookie(jwt_secret: &str, slug: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(jwt_secret.as_bytes());
-    hasher.update(slug.as_bytes());
-    hex::encode(hasher.finalize())
+    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes()).unwrap();
+    mac.update(slug.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
 }
 
 fn verify_cookie(jwt_secret: &str, slug: &str, value: &str) -> bool {
-    sign_cookie(jwt_secret, slug) == value
+    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes()).unwrap();
+    mac.update(slug.as_bytes());
+    let expected = hex::encode(mac.finalize().into_bytes());
+    expected == value
 }
 
 fn get_cookie_value(headers: &HeaderMap, slug: &str) -> Option<String> {
@@ -54,6 +60,12 @@ async fn serve_page_file_inner(
         _ => return (StatusCode::NOT_FOUND, "not found").into_response(),
     };
 
+    if let Some(expires) = page_record.expires_at {
+        if expires < chrono::Utc::now() {
+            return (StatusCode::GONE, "this page has expired").into_response();
+        }
+    }
+
     if page_record.password.is_some() {
         let authenticated = get_cookie_value(headers, slug)
             .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
@@ -72,25 +84,35 @@ async fn serve_page_file_inner(
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
     }
 
-    let base = std::path::PathBuf::from(&state.config.pages_storage_path).join(slug);
-    let file_path = base.join(file_name);
+    let key = format!("pages/{}/{}", slug, file_name);
 
-    match std::fs::canonicalize(&base) {
-        Ok(canonical_base) => {
-            match std::fs::canonicalize(&file_path) {
-                Ok(canonical_file) if canonical_file.starts_with(&canonical_base) => {}
-                _ => return (StatusCode::NOT_FOUND, "not found").into_response(),
+    if state.config.storage_type == "local" {
+        let base_path = std::path::PathBuf::from(&state.config.pages_storage_path).join(slug);
+        let canonical_base = match std::fs::canonicalize(&base_path) {
+            Ok(p) => p,
+            Err(_) => return (StatusCode::NOT_FOUND, "not found").into_response(),
+        };
+        let file_path = canonical_base.join(file_name);
+        match std::fs::canonicalize(&file_path) {
+            Ok(canonical_file) if canonical_file.starts_with(&canonical_base) => {
+                match tokio::fs::read(&canonical_file).await {
+                    Ok(data) => {
+                        let mime = mime_for_file(file_name);
+                        (StatusCode::OK, [("content-type", mime)], data).into_response()
+                    }
+                    Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
+                }
             }
+            _ => (StatusCode::FORBIDDEN, "forbidden").into_response(),
         }
-        Err(_) => {} // base dir may not exist yet, allow passthrough for non-canonical paths
-    }
-
-    match tokio::fs::read(&file_path).await {
-        Ok(data) => {
-            let mime = mime_for_file(file_name);
-            (StatusCode::OK, [("content-type", mime)], data).into_response()
+    } else {
+        match state.storage.get(&key).await {
+            Ok(Some(data)) => {
+                let mime = mime_for_file(file_name);
+                (StatusCode::OK, [("content-type", mime)], data).into_response()
+            }
+            _ => (StatusCode::NOT_FOUND, "not found").into_response(),
         }
-        Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
     }
 }
 
@@ -159,7 +181,7 @@ button:hover{{background:#2563eb}}
 <input type="password" name="password" placeholder="请输入密码" autofocus required>{}
 <button type="submit">确认</button>
 </form></div></body></html>"#,
-        error_html, slug
+        slug, error_html
     );
     (
         StatusCode::OK,

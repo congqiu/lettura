@@ -8,5 +8,6 @@ pub mod models;
 pub mod rate_limit;
 pub mod search;
 pub mod spa;
+pub mod state;
 pub mod storage;
 pub mod tasks;

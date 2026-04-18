@@ -2,7 +2,7 @@ services:
   lettura:
     build: .
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       DATABASE_URL: postgres://lettura:lettura@postgres:5432/lettura
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
@@ -10,6 +10,8 @@ services:
       INDEX_PATH: /data/tantivy
     volumes:
       - lettura_data:/data/tantivy
+      - lettura_pages:/data/pages
+      - lettura_storage:/data/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -38,4 +40,6 @@ services:
 
 volumes:
   lettura_data:
+  lettura_pages:
+  lettura_storage:
   postgres_data:

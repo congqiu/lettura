@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Serialize;
 
-use crate::auth::middleware::AppState;
+use crate::state::AppState;
 
 #[derive(Serialize)]
 pub struct HealthResponse {

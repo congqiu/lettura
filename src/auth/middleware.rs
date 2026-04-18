@@ -1,28 +1,14 @@
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use sqlx::PgPool;
 
 use crate::api::error::ApiError;
 use crate::auth::jwt;
-use crate::config::Config;
-use crate::search::SearchIndex;
-use crate::storage::ImageStorage;
-use crate::tasks::fetcher::FetchQueue;
-use std::sync::Arc;
+use crate::state::AppState;
 
 #[derive(Debug, Clone)]
 pub struct AuthUser {
     pub user_id: uuid::Uuid,
     pub is_admin: bool,
-}
-
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: PgPool,
-    pub config: Config,
-    pub fetch_queue: FetchQueue,
-    pub search_index: SearchIndex,
-    pub storage: Arc<dyn ImageStorage>,
 }
 
 impl FromRequestParts<AppState> for AuthUser {

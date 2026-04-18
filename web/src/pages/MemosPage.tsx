@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listMemos, createMemo, deleteMemo, promoteMemo } from '../api/memos';
+import { toast } from '../components/Toast';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
 
 export default function MemosPage() {
   const [content, setContent] = useState('');
   const qc = useQueryClient();
 
-  const { data: memos = [], isLoading } = useQuery({
+  const { data: memos = [], isLoading, error, refetch } = useQuery({
     queryKey: ['memos'],
     queryFn: listMemos,
   });
@@ -14,16 +17,19 @@ export default function MemosPage() {
   const create = useMutation({
     mutationFn: (content: string) => createMemo(content),
     onSuccess: () => { setContent(''); qc.invalidateQueries({ queryKey: ['memos'] }); },
+    onError: () => toast('error', '保存失败'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteMemo(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['memos'] }),
+    onError: () => toast('error', '删除失败'),
   });
 
   const promote = useMutation({
     mutationFn: (id: string) => promoteMemo(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['memos'] }),
+    onError: () => toast('error', '转化失败'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -54,9 +60,13 @@ export default function MemosPage() {
       </form>
 
       {isLoading ? (
-        <p className="text-gray-500">加载中...</p>
+        <div className="flex justify-center py-12">
+          <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+        </div>
+      ) : error ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : memos.length === 0 ? (
-        <p className="text-gray-500">暂无收集</p>
+        <EmptyState icon="note" title="暂无收集" description="快速记录想法、URL 或灵感" />
       ) : (
         <div className="space-y-3">
           {memos.map((memo) => (

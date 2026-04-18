@@ -7,6 +7,7 @@ const links = [
   { to: '/starred', label: '收藏', end: false },
   { to: '/memos', label: '收集箱', end: false },
   { to: '/pages', label: '展示', end: false },
+  { to: '/settings', label: '设置', end: false },
 ];
 
 // Hamburger button only — drawer is rendered in Layout to escape header stacking

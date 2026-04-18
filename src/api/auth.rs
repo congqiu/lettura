@@ -6,7 +6,8 @@ use validator::Validate;
 
 use crate::api::error::ApiError;
 use crate::auth::jwt;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::auth::password;
 use crate::models::user;
 
@@ -144,4 +145,34 @@ pub async fn regenerate_feed_token(
 ) -> Result<Json<FeedTokenResponse>, ApiError> {
     let new_token = user::regenerate_feed_token(&state.pool, auth.user_id).await?;
     Ok(Json(FeedTokenResponse { feed_token: new_token }))
+}
+
+#[derive(Deserialize, Validate)]
+pub struct ChangePasswordRequest {
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    pub current_password: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    pub new_password: String,
+}
+
+pub async fn change_password(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    ValidatedJson(req): ValidatedJson<ChangePasswordRequest>,
+) -> Result<Json<MessageResponse>, ApiError> {
+    let found = user::find_user_by_id(&state.pool, auth.user_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("user not found".to_string()))?;
+
+    password::verify_password(&req.current_password, &found.password_hash)
+        .map_err(|_| ApiError::BadRequest("current password is incorrect".to_string()))?;
+
+    let new_hash = password::hash_password(&req.new_password)
+        .map_err(|_| ApiError::Internal("failed to hash password".to_string()))?;
+
+    user::update_password(&state.pool, auth.user_id, &new_hash).await?;
+
+    Ok(Json(MessageResponse {
+        message: "password changed".to_string(),
+    }))
 }

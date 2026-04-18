@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { listEntries, type ListParams } from '../api/entries';
 import EntryCard from '../components/EntryCard';
 import AddEntryForm from '../components/AddEntryForm';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
 import { useListKeyboardNav } from '../hooks/useKeyboardShortcuts';
 
 interface Props {
@@ -23,7 +25,7 @@ export default function EntryListPage({ filter }: Props) {
   if (search) params.search = search;
   if (domain) params.domain = domain;
 
-  const { data: entries = [], isLoading } = useQuery({
+  const { data: entries = [], isLoading, error, refetch } = useQuery({
     queryKey: ['entries', filter, search, domain],
     queryFn: () => listEntries(params),
   });
@@ -59,9 +61,13 @@ export default function EntryListPage({ filter }: Props) {
       {!filter || filter === 'unread' ? <AddEntryForm /> : null}
 
       {isLoading ? (
-        <p className="text-gray-500">加载中...</p>
+        <div className="flex justify-center py-12">
+          <div className="w-5 h-5 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+        </div>
+      ) : error ? (
+        <ErrorState onRetry={() => refetch()} />
       ) : entries.length === 0 ? (
-        <p className="text-gray-500">暂无文章</p>
+        <EmptyState icon="book" title="暂无文章" description="粘贴 URL 保存你的第一篇文章" />
       ) : (
         <div className="space-y-3">
           {entries.map((entry, i) => (

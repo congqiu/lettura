@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use url::Url;
 use uuid::Uuid;
 
-use crate::api::error::ApiError;
+use super::error::ModelError;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Entry {
@@ -43,7 +43,7 @@ pub fn extract_domain(url_str: &str) -> Option<String> {
     Url::parse(url_str).ok().and_then(|u| u.host_str().map(String::from))
 }
 
-pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Result<Entry, ApiError> {
+pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Result<Entry, ModelError> {
     let url = given_url.to_string();
     let hashed_url = hash_url(&url);
     let hashed_given_url = hash_url(given_url);
@@ -56,20 +56,68 @@ pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Resu
     .fetch_one(pool).await?)
 }
 
-pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ApiError> {
+pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ModelError> {
     sqlx::query_as::<_, Entry>("SELECT * FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(entry_id).bind(user_id).fetch_optional(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))
+}
+
+fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+    use std::fmt;
+
+    struct BoolOrString;
+
+    impl<'de> de::Visitor<'de> for BoolOrString {
+        type Value = Option<bool>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a boolean or a string \"true\"/\"false\"")
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_some<D: de::Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+            d.deserialize_any(BoolOrString)
+        }
+
+        fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
+            Ok(Some(v))
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            match v {
+                "true" => Ok(Some(true)),
+                "false" => Ok(Some(false)),
+                _ => Err(de::Error::invalid_value(de::Unexpected::Str(v), &self)),
+            }
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+    }
+
+    deserializer.deserialize_option(BoolOrString)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
     pub page: Option<i64>, pub per_page: Option<i64>,
-    pub is_archived: Option<bool>, pub is_starred: Option<bool>, pub domain: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    pub is_archived: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    pub is_starred: Option<bool>,
+    pub domain: Option<String>,
     pub search: Option<String>,
 }
 
-pub async fn list_entries(pool: &PgPool, user_id: Uuid, params: &ListParams) -> Result<Vec<EntrySummary>, ApiError> {
+pub async fn list_entries(pool: &PgPool, user_id: Uuid, params: &ListParams) -> Result<Vec<EntrySummary>, ModelError> {
     let per_page = params.per_page.unwrap_or(20).min(100);
     let offset = (params.page.unwrap_or(1) - 1).max(0) * per_page;
 
@@ -87,7 +135,7 @@ pub async fn list_entries(pool: &PgPool, user_id: Uuid, params: &ListParams) -> 
     if let Some(starred) = params.is_starred { query = query.bind(starred); }
     if let Some(ref domain) = params.domain { query = query.bind(domain); }
     query = query.bind(per_page).bind(offset);
-    query.fetch_all(pool).await.map_err(|e| ApiError::Internal(e.to_string()))
+    query.fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,9 +144,9 @@ pub struct UpdateEntryParams {
     pub is_archived: Option<bool>, pub is_starred: Option<bool>,
 }
 
-pub async fn update_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, params: &UpdateEntryParams) -> Result<Entry, ApiError> {
+pub async fn update_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, params: &UpdateEntryParams) -> Result<Entry, ModelError> {
     let existing = find_entry_by_id(pool, user_id, entry_id).await?
-        .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
+        .ok_or_else(|| ModelError::NotFound("entry not found".to_string()))?;
 
     let title = params.title.as_deref().unwrap_or(existing.title.as_deref().unwrap_or(""));
     let content = params.content.as_deref().or(existing.content.as_deref());
@@ -115,10 +163,10 @@ pub async fn update_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, params: 
     )
     .bind(entry_id).bind(user_id).bind(title).bind(content).bind(is_content_edited)
     .bind(is_archived).bind(archived_at).bind(is_starred).bind(starred_at)
-    .fetch_one(pool).await.map_err(|e| ApiError::Internal(e.to_string()))
+    .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> Result<Vec<EntrySummary>, ApiError> {
+pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> Result<Vec<EntrySummary>, ModelError> {
     if ids.is_empty() {
         return Ok(vec![]);
     }
@@ -129,42 +177,42 @@ pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> 
     .bind(ids)
     .fetch_all(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<bool, ApiError> {
+pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("UPDATE entries SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn list_deleted_entries(pool: &PgPool, user_id: Uuid) -> Result<Vec<EntrySummary>, ApiError> {
+pub async fn list_deleted_entries(pool: &PgPool, user_id: Uuid) -> Result<Vec<EntrySummary>, ModelError> {
     sqlx::query_as::<_, EntrySummary>(
         "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC"
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ApiError> {
+pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ModelError> {
     let result = sqlx::query("UPDATE entries SET deleted_at = NULL WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() == 0 {
-        return Err(ApiError::NotFound("entry not found or not deleted".to_string()));
+        return Err(ModelError::NotFound("entry not found or not deleted".to_string()));
     }
     Ok(())
 }
 
-pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ApiError> {
+pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ModelError> {
     let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() == 0 {
-        return Err(ApiError::NotFound("entry not found".to_string()));
+        return Err(ModelError::NotFound("entry not found".to_string()));
     }
     Ok(())
 }
@@ -174,12 +222,12 @@ pub async fn update_entry_content(
     title: Option<&str>, content: Option<&str>, text_content: Option<&str>,
     language: Option<&str>, preview_picture: Option<&str>, published_by: Option<&str>,
     reading_time: Option<i32>, http_status: i16, extract_method: &str,
-) -> Result<(), ApiError> {
+) -> Result<(), ModelError> {
     sqlx::query(
         "UPDATE entries SET title=COALESCE($2,title), content=$3, text_content=$4, language=$5, preview_picture=$6, published_by=$7, reading_time=$8, http_status=$9, extract_method=$10, updated_at=now() WHERE id=$1 AND is_content_edited=false"
     )
     .bind(entry_id).bind(title).bind(content).bind(text_content).bind(language)
     .bind(preview_picture).bind(published_by).bind(reading_time).bind(http_status).bind(extract_method)
-    .execute(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    .execute(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }

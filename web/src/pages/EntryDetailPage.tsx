@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEntry, updateEntry, deleteEntry } from '../api/entries';
+import { getEntry, updateEntry, deleteEntry, refetchEntry } from '../api/entries';
 import ContentEditor from '../components/ContentEditor';
 import AnnotationsSidebar from '../components/AnnotationsSidebar';
+import ErrorState from '../components/ErrorState';
 import EntryTags from '../components/EntryTags';
+import { useEntryActions } from '../hooks/useEntryActions';
+import { getErrorMessage } from '../utils/error';
+import { toast } from '../components/Toast';
 
 export default function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,7 +20,7 @@ export default function EntryDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
 
-  const { data: entry, isLoading, error } = useQuery({
+  const { data: entry, isLoading, error, refetch: refetchEntryQuery } = useQuery({
     queryKey: ['entry', id],
     queryFn: () => getEntry(id!),
     enabled: !!id,
@@ -23,17 +28,32 @@ export default function EntryDetailPage() {
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['entry', id] }); qc.invalidateQueries({ queryKey: ['entries'] }); };
 
-  const toggleStar = useMutation({ mutationFn: () => updateEntry(id!, { is_starred: !entry?.is_starred }), onSuccess: invalidate });
-  const toggleArchive = useMutation({ mutationFn: () => updateEntry(id!, { is_archived: !entry?.is_archived }), onSuccess: invalidate });
-  const saveContent = useMutation({ mutationFn: (html: string) => updateEntry(id!, { content: html }), onSuccess: () => { setEditing(false); invalidate(); } });
+  const { toggleStar, toggleArchive } = useEntryActions(
+    id!,
+    { is_starred: entry?.is_starred ?? false, is_archived: entry?.is_archived ?? false },
+  );
+  const saveContent = useMutation({ mutationFn: (html: string) => updateEntry(id!, { content: html }), onSuccess: () => { setEditing(false); invalidate(); }, onError: () => toast('error', '保存内容失败') });
   const saveTitle = useMutation({
     mutationFn: (title: string) => updateEntry(id!, { title }),
     onSuccess: () => { setEditingTitle(false); invalidate(); },
+    onError: () => toast('error', '保存标题失败'),
   });
-  const remove = useMutation({ mutationFn: () => deleteEntry(id!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['entries'] }); navigate('/'); } });
+  const remove = useMutation({ mutationFn: () => deleteEntry(id!), onSuccess: () => { qc.invalidateQueries({ queryKey: ['entries'] }); navigate('/'); }, onError: () => toast('error', '删除失败') });
+  const refetch = useMutation({
+    mutationFn: () => refetchEntry(id!),
+    onSuccess: () => { invalidate(); toast('success', '已重新抓取'); },
+    onError: (err: unknown) => {
+      toast('error', getErrorMessage(err, '重新抓取失败'));
+    },
+  });
 
-  if (isLoading) return <p className="text-gray-500">加载中...</p>;
-  if (error || !entry) return <p className="text-red-500">文章未找到</p>;
+  if (isLoading) return (
+    <div className="flex justify-center py-16">
+      <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+    </div>
+  );
+  if (error) return <div className="py-8"><ErrorState message="文章加载失败" onRetry={() => refetchEntryQuery()} /></div>;
+  if (!entry) return <div className="py-8"><ErrorState message="文章未找到" /></div>;
 
   const btnBase = "text-sm px-3 py-1.5 rounded border transition-colors";
   const btnNormal = `${btnBase} border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800`;
@@ -106,9 +126,14 @@ export default function EntryDetailPage() {
         ) : entry.extract_method === 'pending' ? (
           <p className="text-yellow-600 dark:text-yellow-500">正在抓取内容...</p>
         ) : entry.extract_method === 'failed' ? (
-          <p className="text-red-500">内容提取失败。<a href={entry.url} target="_blank" className="underline">查看原文</a></p>
+          <p className="text-red-500">内容提取失败。
+            <button onClick={() => refetch.mutate()} disabled={refetch.isPending} className="underline ml-1">
+              {refetch.isPending ? '抓取中...' : '重新抓取'}
+            </button>
+            <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
+          </p>
         ) : entry.content ? (
-          <article className="prose prose-gray dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: entry.content }} />
+          <article className="prose prose-gray dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
         ) : (
           <p className="text-gray-500">暂无内容</p>
         )}

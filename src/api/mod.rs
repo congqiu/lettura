@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 
-use crate::auth::middleware::AppState;
+use crate::state::AppState;
 use crate::config::Config;
 use crate::rate_limit::{rate_limit_middleware, GlobalRateLimit};
 use crate::search::SearchIndex;
@@ -61,7 +61,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             .expect("failed to open search index")
     });
     let storage: std::sync::Arc<dyn crate::storage::ImageStorage> = std::sync::Arc::from(crate::storage::create_storage(&config));
-    let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone());
+    let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone(), search_index.clone());
 
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();
@@ -176,7 +176,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .nest("/p", {
             let page_router = Router::new()
                 .route("/{slug}", get(pages_public::serve_page))
-                .route("/{slug}/*file", get(pages_public::serve_page_file))
+                .route("/{slug}/{*file}", get(pages_public::serve_page_file))
                 .route("/{slug}/auth", post(pages_public::auth_page))
                 .with_state(state.clone());
             page_router.layer(

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 import { addTagToEntry, removeTagFromEntry, type Tag } from '../api/tags';
+import { toast } from './Toast';
 
 export default function EntryTags({ entryId }: { entryId: string }) {
   const [input, setInput] = useState('');
@@ -21,11 +22,13 @@ export default function EntryTags({ entryId }: { entryId: string }) {
   const addTag = useMutation({
     mutationFn: (label: string) => addTagToEntry(entryId, label),
     onSuccess: () => { setInput(''); qc.invalidateQueries({ queryKey: ['tags'] }); },
+    onError: () => toast('error', '添加标签失败'),
   });
 
   const removeTag = useMutation({
     mutationFn: (tagId: string) => removeTagFromEntry(entryId, tagId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tags'] }),
+    onError: () => toast('error', '删除标签失败'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {

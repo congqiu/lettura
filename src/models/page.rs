@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::api::error::ApiError;
+use super::error::ModelError;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Page {
@@ -17,6 +17,7 @@ pub struct Page {
     pub password: Option<String>,
     pub status: String,
     pub file_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -31,6 +32,7 @@ pub struct PageSummary {
     pub has_password: bool,
     pub status: String,
     pub file_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -49,22 +51,23 @@ pub async fn create_page(
     entry_file: &str,
     password_hash: Option<&str>,
     file_count: i32,
-) -> Result<Page, ApiError> {
+    expires_at: Option<DateTime<Utc>>,
+) -> Result<Page, ModelError> {
     let slug = generate_slug();
     let password = password_hash.map(|s| s.to_string());
 
     match sqlx::query_as::<_, Page>(
-        "INSERT INTO pages (slug, user_id, title, description, entry_file, password, file_count)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *"
+        "INSERT INTO pages (slug, user_id, title, description, entry_file, password, file_count, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *"
     )
     .bind(&slug).bind(user_id).bind(title).bind(description)
-    .bind(entry_file).bind(&password).bind(file_count)
+    .bind(entry_file).bind(&password).bind(file_count).bind(expires_at)
     .fetch_one(pool).await {
         Ok(page) => Ok(page),
         Err(sqlx::Error::Database(db_err)) if db_err.constraint() == Some("pages_slug_key") => {
-            Err(ApiError::Conflict("slug collision, please retry".to_string()))
+            Err(ModelError::Conflict("slug collision, please retry".to_string()))
         }
-        Err(e) => Err(ApiError::from(e)),
+        Err(e) => Err(ModelError::from(e)),
     }
 }
 
@@ -76,31 +79,32 @@ pub async fn create_page_with_retry(
     entry_file: &str,
     password_hash: Option<&str>,
     file_count: i32,
-) -> Result<Page, ApiError> {
+    expires_at: Option<DateTime<Utc>>,
+) -> Result<Page, ModelError> {
     for _ in 0..5 {
-        match create_page(pool, user_id, title, description, entry_file, password_hash, file_count).await {
+        match create_page(pool, user_id, title, description, entry_file, password_hash, file_count, expires_at).await {
             Ok(page) => return Ok(page),
-            Err(ApiError::Conflict(_)) => continue,
+            Err(ModelError::Conflict(_)) => continue,
             Err(e) => return Err(e),
         }
     }
-    Err(ApiError::Internal("failed to generate unique slug".to_string()))
+    Err(ModelError::Database("failed to generate unique slug".to_string()))
 }
 
-pub async fn find_page_by_id(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<Option<Page>, ApiError> {
+pub async fn find_page_by_id(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<Option<Page>, ModelError> {
     sqlx::query_as::<_, Page>("SELECT * FROM pages WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(page_id).bind(user_id)
         .fetch_optional(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn find_page_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Page>, ApiError> {
+pub async fn find_page_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Page>, ModelError> {
     sqlx::query_as::<_, Page>(
         "SELECT * FROM pages WHERE slug = $1 AND deleted_at IS NULL AND status = 'active'"
     )
     .bind(slug)
     .fetch_optional(pool).await
-    .map_err(|e| ApiError::Internal(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 pub async fn list_pages(
@@ -109,36 +113,36 @@ pub async fn list_pages(
     status: Option<&str>,
     page: i64,
     limit: i64,
-) -> Result<(Vec<PageSummary>, i64), ApiError> {
+) -> Result<(Vec<PageSummary>, i64), ModelError> {
     let limit = limit.min(100).max(1);
     let offset = (page.max(1) - 1) * limit;
 
     let (items, count) = match status {
         Some("deleted") => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, 'deleted' as status, file_count, created_at, updated_at
+                "SELECT id, slug, title, description, password IS NOT NULL as has_password, 'deleted' as status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT $2 OFFSET $3"
-            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NOT NULL")
-                .bind(user_id).fetch_one(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
         Some(s) => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, created_at, updated_at
+                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4"
-            ).bind(user_id).bind(s).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            ).bind(user_id).bind(s).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2")
-                .bind(user_id).bind(s).fetch_one(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                .bind(user_id).bind(s).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
         None => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, created_at, updated_at
+                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3"
-            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL")
-                .bind(user_id).fetch_one(pool).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
     };
@@ -151,6 +155,9 @@ pub struct UpdatePageParams {
     pub description: Option<String>,
     pub password: Option<Option<String>>,
     pub status: Option<String>,
+    pub expires_at: Option<Option<DateTime<Utc>>>,
+    pub entry_file: Option<String>,
+    pub file_count: Option<i32>,
 }
 
 pub async fn update_page(
@@ -158,40 +165,47 @@ pub async fn update_page(
     user_id: Uuid,
     page_id: Uuid,
     params: &UpdatePageParams,
-) -> Result<Page, ApiError> {
+) -> Result<Page, ModelError> {
     let existing = find_page_by_id(pool, user_id, page_id).await?
-        .ok_or_else(|| ApiError::NotFound("page not found".to_string()))?;
+        .ok_or_else(|| ModelError::NotFound("page not found".to_string()))?;
 
     let title = params.title.as_deref().unwrap_or(&existing.title);
     let description = params.description.as_deref().or(existing.description.as_deref());
     let status = params.status.as_deref().unwrap_or(&existing.status);
+    let entry_file = params.entry_file.as_deref().unwrap_or(&existing.entry_file);
+    let file_count = params.file_count.unwrap_or(existing.file_count);
     let password = match &params.password {
-        Some(Some(pw)) => Some(crate::auth::password::hash_password(pw).map_err(|_| ApiError::Internal("hash failed".to_string()))?),
+        Some(Some(pw)) => Some(crate::auth::password::hash_password(pw).map_err(|_| ModelError::Database("hash failed".to_string()))?),
         Some(None) => None,
         None => existing.password.clone(),
     };
+    let expires_at = match &params.expires_at {
+        Some(Some(dt)) => Some(*dt),
+        Some(None) => None,
+        None => existing.expires_at,
+    };
 
     sqlx::query_as::<_, Page>(
-        "UPDATE pages SET title=$3, description=$4, status=$5, password=$6, updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *"
+        "UPDATE pages SET title=$3, description=$4, status=$5, password=$6, expires_at=$7, entry_file=$8, file_count=$9, updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *"
     )
     .bind(page_id).bind(user_id).bind(title).bind(description)
-    .bind(status).bind(password)
-    .fetch_one(pool).await.map_err(|e| ApiError::Internal(e.to_string()))
+    .bind(status).bind(password).bind(expires_at).bind(entry_file).bind(file_count)
+    .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn delete_page(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<bool, ApiError> {
+pub async fn delete_page(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("UPDATE pages SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(page_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn restore_page(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<(), ApiError> {
+pub async fn restore_page(pool: &PgPool, user_id: Uuid, page_id: Uuid) -> Result<(), ModelError> {
     let result = sqlx::query("UPDATE pages SET deleted_at = NULL WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
         .bind(page_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() == 0 {
-        return Err(ApiError::NotFound("page not found or not deleted".to_string()));
+        return Err(ModelError::NotFound("page not found or not deleted".to_string()));
     }
     Ok(())
 }

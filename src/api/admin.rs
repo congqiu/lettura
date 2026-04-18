@@ -2,7 +2,8 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::user::User;
 
 pub async fn list_users(
@@ -56,20 +57,21 @@ pub async fn reindex(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let entries: Vec<(uuid::Uuid, Option<String>, Option<String>, String, Option<String>)> =
+    let entries: Vec<(uuid::Uuid, uuid::Uuid, Option<String>, Option<String>, String, Option<String>)> =
         sqlx::query_as(
-            "SELECT id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
+            "SELECT id, user_id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
         )
         .fetch_all(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let count = entries.len();
-    for (id, title, text_content, url, domain) in entries {
+    for (id, user_id, title, text_content, url, domain) in entries {
         state
             .search_index
             .upsert(
                 id,
+                user_id,
                 title.as_deref().unwrap_or(""),
                 text_content.as_deref().unwrap_or(""),
                 &url,

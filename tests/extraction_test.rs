@@ -16,7 +16,7 @@ fn load_expected(name: &str) -> serde_json::Value {
 #[test]
 fn blog_en_simple_extracts_content() {
     let html = load_fixture("blog_en_simple.html");
-    let result = extract::extract(&html, Some("https://example.com/article")).unwrap();
+    let result = extract::extract(&html, Some("https://example.com/article"), None).unwrap();
 
     // Metadata verification
     assert_eq!(
@@ -64,7 +64,7 @@ fn blog_en_simple_extracts_content() {
 #[test]
 fn extract_returns_error_for_garbage_html() {
     let html = "<html><body><div></div></body></html>";
-    let result = extract::extract(html, None);
+    let result = extract::extract(html, None, None);
     assert!(result.is_err(), "should fail for content-less HTML");
 }
 
@@ -77,7 +77,7 @@ fn extract_handles_chinese_content() {
         </article>
     </body></html>"#;
 
-    let result = extract::extract(html, None).unwrap();
+    let result = extract::extract(html, None, None).unwrap();
     assert_eq!(result.language.as_deref(), Some("zh-CN"));
     assert!(result.text_content.contains("所有权系统"));
     assert!(result.reading_time >= 1);

@@ -3,7 +3,7 @@ use axum::http::header;
 use axum::response::{IntoResponse, Response};
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AppState;
+use crate::state::AppState;
 
 pub async fn feed_unread(
     State(state): State<AppState>,

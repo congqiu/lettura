@@ -8,6 +8,21 @@ export interface PageSummary {
   has_password: boolean;
   status: string;
   file_count: number;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Page {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  entry_file: string;
+  has_password: boolean;
+  status: string;
+  file_count: number;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +65,7 @@ export async function createPage(data: {
   title: string;
   description?: string;
   password?: string;
+  expires_at?: string;
 }): Promise<CreatePageResponse> {
   const res = await api.post('/pages', data);
   return res.data;
@@ -71,9 +87,13 @@ export async function updatePage(
     description?: string;
     password?: string | null;
     status?: string;
+    expires_at?: string | null;
+    upload_id?: string;
+    entry_file?: string;
   }
-): Promise<void> {
-  await api.patch(`/pages/${id}`, data);
+): Promise<Page> {
+  const res = await api.patch(`/pages/${id}`, data);
+  return res.data;
 }
 
 export async function deletePage(id: string): Promise<void> {

@@ -3,7 +3,8 @@ use axum::Json;
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::tagging_rule::{self, CreateTaggingRule, UpdateTaggingRule};
 
 use super::validate::ValidatedJson;

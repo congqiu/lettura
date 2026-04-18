@@ -51,7 +51,7 @@ impl Config {
         }
 
         Ok(Self {
-            database_url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+            database_url: env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?,
             jwt_secret,
             listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".to_string()),
             index_path: env::var("INDEX_PATH").unwrap_or_else(|_| "/data/tantivy".to_string()),

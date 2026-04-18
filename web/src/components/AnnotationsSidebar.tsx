@@ -4,6 +4,7 @@ import {
   listAnnotations, createAnnotation, updateAnnotation, deleteAnnotation,
   type Annotation,
 } from '../api/annotations';
+import { toast } from './Toast';
 
 interface Props { entryId: string; }
 
@@ -22,16 +23,19 @@ export default function AnnotationsSidebar({ entryId }: Props) {
   const create = useMutation({
     mutationFn: () => createAnnotation(entryId, newQuote, newText),
     onSuccess: () => { setNewQuote(''); setNewText(''); qc.invalidateQueries({ queryKey: ['annotations', entryId] }); },
+    onError: () => toast('error', '添加批注失败'),
   });
 
   const update = useMutation({
     mutationFn: ({ id, text }: { id: string; text: string }) => updateAnnotation(id, text),
     onSuccess: () => { setEditingId(null); qc.invalidateQueries({ queryKey: ['annotations', entryId] }); },
+    onError: () => toast('error', '更新批注失败'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteAnnotation(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['annotations', entryId] }),
+    onError: () => toast('error', '删除批注失败'),
   });
 
   const handleCaptureSelection = () => {

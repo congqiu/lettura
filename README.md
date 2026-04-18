@@ -12,6 +12,7 @@
 - 浏览器扩展一键保存
 - Wallabag/浏览器书签导入
 - RSS 订阅输出
+- HTML 页面分享（支持密码保护、有效期、文件替换）
 - 响应式 Web 界面 + 内容编辑器
 - 管理员备份/恢复
 - Prometheus 指标（可选）
@@ -30,7 +31,7 @@ JWT_SECRET=your-secret-key-at-least-32-characters-long
 docker compose up -d
 ```
 
-3. 访问 http://localhost:3000，注册第一个用户（自动成为管理员）
+3. 访问 http://localhost:3001，注册第一个用户（自动成为管理员）
 
 ### 环境变量
 
@@ -63,7 +64,7 @@ docker compose up -d
 cargo test
 
 # 前端
-cd web && npm install && npm run dev
+cd web && pnpm install && pnpm run dev
 
 # Docker 构建
 docker build -t lettura .

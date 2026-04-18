@@ -3,7 +3,8 @@ use axum::Json;
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 use crate::models::{entry, memo};
 use crate::tasks::fetcher::FetchJob;
 
@@ -60,6 +61,7 @@ pub async fn promote_memo(
             .fetch_queue
             .send(FetchJob {
                 entry_id: new_entry.id,
+                user_id: auth.user_id,
                 url: new_entry.url.clone(),
             })
             .await;

@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AppState, AuthUser};
+use crate::auth::middleware::AuthUser;
+use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
 // Backup data structures
@@ -238,6 +239,7 @@ pub async fn backup(
 
 #[derive(Deserialize)]
 pub struct RestoreParams {
+    #[serde(default, deserialize_with = "crate::api::validate::deserialize_bool_from_string")]
     pub confirm: Option<bool>,
 }
 
@@ -468,19 +470,20 @@ pub async fn restore(
     // Rebuild search index
     state.search_index.clear().await.ok();
 
-    let entries_for_index: Vec<(Uuid, Option<String>, Option<String>, String, Option<String>)> =
+    let entries_for_index: Vec<(Uuid, Uuid, Option<String>, Option<String>, String, Option<String>)> =
         sqlx::query_as(
-            "SELECT id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
+            "SELECT id, user_id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
         )
         .fetch_all(&state.pool)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    for (id, title, text_content, url, domain) in &entries_for_index {
+    for (id, user_id, title, text_content, url, domain) in &entries_for_index {
         state
             .search_index
             .upsert(
                 *id,
+                *user_id,
                 title.as_deref().unwrap_or(""),
                 text_content.as_deref().unwrap_or(""),
                 url,

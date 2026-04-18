@@ -18,6 +18,13 @@ pub struct ExtractResult {
     pub reading_time: u32,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SiteRuleConfig {
+    pub content_selector: Option<String>,
+    pub title_selector: Option<String>,
+    pub strip_selectors: Option<Vec<String>>,
+}
+
 #[derive(Error, Debug)]
 pub enum ExtractError {
     #[error("failed to parse HTML")]
@@ -27,18 +34,55 @@ pub enum ExtractError {
 }
 
 /// Extract article content from raw HTML - main entry point
-pub fn extract(html: &str, url: Option<&str>) -> Result<ExtractResult, ExtractError> {
+pub fn extract(html: &str, url: Option<&str>, site_rule: Option<&SiteRuleConfig>) -> Result<ExtractResult, ExtractError> {
     let preprocessed = preprocess::preprocess(html);
-    let document = scraper::Html::parse_document(&preprocessed);
+    let mut document = scraper::Html::parse_document(&preprocessed);
+
+    if let Some(rule) = site_rule {
+        if let Some(ref strip_selectors) = rule.strip_selectors {
+            for sel_str in strip_selectors {
+                if let Ok(sel) = scraper::Selector::parse(sel_str) {
+                    let ids: Vec<_> = document.select(&sel)
+                        .map(|el| el.id())
+                        .collect();
+                    for id in ids {
+                        if let Some(mut node) = document.tree.get_mut(id) {
+                            node.detach();
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let meta = metadata::extract_metadata(&document, url);
-    let article_html = readability::extract_content(&document)?;
+
+    let title = if let Some(rule) = site_rule {
+        if let Some(ref title_selector) = rule.title_selector {
+            extract_title_with_selector(&document, title_selector).or(meta.title)
+        } else {
+            meta.title
+        }
+    } else {
+        meta.title
+    };
+
+    let article_html = if let Some(rule) = site_rule {
+        if let Some(ref content_selector) = rule.content_selector {
+            readability::extract_content_with_selector(&document, content_selector)?
+        } else {
+            readability::extract_content(&document)?
+        }
+    } else {
+        readability::extract_content(&document)?
+    };
+
     let clean_html = sanitize::sanitize(&article_html);
     let text_content = html_to_text(&clean_html);
     let reading_time = estimate_reading_time(&text_content);
 
     Ok(ExtractResult {
-        title: meta.title,
+        title,
         content: clean_html,
         text_content,
         author: meta.author,
@@ -47,6 +91,13 @@ pub fn extract(html: &str, url: Option<&str>) -> Result<ExtractResult, ExtractEr
         excerpt: meta.excerpt,
         reading_time,
     })
+}
+
+fn extract_title_with_selector(document: &scraper::Html, selector: &str) -> Option<String> {
+    let sel = scraper::Selector::parse(selector).ok()?;
+    let el = document.select(&sel).next()?;
+    let text = el.text().collect::<String>().trim().to_string();
+    if text.is_empty() { None } else { Some(text) }
 }
 
 fn html_to_text(html: &str) -> String {

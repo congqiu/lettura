@@ -103,3 +103,16 @@ impl From<sqlx::Error> for ApiError {
         }
     }
 }
+
+impl From<crate::models::error::ModelError> for ApiError {
+    fn from(e: crate::models::error::ModelError) -> Self {
+        match e {
+            crate::models::error::ModelError::NotFound(msg) => ApiError::NotFound(msg),
+            crate::models::error::ModelError::Conflict(msg) => ApiError::Conflict(msg),
+            crate::models::error::ModelError::Database(msg) => {
+                tracing::error!("database error: {msg}");
+                ApiError::Internal("internal server error".to_string())
+            }
+        }
+    }
+}

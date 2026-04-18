@@ -24,9 +24,32 @@ export default function PageUploadModal({ open, onClose }: Props) {
   const [description, setDescription] = useState('');
   const [password, setPassword] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [expiry, setExpiry] = useState('');
+
+  const EXPIRY_OPTIONS = [
+    { label: '永久', value: '' },
+    { label: '1 小时', value: '1h' },
+    { label: '1 天', value: '1d' },
+    { label: '7 天', value: '7d' },
+    { label: '30 天', value: '30d' },
+  ];
+
+  function computeExpiry(value: string): string | undefined {
+    if (!value) return undefined;
+    const now = new Date();
+    const map: Record<string, number> = { '1h': 3600, '1d': 86400, '7d': 604800, '30d': 2592000 };
+    const seconds = map[value];
+    if (!seconds) return undefined;
+    return new Date(now.getTime() + seconds * 1000).toISOString();
+  }
 
   const handleFiles = useCallback(async (fileList: FileList | File[]) => {
     const arr = Array.from(fileList);
+    const hasHtml = arr.some(f => f.name.toLowerCase().endsWith('.html') || f.name.toLowerCase().endsWith('.htm'));
+    if (!hasHtml) {
+      toast('error', '当前只支持 HTML 页面，请至少上传一个 HTML 文件');
+      return;
+    }
     try {
       const result = await uploadFiles(arr);
       setUploadResult(result);
@@ -58,6 +81,7 @@ export default function PageUploadModal({ open, onClose }: Props) {
       title,
       description: description || undefined,
       password: password || undefined,
+      expires_at: computeExpiry(expiry),
     }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['pages'] });
@@ -177,6 +201,18 @@ export default function PageUploadModal({ open, onClose }: Props) {
                       <RefreshCw size={14} />
                     </button>
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">分享有效期</label>
+                  <select
+                    value={expiry}
+                    onChange={(e) => setExpiry(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                  >
+                    {EXPIRY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <p className="text-xs text-gray-400">{uploadResult.file_count} 个文件</p>
               </div>

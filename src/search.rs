@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
+use tantivy::query::{BooleanQuery, Occur, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
 use tokio::sync::Mutex;
@@ -19,6 +19,7 @@ pub struct SearchIndex {
     f_content: Field,
     f_url: Field,
     f_domain: Field,
+    f_user_id: Field,
 }
 
 impl SearchIndex {
@@ -30,6 +31,7 @@ impl SearchIndex {
         let f_content = schema_builder.add_text_field("content", TEXT);
         let f_url = schema_builder.add_text_field("url", STRING | STORED);
         let f_domain = schema_builder.add_text_field("domain", STRING);
+        let f_user_id = schema_builder.add_text_field("user_id", STRING | STORED);
         let schema = schema_builder.build();
 
         std::fs::create_dir_all(index_path).ok();
@@ -56,6 +58,7 @@ impl SearchIndex {
             f_content,
             f_url,
             f_domain,
+            f_user_id,
         })
     }
 
@@ -67,6 +70,7 @@ impl SearchIndex {
         let f_content = schema_builder.add_text_field("content", TEXT);
         let f_url = schema_builder.add_text_field("url", STRING | STORED);
         let f_domain = schema_builder.add_text_field("domain", STRING);
+        let f_user_id = schema_builder.add_text_field("user_id", STRING | STORED);
         let schema = schema_builder.build();
 
         let index = Index::create_in_ram(schema.clone());
@@ -86,6 +90,7 @@ impl SearchIndex {
             f_content,
             f_url,
             f_domain,
+            f_user_id,
         })
     }
 
@@ -93,13 +98,13 @@ impl SearchIndex {
     pub async fn upsert(
         &self,
         id: Uuid,
+        user_id: Uuid,
         title: &str,
         content: &str,
         url: &str,
         domain: &str,
     ) -> Result<(), tantivy::TantivyError> {
         let mut writer = self.writer.lock().await;
-        // Delete existing doc first
         let id_str = id.to_string();
         let id_term = tantivy::Term::from_field_text(self.f_id, &id_str);
         writer.delete_term(id_term);
@@ -109,6 +114,7 @@ impl SearchIndex {
             self.f_content => content,
             self.f_url => url,
             self.f_domain => domain,
+            self.f_user_id => user_id.to_string(),
         ))?;
         writer.commit()?;
         Ok(())
@@ -129,11 +135,23 @@ impl SearchIndex {
     }
 
     /// Search and return matching entry UUIDs
-    pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<Uuid>, tantivy::TantivyError> {
+    pub fn search(&self, query_str: &str, user_id: Option<Uuid>, limit: usize) -> Result<Vec<Uuid>, tantivy::TantivyError> {
         let searcher = self.reader.searcher();
         let query_parser = QueryParser::for_index(&self.index, vec![self.f_title, self.f_content]);
-        let query = query_parser.parse_query(query_str)?;
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(limit))?;
+        let text_query = query_parser.parse_query(query_str)?;
+
+        let query: Box<dyn tantivy::query::Query> = if let Some(uid) = user_id {
+            let user_term = tantivy::Term::from_field_text(self.f_user_id, &uid.to_string());
+            let user_query = Box::new(TermQuery::new(user_term, IndexRecordOption::Basic));
+            Box::new(BooleanQuery::new(vec![
+                (Occur::Must, Box::new(text_query) as _),
+                (Occur::Must, user_query as _),
+            ]))
+        } else {
+            Box::new(text_query)
+        };
+
+        let top_docs = searcher.search(query.as_ref(), &TopDocs::with_limit(limit))?;
 
         let mut ids = Vec::new();
         for (_score, doc_address) in top_docs {
@@ -168,23 +186,31 @@ impl SearchIndex {
 mod tests {
     use super::*;
 
+    fn test_user_id() -> Uuid {
+        Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()
+    }
+
+    fn test_user_id_2() -> Uuid {
+        Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()
+    }
+
     #[tokio::test]
     async fn index_and_search() {
         let idx = SearchIndex::in_memory().unwrap();
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
+        let uid = test_user_id();
 
-        idx.upsert(id1, "Rust Ownership", "Learn about ownership and borrowing in Rust", "https://example.com/rust", "example.com").await.unwrap();
-        idx.upsert(id2, "Python Guide", "A beginner guide to Python programming", "https://example.com/python", "example.com").await.unwrap();
+        idx.upsert(id1, uid, "Rust Ownership", "Learn about ownership and borrowing in Rust", "https://example.com/rust", "example.com").await.unwrap();
+        idx.upsert(id2, uid, "Python Guide", "A beginner guide to Python programming", "https://example.com/python", "example.com").await.unwrap();
 
-        // Reload reader to see committed changes
         idx.reader.reload().unwrap();
 
-        let results = idx.search("ownership", 10).unwrap();
+        let results = idx.search("ownership", Some(uid), 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], id1);
 
-        let results = idx.search("Python", 10).unwrap();
+        let results = idx.search("Python", Some(uid), 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], id2);
     }
@@ -193,16 +219,17 @@ mod tests {
     async fn upsert_replaces_existing() {
         let idx = SearchIndex::in_memory().unwrap();
         let id = Uuid::new_v4();
+        let uid = test_user_id();
 
-        idx.upsert(id, "Old Title", "old content", "https://example.com", "example.com").await.unwrap();
-        idx.upsert(id, "New Title", "new content about Rust", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(id, uid, "Old Title", "old content", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(id, uid, "New Title", "new content about Rust", "https://example.com", "example.com").await.unwrap();
 
         idx.reader.reload().unwrap();
 
-        let results = idx.search("old", 10).unwrap();
+        let results = idx.search("old", Some(uid), 10).unwrap();
         assert!(results.is_empty());
 
-        let results = idx.search("Rust", 10).unwrap();
+        let results = idx.search("Rust", Some(uid), 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], id);
     }
@@ -211,13 +238,39 @@ mod tests {
     async fn delete_removes_from_index() {
         let idx = SearchIndex::in_memory().unwrap();
         let id = Uuid::new_v4();
+        let uid = test_user_id();
 
-        idx.upsert(id, "Title", "searchable content", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(id, uid, "Title", "searchable content", "https://example.com", "example.com").await.unwrap();
         idx.reader.reload().unwrap();
-        assert_eq!(idx.search("searchable", 10).unwrap().len(), 1);
+        assert_eq!(idx.search("searchable", Some(uid), 10).unwrap().len(), 1);
 
         idx.delete(id).await.unwrap();
         idx.reader.reload().unwrap();
-        assert_eq!(idx.search("searchable", 10).unwrap().len(), 0);
+        assert_eq!(idx.search("searchable", Some(uid), 10).unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn search_filters_by_user() {
+        let idx = SearchIndex::in_memory().unwrap();
+        let uid1 = test_user_id();
+        let uid2 = test_user_id_2();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        idx.upsert(id1, uid1, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
+        idx.upsert(id2, uid2, "Rust Guide", "Another Rust tutorial", "https://example.com/rust2", "example.com").await.unwrap();
+
+        idx.reader.reload().unwrap();
+
+        let results = idx.search("Rust", Some(uid1), 10).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], id1);
+
+        let results = idx.search("Rust", Some(uid2), 10).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], id2);
+
+        let results = idx.search("Rust", None, 10).unwrap();
+        assert_eq!(results.len(), 2);
     }
 }

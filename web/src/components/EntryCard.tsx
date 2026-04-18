@@ -1,16 +1,7 @@
 import { Link } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateEntry, type EntrySummary } from '../api/entries';
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}分钟前`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}小时前`;
-  const days = Math.floor(hrs / 24);
-  return `${days}天前`;
-}
+import { type EntrySummary } from '../api/entries';
+import { timeAgo } from '../utils/time';
+import { useEntryActions } from '../hooks/useEntryActions';
 
 export default function EntryCard({
   entry,
@@ -21,17 +12,7 @@ export default function EntryCard({
   selected?: boolean;
   onDomainClick?: (domain: string) => void;
 }) {
-  const qc = useQueryClient();
-
-  const toggleStar = useMutation({
-    mutationFn: () => updateEntry(entry.id, { is_starred: !entry.is_starred }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['entries'] }),
-  });
-
-  const toggleArchive = useMutation({
-    mutationFn: () => updateEntry(entry.id, { is_archived: !entry.is_archived }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['entries'] }),
-  });
+  const { toggleStar, toggleArchive } = useEntryActions(entry.id, entry);
 
   return (
     <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:shadow-sm dark:hover:shadow-gray-900/50 transition-all ${selected ? 'ring-2 ring-blue-500' : ''}`}>

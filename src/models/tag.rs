@@ -3,7 +3,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::api::error::ApiError;
+use super::error::ModelError;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Tag {
@@ -24,42 +24,52 @@ pub fn slugify(label: &str) -> String {
         .to_string()
 }
 
-pub async fn list_tags(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ApiError> {
+pub async fn list_tags(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ModelError> {
     sqlx::query_as::<_, Tag>("SELECT * FROM tags WHERE user_id = $1 ORDER BY label")
         .bind(user_id)
         .fetch_all(pool)
         .await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Result<Tag, ApiError> {
+pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Result<Tag, ModelError> {
     let slug = slugify(label);
     if let Some(tag) = sqlx::query_as::<_, Tag>("SELECT * FROM tags WHERE user_id = $1 AND slug = $2")
-        .bind(user_id).bind(&slug).fetch_optional(pool).await.map_err(|e| ApiError::Internal(e.to_string()))? {
+        .bind(user_id).bind(&slug).fetch_optional(pool).await.map_err(|e| ModelError::Database(e.to_string()))? {
         return Ok(tag);
     }
     sqlx::query_as::<_, Tag>("INSERT INTO tags (user_id, label, slug) VALUES ($1, $2, $3) RETURNING *")
         .bind(user_id).bind(label).bind(&slug).fetch_one(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn add_tag_to_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<(), ApiError> {
+pub async fn add_tag_to_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<(), ModelError> {
     sqlx::query("INSERT INTO entry_tags (entry_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
         .bind(entry_id).bind(tag_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }
 
-pub async fn remove_tag_from_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<bool, ApiError> {
+pub async fn remove_tag_from_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM entry_tags WHERE entry_id = $1 AND tag_id = $2")
         .bind(entry_id).bind(tag_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bool, ApiError> {
+pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM tags WHERE id = $1 AND user_id = $2")
         .bind(tag_id).bind(user_id).execute(pool).await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+        .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
+}
+
+pub async fn list_tags_for_entry(pool: &PgPool, entry_id: Uuid) -> Result<Vec<Tag>, ModelError> {
+    sqlx::query_as::<_, Tag>(
+        "SELECT t.* FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1 ORDER BY t.label"
+    )
+    .bind(entry_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
