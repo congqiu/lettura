@@ -9,18 +9,9 @@ use crate::state::AppState;
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
 use crate::tasks::fetcher::FetchJob;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-#[derive(serde::Deserialize)]
-=======
-use super::validate::ValidatedJson;
-=======
 use super::validate::{deserialize_bool_from_string, ValidatedJson};
->>>>>>> 7b9e29d (feat: page reupload, expiry support and UI/UX improvements #none)
 
 #[derive(Debug, serde::Deserialize)]
->>>>>>> 90aaa72 (fix: compilation fixes from Docker test run)
 pub struct ListQueryParams {
     #[serde(flatten)]
     pub inner: ListParams,
@@ -28,12 +19,7 @@ pub struct ListQueryParams {
     pub deleted: Option<bool>,
 }
 
-#[derive(serde::Deserialize)]
-=======
-use super::validate::ValidatedJson;
-
 #[derive(serde::Deserialize, Validate)]
->>>>>>> 86673bc (feat: add ValidatedJson extractor with validator crate for centralized request validation)
 pub struct CreateEntryRequest {
     #[validate(url(message = "invalid URL format"))]
     pub url: String,

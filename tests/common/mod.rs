@@ -50,11 +50,8 @@ impl TestApp {
             db_max_connections: 10,
             db_min_connections: 2,
             db_acquire_timeout_secs: 30,
-<<<<<<< HEAD
-=======
             cors_origins: "*".to_string(),
             metrics_enabled: false,
->>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
         };
 
         let (app, _, _) = lettura::api::router_with_search(
