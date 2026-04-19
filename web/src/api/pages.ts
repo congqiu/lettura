@@ -6,6 +6,7 @@ export interface PageSummary {
   title: string;
   description: string | null;
   has_password: boolean;
+  password: string | null;
   status: string;
   file_count: number;
   expires_at: string | null;
@@ -20,6 +21,7 @@ export interface Page {
   description: string | null;
   entry_file: string;
   has_password: boolean;
+  password: string | null;
   status: string;
   file_count: number;
   expires_at: string | null;
@@ -47,6 +49,8 @@ export interface CreatePageResponse {
   slug: string;
   title: string;
   url: string;
+  url_with_password: string | null;
+  has_password: boolean;
   created_at: string;
 }
 

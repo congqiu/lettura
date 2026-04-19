@@ -1,14 +1,21 @@
-use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::extract::{Path, Query, State};
+use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use chrono::Utc;
+use serde::Deserialize;
 
 use crate::state::AppState;
 use crate::models::page;
 
 type HmacSha256 = Hmac<Sha256>;
+
+#[derive(Debug, Deserialize)]
+pub struct ShareQueryParams {
+    #[serde(rename = "p")]
+    password: Option<String>,
+}
 
 fn sign_cookie(jwt_secret: &str, slug: &str) -> String {
     let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes()).unwrap();
@@ -36,23 +43,26 @@ fn get_cookie_value(headers: &HeaderMap, slug: &str) -> Option<String> {
 pub async fn serve_page(
     State(state): State<AppState>,
     Path(slug): Path<String>,
+    Query(params): Query<ShareQueryParams>,
     headers: HeaderMap,
 ) -> Response {
-    serve_page_file_inner(&state, &slug, None, &headers).await
+    serve_page_file_inner(&state, &slug, None, params.password.as_deref(), &headers).await
 }
 
 pub async fn serve_page_file(
     State(state): State<AppState>,
     Path((slug, file)): Path<(String, String)>,
+    Query(params): Query<ShareQueryParams>,
     headers: HeaderMap,
 ) -> Response {
-    serve_page_file_inner(&state, &slug, Some(&file), &headers).await
+    serve_page_file_inner(&state, &slug, Some(&file), params.password.as_deref(), &headers).await
 }
 
 async fn serve_page_file_inner(
     state: &AppState,
     slug: &str,
     sub_path: Option<&str>,
+    query_password: Option<&str>,
     headers: &HeaderMap,
 ) -> Response {
     let page_record = match page::find_page_by_slug(&state.pool, slug).await {
@@ -67,9 +77,13 @@ async fn serve_page_file_inner(
     }
 
     if page_record.password.is_some() {
-        let authenticated = get_cookie_value(headers, slug)
-            .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
-            .unwrap_or(false);
+        let authenticated = if let Some(pw) = query_password {
+            pw == page_record.password.as_ref().unwrap()
+        } else {
+            get_cookie_value(headers, slug)
+                .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
+                .unwrap_or(false)
+        };
         if !authenticated {
             return render_password_page(slug, false);
         }
@@ -132,8 +146,8 @@ pub async fn auth_page(
     };
 
     match &page_record.password {
-        Some(hash) => {
-            if crate::auth::password::verify_password(&form.password, hash).is_ok() {
+        Some(stored_password) => {
+            if form.password == *stored_password {
                 let sig = sign_cookie(&state.config.jwt_secret, &slug);
                 let cookie = format!(
                     "page_auth_{}={}; Path=/p/{}; Max-Age=86400; HttpOnly; SameSite=Lax",

@@ -54,7 +54,7 @@ pub struct UpdatePageRequest {
     #[validate(length(max = 500))]
     pub title: Option<String>,
     pub description: Option<String>,
-    pub password: Option<Option<String>>,
+    pub password: Option<String>,
     pub status: Option<String>,
     pub expires_at: Option<Option<String>>,
     pub upload_id: Option<String>,
@@ -239,8 +239,8 @@ pub async fn create_page_handler(
 
     let file_count = count_files_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let password_hash = match &req.password {
-        Some(pw) if !pw.is_empty() => Some(crate::auth::password::hash_password(pw).map_err(|_| ApiError::Internal("hash failed".to_string()))?),
+    let password = match &req.password {
+        Some(pw) if !pw.is_empty() => Some(pw.clone()),
         _ => None,
     };
 
@@ -253,11 +253,12 @@ pub async fn create_page_handler(
     let new_page = page::create_page_with_retry(
         &state.pool, auth.user_id, &req.title,
         req.description.as_deref(), &req.entry_file,
-        password_hash.as_deref(), file_count as i32,
+        password.as_deref(), file_count as i32,
         expires_at,
     ).await?;
 
     let slug = new_page.slug.clone();
+    let password_for_url = req.password.clone();
 
     if state.config.storage_type == "local" {
         let pages_base = pages_storage_path(&state).join(&slug);
@@ -277,11 +278,18 @@ pub async fn create_page_handler(
 
     tracing::info!(page_id = %new_page.id, slug = %slug, "page created");
 
+    let url = format!("/p/{}", new_page.slug);
+    let url_with_password = password_for_url.as_ref()
+        .filter(|pw| !pw.is_empty())
+        .map(|pw| format!("{}?p={}", url, pw));
+
     Ok(Json(serde_json::json!({
         "id": new_page.id,
         "slug": new_page.slug,
         "title": new_page.title,
-        "url": format!("/p/{}", new_page.slug),
+        "url": url,
+        "url_with_password": url_with_password,
+        "has_password": password_for_url.as_ref().filter(|pw| !pw.is_empty()).is_some(),
         "created_at": new_page.created_at,
     })))
 }
@@ -416,7 +424,9 @@ pub async fn update_page_handler(
         let slug = existing.slug.clone();
 
         // Delete old files and copy new ones
-        if state.config.storage_type == "local" {
+    let password_for_url = req.password.clone();
+
+    if state.config.storage_type == "local" {
             let pages_base = pages_storage_path(&state).join(&slug);
             // Remove old files (ignore if directory doesn't exist)
             tokio::fs::remove_dir_all(&pages_base).await.ok();
@@ -482,4 +492,30 @@ pub async fn restore_page_handler(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     page::restore_page(&state.pool, auth.user_id, page_id).await?;
     Ok(Json(serde_json::json!({"success": true})))
+}
+
+#[derive(Debug, Serialize)]
+pub struct ShareUrlResponse {
+    pub url: String,
+    pub password: Option<String>,
+    pub has_password: bool,
+}
+
+#[tracing::instrument(skip(state), err)]
+pub async fn get_share_url_handler(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(page_id): Path<Uuid>,
+) -> Result<Json<ShareUrlResponse>, ApiError> {
+    let page = page::find_page_by_id(&state.pool, auth.user_id, page_id).await?
+        .ok_or_else(|| ApiError::NotFound("page not found".to_string()))?;
+    
+    let base_url = format!("/p/{}", page.slug);
+    let has_password = page.password.is_some();
+    
+    Ok(Json(ShareUrlResponse {
+        url: base_url,
+        password: page.password,
+        has_password,
+    }))
 }

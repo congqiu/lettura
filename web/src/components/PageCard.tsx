@@ -6,6 +6,10 @@ import { toast } from './Toast';
 import { timeAgo } from '../utils/time';
 import PageEditModal from './PageEditModal';
 
+interface PageCardProps {
+  page: PageSummary;
+}
+
 function formatExpiry(expiresAt: string): { text: string; urgent: boolean } {
   const now = Date.now();
   const end = new Date(expiresAt).getTime();
@@ -19,10 +23,22 @@ function formatExpiry(expiresAt: string): { text: string; urgent: boolean } {
   return { text: `${minutes}分钟后到期`, urgent: true };
 }
 
-export default function PageCard({ page }: { page: PageSummary }) {
+export default function PageCard({ page }: PageCardProps) {
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const pageUrl = `${window.location.origin}/p/${page.slug}`;
+
+  const getFullUrl = () => {
+    if (page.has_password && page.password) {
+      return `${pageUrl}?p=${encodeURIComponent(page.password)}`;
+    }
+    return pageUrl;
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getFullUrl());
+    toast('success', '链接已复制');
+  };
 
   const toggleStatus = useMutation({
     mutationFn: () => updatePage(page.id, { status: page.status === 'active' ? 'disabled' : 'active' }),
@@ -51,11 +67,6 @@ export default function PageCard({ page }: { page: PageSummary }) {
     onError: () => toast('error', '恢复失败，请重试'),
   });
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(pageUrl);
-    toast('success', '链接已复制');
-  };
-
   const isDeleted = page.status === 'deleted';
   const expiry = page.expires_at ? formatExpiry(page.expires_at) : null;
 
@@ -69,7 +80,7 @@ export default function PageCard({ page }: { page: PageSummary }) {
             </h3>
             <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-500 flex-wrap">
               <button
-                onClick={() => window.open(pageUrl, '_blank')}
+                onClick={() => window.open(getFullUrl(), '_blank')}
                 className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 font-mono"
               >
                 /p/{page.slug}
@@ -92,7 +103,7 @@ export default function PageCard({ page }: { page: PageSummary }) {
             {!isDeleted && (
               <>
                 <a
-                  href={pageUrl}
+                  href={getFullUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 rounded-md transition-colors"
@@ -101,7 +112,7 @@ export default function PageCard({ page }: { page: PageSummary }) {
                   <ExternalLink size={15} />
                 </a>
                 <button
-                  onClick={copyLink}
+                  onClick={handleCopyLink}
                   className="p-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 rounded-md transition-colors"
                   title="复制链接"
                 >

@@ -23,18 +23,40 @@ pub struct Page {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct PageSummary {
     pub id: Uuid,
     pub slug: String,
     pub title: String,
     pub description: Option<String>,
-    pub has_password: bool,
+    pub password: Option<String>,
     pub status: String,
     pub file_count: i32,
     pub expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl Serialize for PageSummary {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PageSummary", 11)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("slug", &self.slug)?;
+        state.serialize_field("title", &self.title)?;
+        state.serialize_field("description", &self.description)?;
+        state.serialize_field("has_password", &self.password.is_some())?;
+        state.serialize_field("password", &self.password)?;
+        state.serialize_field("status", &self.status)?;
+        state.serialize_field("file_count", &self.file_count)?;
+        state.serialize_field("expires_at", &self.expires_at)?;
+        state.serialize_field("created_at", &self.created_at)?;
+        state.serialize_field("updated_at", &self.updated_at)?;
+        state.end()
+    }
 }
 
 pub fn generate_slug() -> String {
@@ -120,7 +142,7 @@ pub async fn list_pages(
     let (items, count) = match status {
         Some("deleted") => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, 'deleted' as status, file_count, expires_at, created_at, updated_at
+                "SELECT id, slug, title, description, password, 'deleted' as status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT $2 OFFSET $3"
             ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NOT NULL")
@@ -129,7 +151,7 @@ pub async fn list_pages(
         }
         Some("expired") => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                "SELECT id, slug, title, description, password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND expires_at IS NOT NULL AND expires_at < NOW() ORDER BY expires_at ASC LIMIT $2 OFFSET $3"
             ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND expires_at IS NOT NULL AND expires_at < NOW()")
@@ -138,7 +160,7 @@ pub async fn list_pages(
         }
         Some("all") => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                "SELECT id, slug, title, description, password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3"
             ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL")
@@ -147,7 +169,7 @@ pub async fn list_pages(
         }
         Some(s) => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                "SELECT id, slug, title, description, password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT $3 OFFSET $4"
             ).bind(user_id).bind(s).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 AND (expires_at IS NULL OR expires_at > NOW())")
@@ -156,7 +178,7 @@ pub async fn list_pages(
         }
         None => {
             let items = sqlx::query_as::<_, PageSummary>(
-                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                "SELECT id, slug, title, description, password, status, file_count, expires_at, created_at, updated_at
                  FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT $2 OFFSET $3"
             ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())")
@@ -171,7 +193,7 @@ pub async fn list_pages(
 pub struct UpdatePageParams {
     pub title: Option<String>,
     pub description: Option<String>,
-    pub password: Option<Option<String>>,
+    pub password: Option<String>,
     pub status: Option<String>,
     pub expires_at: Option<Option<DateTime<Utc>>>,
     pub entry_file: Option<String>,
@@ -193,9 +215,8 @@ pub async fn update_page(
     let entry_file = params.entry_file.as_deref().unwrap_or(&existing.entry_file);
     let file_count = params.file_count.unwrap_or(existing.file_count);
     let password = match &params.password {
-        Some(Some(pw)) if pw.is_empty() => None,
-        Some(Some(pw)) => Some(crate::auth::password::hash_password(pw).map_err(|_| ModelError::Database("hash failed".to_string()))?),
-        Some(None) => None,
+        Some(pw) if pw.is_empty() => None,
+        Some(pw) => Some(pw.clone()),
         None => existing.password.clone(),
     };
     let expires_at = match &params.expires_at {

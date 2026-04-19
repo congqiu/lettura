@@ -31,7 +31,7 @@ JWT_SECRET=your-secret-key-at-least-32-characters-long
 docker compose up -d
 ```
 
-3. 访问 http://localhost:3001，注册第一个用户（自动成为管理员）
+3. 访问 http://localhost:3330，注册第一个用户（自动成为管理员）
 
 ### 环境变量
 
@@ -39,7 +39,7 @@ docker compose up -d
 |------|--------|------|
 | `DATABASE_URL` | 必填 | PostgreSQL 连接字符串 |
 | `JWT_SECRET` | 必填 | JWT 签名密钥（至少 32 字符） |
-| `LISTEN_ADDR` | `0.0.0.0:3000` | HTTP 监听地址 |
+| `LISTEN_ADDR` | `0.0.0.0:3330` | HTTP 监听地址 |
 | `STORAGE_TYPE` | `local` | 图片存储类型（local/oss） |
 | `CORS_ORIGINS` | `*` | CORS 允许来源（逗号分隔或 *） |
 | `METRICS_ENABLED` | `false` | 启用 Prometheus 指标 |

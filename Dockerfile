@@ -42,6 +42,6 @@ COPY --from=backend-builder /app/migrations ./migrations
 
 RUN mkdir -p /data/tantivy
 
-EXPOSE 3000
+EXPOSE 3330
 
 CMD ["./lettura"]

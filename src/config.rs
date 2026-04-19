@@ -7,8 +7,8 @@ pub struct Config {
     pub listen_addr: String,
     pub index_path: String,
     // Storage
-    pub storage_type: String,           // "local" or "oss"
-    pub storage_local_path: String,     // local storage directory
+    pub storage_type: String,       // "local" or "oss"
+    pub storage_local_path: String, // local storage directory
     pub pages_storage_path: String,
     // OSS (S3-compatible)
     pub oss_endpoint: String,
@@ -16,7 +16,7 @@ pub struct Config {
     pub oss_bucket: String,
     pub oss_access_key: String,
     pub oss_secret_key: String,
-    pub oss_public_url: String,         // custom public URL prefix (optional)
+    pub oss_public_url: String, // custom public URL prefix (optional)
     // DB connection pool
     pub db_max_connections: u32,
     pub db_min_connections: u32,
@@ -36,11 +36,13 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, String> {
-        let jwt_secret = env::var("JWT_SECRET")
-            .map_err(|_| "JWT_SECRET must be set".to_string())?;
+        let jwt_secret =
+            env::var("JWT_SECRET").map_err(|_| "JWT_SECRET must be set".to_string())?;
 
         if jwt_secret == "change-me-in-production" {
-            return Err("JWT_SECRET must not be the default value 'change-me-in-production'".to_string());
+            return Err(
+                "JWT_SECRET must not be the default value 'change-me-in-production'".to_string(),
+            );
         }
 
         if jwt_secret.len() < 32 {
@@ -53,7 +55,7 @@ impl Config {
         Ok(Self {
             database_url: env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?,
             jwt_secret,
-            listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".to_string()),
+            listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:3330".to_string()),
             index_path: env::var("INDEX_PATH").unwrap_or_else(|_| "/data/tantivy".to_string()),
             storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
             storage_local_path: env::var("STORAGE_LOCAL_PATH").unwrap_or_else(|_| "/data/storage".to_string()),
@@ -141,7 +143,9 @@ mod tests {
         let result = Config::from_env();
         cleanup_env();
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("must not be the default value"));
+        assert!(result
+            .unwrap_err()
+            .contains("must not be the default value"));
     }
 
     #[test]

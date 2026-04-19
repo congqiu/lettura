@@ -169,6 +169,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/pages", get(pages::list_pages_handler).post(pages::create_page_handler))
         .route("/api/v1/pages/{id}", patch(pages::update_page_handler).delete(pages::delete_page_handler))
         .route("/api/v1/pages/{id}/restore", post(pages::restore_page_handler))
+        .route("/api/v1/pages/{id}/share-url", get(pages::get_share_url_handler))
         // Local storage file serving
         .route("/storage/{*path}", get(serve_storage))
         // Legacy API redirect: /api/{path} -> /api/v1/{path} (301)

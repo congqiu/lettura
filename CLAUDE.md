@@ -119,7 +119,7 @@ exclude: /video/
 
 ### 服务端口
 
-- 应用: `http://localhost:3001`
+- 应用: `http://localhost:3330`
 - PostgreSQL: `localhost:5432`（用户名/密码: lettura/lettura）
 
 ## 不要做的事

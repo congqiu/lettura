@@ -87,9 +87,10 @@ export default function PageUploadModal({ open, onClose }: Props) {
     }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      const url = `${window.location.origin}${data.url}`;
-      navigator.clipboard.writeText(url);
-      toast('success', `页面已发布，链接已复制: /p/${data.slug}`);
+      const url = data.url_with_password || data.url;
+      const fullUrl = `${window.location.origin}${url}`;
+      navigator.clipboard.writeText(fullUrl);
+      toast('success', `页面已发布，链接已复制${data.has_password ? '（含密码）' : ''}: /p/${data.slug}`);
       onClose();
     },
     onError: () => {

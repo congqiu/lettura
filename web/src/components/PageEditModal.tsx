@@ -33,8 +33,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(page.title);
-  const [password, setPassword] = useState('');
-  const [clearPassword, setClearPassword] = useState(false);
+  const [password, setPassword] = useState(page.password || '');
   const [expiry, setExpiry] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -78,7 +77,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   const saveMutation = useMutation({
     mutationFn: () => updatePage(page.id, {
       title,
-      password: clearPassword ? '' : (password || undefined),
+      password: password || '',
       expires_at: expiry === '' ? undefined : (expiry === '__clear__' ? null : computeExpiry(expiry)),
       upload_id: uploadResult?.upload_id || undefined,
       entry_file: uploadResult ? entryFile : undefined,
@@ -189,46 +188,37 @@ export default function PageEditModal({ page, open, onClose }: Props) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               访问密码 {page.has_password && <span className="text-yellow-500 text-xs">(已设置)</span>}
             </label>
-            {page.has_password && !clearPassword && (
-              <button
-                type="button"
-                onClick={() => setClearPassword(true)}
-                className="text-xs text-red-500 hover:text-red-600 mb-1"
-              >
-                清除密码
-              </button>
-            )}
-            {clearPassword && (
-              <button
-                type="button"
-                onClick={() => setClearPassword(false)}
-                className="text-xs text-blue-500 hover:text-blue-600 mb-1"
-              >
-                取消清除
-              </button>
-            )}
-            {!clearPassword && (
-              <div className="flex gap-2">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={page.has_password ? '留空则不修改' : '留空则无密码'}
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="留空则无密码"
+                  className="w-full px-3 py-2 pr-8 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-                    setPassword(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));
-                  }}
-                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  title="自动生成密码"
-                >
-                  <RefreshCw size={14} />
-                </button>
+                {password && (
+                  <button
+                    type="button"
+                    onClick={() => setPassword('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => {
+                  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                  setPassword(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                title="自动生成密码"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
 
           <div>
