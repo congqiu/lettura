@@ -1,0 +1,5 @@
+render: true
+title: h1
+body: article
+author: a[rel="author"]
+date: time

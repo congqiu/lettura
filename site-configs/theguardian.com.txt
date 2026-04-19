@@ -1,0 +1,5 @@
+title: h1
+body: div.article-body-commercial-selector
+strip: aside
+author: a[rel="author"]
+date: time

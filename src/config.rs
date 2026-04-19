@@ -30,6 +30,13 @@ pub struct Config {
     pub cors_origins: String,
     // Metrics
     pub metrics_enabled: bool,
+    // Fetch
+    pub user_agent: String,
+    pub fetch_timeout_secs: u64,
+    pub fetch_max_retries: u32,
+    pub proxy: Option<String>,
+    pub rendering_url: Option<String>,
+    pub site_configs_path: Option<String>,
 }
 
 impl Config {
@@ -92,7 +99,18 @@ impl Config {
             db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
             cors_origins: env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string()),
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
+<<<<<<< HEAD
 >>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
+=======
+            user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36".to_string()
+            }),
+            fetch_timeout_secs: env::var("LETTURA_FETCH_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
+            fetch_max_retries: env::var("LETTURA_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
+            proxy: env::var("LETTURA_PROXY").ok(),
+            rendering_url: env::var("LETTURA_RENDERING_URL").ok(),
+            site_configs_path: env::var("LETTURA_SITE_CONFIGS_PATH").ok(),
+>>>>>>> 02ab4a0 (feat: add site config system for improved content extraction)
         })
     }
 }
@@ -138,7 +156,16 @@ mod tests {
 >>>>>>> 4ab46eb (feat: add configurable CORS support (CORS_ORIGINS env var, default *))
 =======
             env::remove_var("PAGES_STORAGE_PATH");
+<<<<<<< HEAD
 >>>>>>> 09eed43 (feat: add pages display module — lightweight HTML page hosting)
+=======
+            env::remove_var("LETTURA_USER_AGENT");
+            env::remove_var("LETTURA_FETCH_TIMEOUT");
+            env::remove_var("LETTURA_FETCH_MAX_RETRIES");
+            env::remove_var("LETTURA_PROXY");
+            env::remove_var("LETTURA_RENDERING_URL");
+            env::remove_var("LETTURA_SITE_CONFIGS_PATH");
+>>>>>>> 02ab4a0 (feat: add site config system for improved content extraction)
         }
     }
 

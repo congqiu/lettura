@@ -127,21 +127,39 @@ pub async fn list_pages(
                 .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
+        Some("expired") => {
+            let items = sqlx::query_as::<_, PageSummary>(
+                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND expires_at IS NOT NULL AND expires_at < NOW() ORDER BY expires_at ASC LIMIT $2 OFFSET $3"
+            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND expires_at IS NOT NULL AND expires_at < NOW()")
+                .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
+            (items, count)
+        }
+        Some("all") => {
+            let items = sqlx::query_as::<_, PageSummary>(
+                "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
+                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+            ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL")
+                .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
+            (items, count)
+        }
         Some(s) => {
             let items = sqlx::query_as::<_, PageSummary>(
                 "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
-                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4"
+                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT $3 OFFSET $4"
             ).bind(user_id).bind(s).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2")
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND status = $2 AND (expires_at IS NULL OR expires_at > NOW())")
                 .bind(user_id).bind(s).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
         None => {
             let items = sqlx::query_as::<_, PageSummary>(
                 "SELECT id, slug, title, description, password IS NOT NULL as has_password, status, file_count, expires_at, created_at, updated_at
-                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+                 FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY created_at DESC LIMIT $2 OFFSET $3"
             ).bind(user_id).bind(limit).bind(offset).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL")
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pages WHERE user_id = $1 AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())")
                 .bind(user_id).fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
             (items, count)
         }
@@ -175,6 +193,7 @@ pub async fn update_page(
     let entry_file = params.entry_file.as_deref().unwrap_or(&existing.entry_file);
     let file_count = params.file_count.unwrap_or(existing.file_count);
     let password = match &params.password {
+        Some(Some(pw)) if pw.is_empty() => None,
         Some(Some(pw)) => Some(crate::auth::password::hash_password(pw).map_err(|_| ModelError::Database("hash failed".to_string()))?),
         Some(None) => None,
         None => existing.password.clone(),

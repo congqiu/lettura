@@ -8,7 +8,9 @@ import EmptyState from '../components/EmptyState';
 import { Plus, Loader2 } from 'lucide-react';
 
 const TABS = [
+  { key: 'all', label: '全部' },
   { key: 'active', label: '活跃' },
+  { key: 'expired', label: '已过期' },
   { key: 'disabled', label: '已禁用' },
   { key: 'deleted', label: '已删除' },
 ] as const;

@@ -108,6 +108,10 @@ export default function EntryDetailPage() {
             className={`${btnBase} ${entry.is_archived ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-800 text-green-700 dark:text-green-400' : btnNormal}`}>
             {entry.is_archived ? '已归档' : '归档'}
           </button>
+          <button onClick={() => refetch.mutate()} disabled={refetch.isPending}
+            className={`${btnBase} ${refetch.isPending ? 'text-gray-400 cursor-not-allowed' : btnNormal}`}>
+            {refetch.isPending ? '抓取中...' : '重新抓取'}
+          </button>
           {entry.content && !editing && (
             <button onClick={() => setEditing(true)} className={btnNormal}>编辑内容</button>
           )}
@@ -127,9 +131,6 @@ export default function EntryDetailPage() {
           <p className="text-yellow-600 dark:text-yellow-500">正在抓取内容...</p>
         ) : entry.extract_method === 'failed' ? (
           <p className="text-red-500">内容提取失败。
-            <button onClick={() => refetch.mutate()} disabled={refetch.isPending} className="underline ml-1">
-              {refetch.isPending ? '抓取中...' : '重新抓取'}
-            </button>
             <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
           </p>
         ) : entry.content ? (

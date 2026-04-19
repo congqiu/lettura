@@ -61,7 +61,8 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             .expect("failed to open search index")
     });
     let storage: std::sync::Arc<dyn crate::storage::ImageStorage> = std::sync::Arc::from(crate::storage::create_storage(&config));
-    let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone(), search_index.clone());
+    crate::site_config::store::init_store(config.site_configs_path.clone());
+    let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone(), search_index.clone(), &config);
 
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();

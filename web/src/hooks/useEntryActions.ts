@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateEntry } from '../api/entries';
+import { updateEntry, refetchEntry } from '../api/entries';
 import { toast } from '../components/Toast';
 
 export function useEntryActions(
@@ -31,5 +31,14 @@ export function useEntryActions(
     onError: () => toast('error', '操作失败，请重试'),
   });
 
-  return { toggleStar, toggleArchive };
+  const refetch = useMutation({
+    mutationFn: () => refetchEntry(entryId),
+    onSuccess: () => {
+      invalidate();
+      toast('success', '已重新抓取');
+    },
+    onError: () => toast('error', '重新抓取失败'),
+  });
+
+  return { toggleStar, toggleArchive, refetch };
 }

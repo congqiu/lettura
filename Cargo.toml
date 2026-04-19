@@ -44,7 +44,7 @@ hmac = "0.12"
 hex = "0.4"
 
 # HTTP client + hashing
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "cookies", "socks"] }
 sha1 = "0.10"
 
 # Types

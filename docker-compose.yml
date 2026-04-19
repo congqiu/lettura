@@ -8,10 +8,24 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
       LISTEN_ADDR: 0.0.0.0:3000
       INDEX_PATH: /data/tantivy
+      RUST_LOG: info
+      # Fetch configuration (optional)
+      LETTURA_USER_AGENT: ${LETTURA_USER_AGENT:-}
+      LETTURA_FETCH_TIMEOUT: ${LETTURA_FETCH_TIMEOUT:-30}
+      LETTURA_FETCH_MAX_RETRIES: ${LETTURA_FETCH_MAX_RETRIES:-3}
+      LETTURA_PROXY: ${LETTURA_PROXY:-}
+      LETTURA_RENDERING_URL: ${LETTURA_RENDERING_URL:-}
+      LETTURA_SITE_CONFIGS_PATH: ${LETTURA_SITE_CONFIGS_PATH:-}
     volumes:
       - lettura_data:/data/tantivy
       - lettura_pages:/data/pages
       - lettura_storage:/data/storage
+      - ./site-configs-local:/data/site-configs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -21,6 +35,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      browserless:
+        condition: service_started
+
+  browserless:
+    image: browserless/chrome:latest
+    environment:
+      - MAX_CONCURRENT_SESSIONS=5
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_SIZE=10
+    shm_size: "2gb"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   postgres:
     image: postgres:16-alpine

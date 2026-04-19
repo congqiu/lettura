@@ -57,12 +57,12 @@ async fn serve_page_file_inner(
 ) -> Response {
     let page_record = match page::find_page_by_slug(&state.pool, slug).await {
         Ok(Some(p)) => p,
-        _ => return (StatusCode::NOT_FOUND, "not found").into_response(),
+        _ => return render_status_page(StatusCode::NOT_FOUND, "页面不存在", "该分享链接无效或已被删除"),
     };
 
     if let Some(expires) = page_record.expires_at {
         if expires < chrono::Utc::now() {
-            return (StatusCode::GONE, "this page has expired").into_response();
+            return render_status_page(StatusCode::GONE, "分享已过期", "该页面的分享有效期已结束");
         }
     }
 
@@ -155,6 +155,45 @@ pub async fn auth_page(
             [("location", format!("/p/{}", slug))],
         ).into_response(),
     }
+}
+
+fn render_status_page(status: StatusCode, title: &str, message: &str) -> Response {
+    let status_code = status.as_u16();
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f9fafb;color:#111827}}
+.card{{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:32px;width:100%;max-width:360px;text-align:center}}
+.icon{{width:48px;height:48px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center}}
+.icon-missing{{background:#f3f4f6}}
+.icon-expired{{background:#fef3c7}}
+h1{{font-size:18px;font-weight:600;margin:0 0 8px}}
+p{{font-size:14px;color:#6b7280;margin:0}}
+.code{{font-size:12px;color:#9ca3af;margin-top:16px}}
+</style></head><body>
+<div class="card">
+<div class="icon {}">{}</div>
+<h1>{title}</h1>
+<p>{message}</p>
+<p class="code">{status_code}</p>
+</div></body></html>"#,
+        if status_code == 410 { "icon-expired" } else { "icon-missing" },
+        if status_code == 410 {
+            r##"<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>"##
+        } else {
+            r##"<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>"##
+        },
+        title = title,
+        message = message,
+        status_code = status_code,
+    );
+    (
+        status,
+        [("content-type", "text/html; charset=utf-8")],
+        html,
+    ).into_response()
 }
 
 fn render_password_page(slug: &str, error: bool) -> Response {

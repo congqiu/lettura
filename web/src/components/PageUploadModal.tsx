@@ -10,6 +10,8 @@ interface Props {
 }
 
 export default function PageUploadModal({ open, onClose }: Props) {
+  if (!open) return null;
+
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadResult, setUploadResult] = useState<{
@@ -88,7 +90,7 @@ export default function PageUploadModal({ open, onClose }: Props) {
       const url = `${window.location.origin}${data.url}`;
       navigator.clipboard.writeText(url);
       toast('success', `页面已发布，链接已复制: /p/${data.slug}`);
-      handleClose();
+      onClose();
     },
     onError: () => {
       toast('error', '创建失败');
@@ -103,8 +105,6 @@ export default function PageUploadModal({ open, onClose }: Props) {
     setPassword('');
     onClose();
   };
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

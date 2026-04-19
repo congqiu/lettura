@@ -23,6 +23,7 @@ RUN rm -rf src
 
 # 2b: Build actual application (only src/ changes invalidate this layer)
 COPY src/ src/
+COPY site-configs/ site-configs/
 COPY --from=frontend-builder /app/web/dist web/dist
 RUN touch src/main.rs && cargo build --release
 

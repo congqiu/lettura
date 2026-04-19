@@ -1,0 +1,4 @@
+render: true
+match: /status/
+title: article div[data-testid="tweetText"]
+body: article div[data-testid="tweetText"]

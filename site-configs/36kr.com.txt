@@ -1,0 +1,5 @@
+match: /p/
+title: h1.article-title
+body: div.article-content
+author: a.author-name
+strip: div.sidebar, div.related-articles

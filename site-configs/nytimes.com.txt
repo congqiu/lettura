@@ -1,0 +1,5 @@
+title: h1[data-testid="headline"]
+body: section[name="articleBody"]
+strip: div.css-1fanzo5
+author: span[itemprop="name"]
+date: time

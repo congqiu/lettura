@@ -28,6 +28,8 @@ function computeExpiry(value: string): string | undefined {
 }
 
 export default function PageEditModal({ page, open, onClose }: Props) {
+  if (!open) return null;
+
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(page.title);
@@ -76,7 +78,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   const saveMutation = useMutation({
     mutationFn: () => updatePage(page.id, {
       title,
-      password: clearPassword ? null : (password || undefined),
+      password: clearPassword ? '' : (password || undefined),
       expires_at: expiry === '' ? undefined : (expiry === '__clear__' ? null : computeExpiry(expiry)),
       upload_id: uploadResult?.upload_id || undefined,
       entry_file: uploadResult ? entryFile : undefined,
@@ -90,8 +92,6 @@ export default function PageEditModal({ page, open, onClose }: Props) {
       toast('error', '保存失败');
     },
   });
-
-  if (!open) return null;
 
   const handleExpiryChange = (value: string) => {
     if (value === '') {
@@ -116,7 +116,6 @@ export default function PageEditModal({ page, open, onClose }: Props) {
         </div>
 
         <div className="p-4 space-y-4">
-          {/* File re-upload section */}
           {!uploadResult ? (
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
