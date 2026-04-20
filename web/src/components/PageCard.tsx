@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updatePage, deletePage, restorePage, type PageSummary } from '../api/pages';
 import { ExternalLink, Copy, Lock, Trash2, RotateCcw, EyeOff, Pencil, Clock } from 'lucide-react';
-import { toast } from './Toast';
+import { toast } from 'sonner';
 import { timeAgo } from '../utils/time';
 import PageEditModal from './PageEditModal';
+import { Button } from './ui/button';
 
 interface PageCardProps {
   page: PageSummary;
@@ -37,34 +38,34 @@ export default function PageCard({ page }: PageCardProps) {
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(getFullUrl());
-    toast('success', '链接已复制');
+    toast.success('链接已复制');
   };
 
   const toggleStatus = useMutation({
     mutationFn: () => updatePage(page.id, { status: page.status === 'active' ? 'disabled' : 'active' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      toast('success', page.status === 'active' ? '已禁用' : '已启用');
+      toast.success(page.status === 'active' ? '已禁用' : '已启用');
     },
-    onError: () => toast('error', '操作失败，请重试'),
+    onError: () => toast.error('操作失败，请重试'),
   });
 
   const handleDelete = useMutation({
     mutationFn: () => deletePage(page.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      toast('success', '已删除');
+      toast.success('已删除');
     },
-    onError: () => toast('error', '删除失败，请重试'),
+    onError: () => toast.error('删除失败，请重试'),
   });
 
   const handleRestore = useMutation({
     mutationFn: () => restorePage(page.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      toast('success', '已恢复');
+      toast.success('已恢复');
     },
-    onError: () => toast('error', '恢复失败，请重试'),
+    onError: () => toast.error('恢复失败，请重试'),
   });
 
   const isDeleted = page.status === 'deleted';
@@ -72,27 +73,27 @@ export default function PageCard({ page }: PageCardProps) {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 hover:shadow-sm transition-all">
+      <div className="bg-card border border-border rounded-xl p-4 hover:shadow-sm transition-all">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">
+            <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
               {page.title}
             </h3>
-            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-500 flex-wrap">
+            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
               <button
                 onClick={() => window.open(getFullUrl(), '_blank')}
-                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 font-mono"
+                className="flex items-center gap-1 hover:text-primary font-mono"
               >
                 /p/{page.slug}
               </button>
-              {page.has_password && <Lock size={11} className="text-yellow-500 shrink-0" />}
+              {page.has_password && <Lock size={11} className="text-amber-500 shrink-0" />}
               <span>{page.file_count} 个文件</span>
               <span>{timeAgo(page.created_at)}</span>
               {page.status === 'disabled' && (
-                <span className="text-yellow-600 dark:text-yellow-500">已禁用</span>
+                <span className="text-amber-600 dark:text-amber-400">已禁用</span>
               )}
               {expiry && (
-                <span className={`flex items-center gap-0.5 ${expiry.urgent ? 'text-red-500' : 'text-gray-400'}`}>
+                <span className={`flex items-center gap-0.5 ${expiry.urgent ? 'text-destructive' : 'text-muted-foreground'}`}>
                   <Clock size={11} />
                   {expiry.text}
                 </span>
@@ -102,53 +103,27 @@ export default function PageCard({ page }: PageCardProps) {
           <div className="flex items-center gap-0.5 shrink-0">
             {!isDeleted && (
               <>
-                <a
-                  href={getFullUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 rounded-md transition-colors"
-                  title="新窗口打开"
-                >
+                <Button variant="ghost" size="icon" onClick={() => window.open(getFullUrl(), '_blank')} title="新窗口打开">
                   <ExternalLink size={15} />
-                </a>
-                <button
-                  onClick={handleCopyLink}
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 rounded-md transition-colors"
-                  title="复制链接"
-                >
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleCopyLink} title="复制链接">
                   <Copy size={15} />
-                </button>
-                <button
-                  onClick={() => setEditOpen(true)}
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-blue-500 rounded-md transition-colors"
-                  title="编辑"
-                >
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setEditOpen(true)} title="编辑">
                   <Pencil size={15} />
-                </button>
-                <button
-                  onClick={() => toggleStatus.mutate()}
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300 rounded-md transition-colors"
-                  title={page.status === 'active' ? '禁用' : '启用'}
-                >
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => toggleStatus.mutate()} title={page.status === 'active' ? '禁用' : '启用'}>
                   <EyeOff size={15} />
-                </button>
-                <button
-                  onClick={() => handleDelete.mutate()}
-                  className="p-2 text-gray-400 dark:text-gray-600 hover:text-red-500 rounded-md transition-colors"
-                  title="删除"
-                >
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete.mutate()} title="删除" className="text-destructive hover:text-destructive">
                   <Trash2 size={15} />
-                </button>
+                </Button>
               </>
             )}
             {isDeleted && (
-              <button
-                onClick={() => handleRestore.mutate()}
-                className="p-2 text-gray-400 dark:text-gray-600 hover:text-green-500 rounded-md transition-colors"
-                title="恢复"
-              >
+                <Button variant="ghost" size="icon" onClick={() => handleRestore.mutate()} title="恢复" className="hover:text-green-600">
                 <RotateCcw size={15} />
-              </button>
+              </Button>
             )}
           </div>
         </div>

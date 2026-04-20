@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../api/auth';
 import { useAuthStore } from '../store/auth';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -27,37 +29,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="w-full max-w-sm p-8 bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">Lettura</h1>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-sm">
+        <h1 className="text-2xl font-bold mb-6 text-center text-foreground">Lettura</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-          <input
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Input
             type="email"
             placeholder="邮箱"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
-          <input
+          <Input
             type="password"
             placeholder="密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? '登录中...' : '登录'}
-          </button>
+          </Button>
         </form>
-        <p className="mt-4 text-sm text-center text-gray-600 dark:text-gray-400">
-          还没有账号？ <Link to="/register" className="text-blue-600 dark:text-blue-400 hover:underline">注册</Link>
+        <p className="mt-4 text-sm text-center text-muted-foreground">
+          还没有账号？ <Link to="/register" className="text-primary hover:underline">注册</Link>
         </p>
       </div>
     </div>

@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
+import { Star, Archive, ExternalLink, Clock } from 'lucide-react';
 import { type EntrySummary } from '../api/entries';
 import { timeAgo } from '../utils/time';
 import { useEntryActions } from '../hooks/useEntryActions';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function EntryCard({
   entry,
@@ -15,62 +18,91 @@ export default function EntryCard({
   const { toggleStar, toggleArchive } = useEntryActions(entry.id, entry);
 
   return (
-    <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:shadow-sm dark:hover:shadow-gray-900/50 transition-all ${selected ? 'ring-2 ring-blue-500' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+    <div className={cn(
+      'group bg-card border border-border rounded-xl p-5',
+      selected ? 'ring-2 ring-primary shadow-md shadow-primary/10' : ''
+    )}>
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
           <Link to={`/entry/${entry.id}`} className="block">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate hover:text-blue-600 dark:hover:text-blue-400">
+            <h3 className="text-lg font-semibold text-card-foreground leading-snug line-clamp-2 hover:text-primary transition-colors">
               {entry.title || entry.url}
             </h3>
           </Link>
-          <div className="flex items-center gap-2 mt-1 text-sm text-gray-500 dark:text-gray-500 flex-wrap">
+          
+          <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
             {entry.domain_name && (
               <button
                 onClick={() => onDomainClick?.(entry.domain_name!)}
-                className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                className="font-medium hover:text-card-foreground transition-colors"
                 title={`查看 ${entry.domain_name} 的所有文章`}
               >
                 {entry.domain_name}
               </button>
             )}
-            {entry.reading_time && <span>{entry.reading_time} 分钟</span>}
+            <span className="w-1 h-1 rounded-full bg-border"></span>
             <span>{timeAgo(entry.created_at)}</span>
+            
+            {entry.reading_time && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-border"></span>
+                <span className="flex items-center gap-1">
+                  <Clock size={14} />
+                  {entry.reading_time} 分钟
+                </span>
+              </>
+            )}
+            
             {entry.extract_method === 'pending' && (
-              <span className="text-yellow-600 dark:text-yellow-500">抓取中...</span>
+              <>
+                <span className="w-1 h-1 rounded-full bg-border"></span>
+                <span className="text-amber-600 dark:text-amber-400 font-medium animate-pulse">抓取中...</span>
+              </>
             )}
             {entry.extract_method === 'failed' && (
-              <span className="text-red-500">提取失败</span>
+              <>
+                <span className="w-1 h-1 rounded-full bg-border"></span>
+                <span className="text-destructive font-medium">提取失败</span>
+              </>
             )}
           </div>
+          
+          <div className="flex items-center gap-2 mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleStar.mutate()}
+              className={entry.is_starred ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-card-foreground'}
+            >
+              <Star size={18} className={entry.is_starred ? 'fill-current' : ''} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleArchive.mutate()}
+              className={entry.is_archived ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'text-muted-foreground hover:text-card-foreground'}
+            >
+              <Archive size={18} className={entry.is_archived ? 'fill-current' : ''} />
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+
+        <div className="flex sm:flex-col items-center sm:items-end gap-4 w-full sm:w-auto">
           {entry.preview_picture && (
-            <img src={entry.preview_picture} alt="" className="w-16 h-16 object-cover rounded" />
+            <div className="w-24 h-16 sm:w-28 sm:h-20 shrink-0 rounded-lg overflow-hidden border border-border">
+              <img src={entry.preview_picture} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            </div>
           )}
           <a
             href={entry.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400"
+            className="ml-auto sm:ml-0 flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
             title="访问原始网页"
           >
-            原文 ↗
+            原文 <ExternalLink size={12} />
           </a>
         </div>
-      </div>
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => toggleStar.mutate()}
-          className={`text-sm px-2 py-1 rounded transition-colors ${entry.is_starred ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-        >
-          {entry.is_starred ? '已收藏' : '收藏'}
-        </button>
-        <button
-          onClick={() => toggleArchive.mutate()}
-          className={`text-sm px-2 py-1 rounded transition-colors ${entry.is_archived ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'text-gray-500 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-        >
-          {entry.is_archived ? '已归档' : '归档'}
-        </button>
       </div>
     </div>
   );

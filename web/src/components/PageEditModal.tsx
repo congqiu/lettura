@@ -2,7 +2,10 @@ import { useState, useRef, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadFiles, updatePage, type PageSummary } from '../api/pages';
 import { X, Loader2, RefreshCw, Upload } from 'lucide-react';
-import { toast } from './Toast';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface Props {
   page: PageSummary;
@@ -28,8 +31,6 @@ function computeExpiry(value: string): string | undefined {
 }
 
 export default function PageEditModal({ page, open, onClose }: Props) {
-  if (!open) return null;
-
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(page.title);
@@ -49,7 +50,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
     const arr = Array.from(fileList);
     const hasHtml = arr.some(f => f.name.toLowerCase().endsWith('.html') || f.name.toLowerCase().endsWith('.htm'));
     if (!hasHtml) {
-      toast('error', '当前只支持 HTML 页面，请至少上传一个 HTML 文件');
+      toast.error('当前只支持 HTML 页面，请至少上传一个 HTML 文件');
       return;
     }
     try {
@@ -57,7 +58,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
       setUploadResult(result);
       setEntryFile(result.default_entry);
     } catch {
-      toast('error', '上传失败');
+      toast.error('上传失败');
     }
   }, []);
 
@@ -84,11 +85,11 @@ export default function PageEditModal({ page, open, onClose }: Props) {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      toast('success', '已保存');
+      toast.success('已保存');
       onClose();
     },
     onError: () => {
-      toast('error', '保存失败');
+      toast.error('保存失败');
     },
   });
 
@@ -101,20 +102,13 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="fixed inset-0 bg-black/40" />
-      <div
-        className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-lg font-bold">编辑页面</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <X size={18} />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>编辑页面</DialogTitle>
+        </DialogHeader>
 
-        <div className="p-4 space-y-4">
+        <div className="space-y-4">
           {!uploadResult ? (
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -123,15 +117,15 @@ export default function PageEditModal({ page, open, onClose }: Props) {
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
                 dragOver
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground'
               }`}
             >
-              <Upload size={24} className="mx-auto text-gray-400 mb-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
                 拖拽文件替换，或点击选择
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 当前 {page.file_count} 个文件 · 上传新文件将完全替换
               </p>
               <input
@@ -149,20 +143,17 @@ export default function PageEditModal({ page, open, onClose }: Props) {
                 <p className="text-sm text-green-700 dark:text-green-400 font-medium">
                   {uploadResult.file_count} 个文件已准备替换
                 </p>
-                <button
-                  onClick={clearUpload}
-                  className="text-xs text-red-500 hover:text-red-600"
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={clearUpload} className="text-destructive hover:text-destructive">
                   取消替换
-                </button>
+                </Button>
               </div>
               {uploadResult.html_files.length > 1 && (
                 <div className="mt-2">
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">入口文件</label>
+                  <label className="block text-xs text-muted-foreground mb-1">入口文件</label>
                   <select
                     value={entryFile}
                     onChange={(e) => setEntryFile(e.target.value)}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                    className="w-full px-2 py-1 text-sm border border-border rounded-lg bg-background"
                   >
                     {uploadResult.html_files.map(f => (
                       <option key={f} value={f}>{f}</option>
@@ -174,59 +165,58 @@ export default function PageEditModal({ page, open, onClose }: Props) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">标题</label>
-            <input
+            <label className="block text-sm font-medium text-foreground mb-1">标题</label>
+            <Input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               maxLength={500}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              访问密码 {page.has_password && <span className="text-yellow-500 text-xs">(已设置)</span>}
+            <label className="block text-sm font-medium text-foreground mb-1">
+              访问密码 {page.has_password && <span className="text-amber-500 text-xs">(已设置)</span>}
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input
+                <Input
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="留空则无密码"
-                  className="w-full px-3 py-2 pr-8 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="font-mono pr-8"
                 />
                 {password && (
                   <button
                     type="button"
                     onClick={() => setPassword('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     <X size={14} />
                   </button>
                 )}
               </div>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
                   setPassword(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));
                 }}
-                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 title="自动生成密码"
               >
                 <RefreshCw size={14} />
-              </button>
+              </Button>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">分享有效期</label>
+            <label className="block text-sm font-medium text-foreground mb-1">分享有效期</label>
             <select
               value={expiry || ''}
               onChange={(e) => handleExpiryChange(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
             >
               {page.expires_at && (
                 <option value="">永久（清除当前有效期）</option>
@@ -239,30 +229,26 @@ export default function PageEditModal({ page, open, onClose }: Props) {
               ))}
             </select>
             {page.expires_at && expiry === '' && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 当前有效期至 {new Date(page.expires_at).toLocaleString()}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-800">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-          >
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => saveMutation.mutate()}
             disabled={!title.trim() || saveMutation.isPending}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             {saveMutation.isPending && <Loader2 size={14} className="animate-spin" />}
             保存
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

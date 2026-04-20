@@ -1,32 +1,29 @@
-import { Inbox, FileText, BookOpen, StickyNote } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { BookOpen, Inbox, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  book: BookOpen,
+  inbox: Inbox,
+  star: Star,
+};
 
 interface Props {
-  icon: 'inbox' | 'file' | 'book' | 'note';
+  icon?: string;
   title: string;
   description?: string;
-  action?: ReactNode;
+  action?: { label: string; onClick: () => void };
 }
 
-const ICONS = {
-  inbox: Inbox,
-  file: FileText,
-  book: BookOpen,
-  note: StickyNote,
-} as const;
-
-export default function EmptyState({ icon, title, description, action }: Props) {
-  const Icon = ICONS[icon];
+export default function EmptyState({ icon = 'inbox', title, description, action }: Props) {
+  const Icon = iconMap[icon] || Inbox;
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-        <Icon size={24} className="text-gray-400 dark:text-gray-500" />
+      <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-4">
+        <Icon size={24} className="text-muted-foreground" />
       </div>
-      <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{title}</p>
-      {description && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs">{description}</p>
-      )}
-      {action && <div className="mt-3">{action}</div>}
+      <h3 className="font-semibold text-lg mb-1">{title}</h3>
+      {description && <p className="text-sm text-muted-foreground mb-4">{description}</p>}
+      {action && <Button variant="outline" onClick={action.onClick}>{action.label}</Button>}
     </div>
   );
 }

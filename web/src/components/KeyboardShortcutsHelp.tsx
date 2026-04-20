@@ -1,5 +1,15 @@
 import { useEffect } from 'react';
-import { X } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from '@/components/ui/command';
 
 interface Props {
   open: boolean;
@@ -51,49 +61,32 @@ export default function KeyboardShortcutsHelp({ open, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-md p-5 animate-in zoom-in-95 fade-in duration-150 max-h-[80vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">键盘快捷键</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="space-y-5">
-          {SECTIONS.map((section) => (
-            <div key={section.title}>
-              <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
-                {section.title}
-              </h3>
-              <div className="space-y-1.5">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto p-0">
+        <DialogHeader className="px-4 py-3 border-b">
+          <DialogTitle>键盘快捷键</DialogTitle>
+        </DialogHeader>
+        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2">
+          <CommandList>
+            {SECTIONS.map((section, idx) => (
+              <CommandGroup key={section.title} heading={section.title}>
                 {section.shortcuts.map((shortcut) => (
-                  <div key={shortcut.desc} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{shortcut.desc}</span>
+                  <CommandItem key={shortcut.desc} className="flex items-center justify-between">
+                    <span className="text-sm">{shortcut.desc}</span>
                     <div className="flex gap-1">
                       {shortcut.keys.map((key) => (
-                        <kbd
-                          key={key}
-                          className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-mono bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-600 dark:text-gray-400"
-                        >
-                          {key}
-                        </kbd>
+                        <CommandShortcut key={key}>{key}</CommandShortcut>
                       ))}
                     </div>
-                  </div>
+                  </CommandItem>
                 ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+                {idx < SECTIONS.length - 1 && <CommandSeparator />}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
+      </DialogContent>
+    </Dialog>
   );
 }

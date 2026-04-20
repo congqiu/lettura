@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   children: ReactNode;
@@ -36,26 +37,23 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="min-h-[300px] flex items-center justify-center p-8">
         <div className="text-center max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle size={28} className="text-red-500 dark:text-red-400" />
+          <div className="w-14 h-14 rounded-full bg-destructive/10 dark:bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={28} className="text-destructive" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          <h2 className="text-lg font-semibold text-foreground mb-2">
             页面出了点问题
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+          <p className="text-sm text-muted-foreground mb-5">
             {this.state.error?.message || '发生了未知错误'}
           </p>
           {isAppLevel ? (
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            <Button onClick={() => window.location.reload()}>
               重新加载
-            </button>
+            </Button>
           ) : (
             <a
               href="/"
-              className="inline-block px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-block px-4 py-2 bg-primary text-primary-foreground text-sm rounded-lg hover:bg-primary/90 transition-colors"
             >
               回到首页
             </a>

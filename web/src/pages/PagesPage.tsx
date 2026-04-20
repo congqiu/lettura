@@ -6,6 +6,7 @@ import PageUploadModal from '../components/PageUploadModal';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { Plus, Loader2 } from 'lucide-react';
+import { Button } from '../components/ui/button';
 
 const TABS = [
   { key: 'all', label: '全部' },
@@ -34,26 +35,23 @@ export default function PagesPage() {
               onClick={() => setTab(t.key)}
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
                 tab === t.key
-                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:bg-muted'
               }`}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setUploadOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
+        <Button onClick={() => setUploadOpen(true)}>
           <Plus size={15} />
           上传
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-gray-400" />
+          <Loader2 size={24} className="animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
         <ErrorState onRetry={() => refetch()} />

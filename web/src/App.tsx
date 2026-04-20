@@ -20,7 +20,7 @@ function App() {
     <ErrorBoundary level="app">
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading...</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
