@@ -25,7 +25,7 @@ export default function EntryCard({
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           <Link to={`/entry/${entry.id}`} className="block">
-            <h3 className="text-lg font-semibold text-card-foreground leading-snug line-clamp-2 hover:text-primary transition-colors">
+            <h3 className="text-lg font-semibold text-card-foreground leading-snug line-clamp-2 hover:text-primary transition-colors break-all">
               {entry.title || entry.url}
             </h3>
           </Link>

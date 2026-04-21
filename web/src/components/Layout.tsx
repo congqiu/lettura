@@ -21,14 +21,14 @@ export default function Layout() {
             <Search size={20} />
           </NavLink>
         </header>
-        <main className="mx-auto max-w-3xl px-4 py-6 pb-24 lg:pb-6">
+        <main className="mx-auto w-full px-4 py-6 pb-24 lg:pb-6 lg:max-w-3xl">
           <ErrorBoundary level="page">
             <Outlet />
           </ErrorBoundary>
         </main>
       </SidebarInset>
       <MobileBottomNav />
-      <Toaster richColors position="bottom-right" />
+      <Toaster richColors position="top-center" />
     </SidebarProvider>
   );
 }

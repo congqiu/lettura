@@ -70,7 +70,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Separator className="mx-4 w-auto" />
+        <Separator className="mx-0 w-full" />
 
         <SidebarGroup>
           <SidebarGroupContent>

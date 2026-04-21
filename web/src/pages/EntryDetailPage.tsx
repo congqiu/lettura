@@ -71,8 +71,8 @@ export default function EntryDetailPage() {
   if (!entry) return <div className="py-8"><ErrorState message="文章未找到" /></div>;
 
   return (
-    <div className="flex gap-0 -mx-4">
-      <div className={`flex-1 px-4 ${showAnnotations ? 'max-w-3xl' : 'max-w-3xl mx-auto'}`}>
+    <div className="flex gap-0 lg:-mx-4">
+      <div className={`flex-1 px-4 w-full overflow-hidden lg:${showAnnotations ? 'max-w-3xl' : 'max-w-3xl'} ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-4 -ml-2 text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" /> 返回
         </Button>
@@ -177,7 +177,7 @@ export default function EntryDetailPage() {
             <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
           </p>
         ) : entry.content ? (
-          <article className="prose prose-gray dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
+          <article className="prose prose-gray dark:prose-invert max-w-none overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
         ) : (
           <p className="text-muted-foreground">暂无内容</p>
         )}
