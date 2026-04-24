@@ -1,5 +1,6 @@
 use clap::Parser;
 use lettura_cli::cli::{Cli, Command};
+use lettura_cli::client::ApiClient;
 use lettura_cli::commands;
 use lettura_cli::config::{Config, Override, resolve};
 use lettura_cli::error::{emit_error_to_stderr, CliError};
@@ -21,6 +22,24 @@ async fn run(args: Cli) -> i32 {
             }
         }
         Command::Config { cmd } => commands::config::run(cmd),
+
+        Command::List(list_args) => match resolved_client(&args) {
+            Ok(c) => commands::list::run(&c, list_args, args.output, args.pretty).await,
+            Err(e) => Err(e),
+        },
+        Command::Search(search_args) => match resolved_client(&args) {
+            Ok(c) => commands::search::run(&c, search_args, args.output, args.pretty).await,
+            Err(e) => Err(e),
+        },
+        Command::Get(get_args) => match resolved_client(&args) {
+            Ok(c) => commands::get::run(&c, get_args).await,
+            Err(e) => Err(e),
+        },
+        Command::Tags => match resolved_client(&args) {
+            Ok(c) => commands::tags::run(&c, args.output, args.pretty).await,
+            Err(e) => Err(e),
+        },
+
         _ => {
             eprintln!("command not yet implemented");
             return 4;
@@ -44,4 +63,9 @@ fn load_resolved(args: &Cli) -> Result<lettura_cli::config::Resolved, CliError> 
         token: args.token.clone(),
     };
     resolve(&cfg, &over).map_err(|e| CliError::BadArgs(e.to_string()))
+}
+
+fn resolved_client(args: &Cli) -> Result<ApiClient, CliError> {
+    let resolved = load_resolved(args)?;
+    ApiClient::new(resolved.url, &resolved.token).map_err(CliError::from)
 }

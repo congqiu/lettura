@@ -108,34 +108,127 @@ where
 
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
-    pub page: Option<i64>, pub per_page: Option<i64>,
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_bool_from_string")]
     pub is_archived: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_bool_from_string")]
     pub is_starred: Option<bool>,
+    /// Alias for `is_archived` (CLI Filter DSL compatibility).
+    /// `is_read=true` → `is_archived = true`, `is_read=false` → `is_archived = false`.
+    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    pub is_read: Option<bool>,
     pub domain: Option<String>,
+    /// Comma-separated tag labels; AND semantics (entry must have ALL listed tags).
+    pub tag: Option<String>,
+    /// Comma-separated tag labels to exclude; entry must NOT have any of these tags.
+    pub exclude_tag: Option<String>,
+    /// When true, return only entries with no tags.
+    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    pub untagged: Option<bool>,
+    /// Return entries created at or after this timestamp.
+    pub since: Option<DateTime<Utc>>,
+    /// Return entries created strictly before this timestamp.
+    pub before: Option<DateTime<Utc>>,
+    /// Search query. Handled by tantivy in the API handler; unused in list_entries itself.
     pub search: Option<String>,
+    /// Field-projection hint — placeholder for Task 15, not used in query construction.
+    pub fields: Option<String>,
 }
 
-pub async fn list_entries(pool: &PgPool, user_id: Uuid, params: &ListParams) -> Result<Vec<EntrySummary>, ModelError> {
+pub async fn list_entries(
+    pool: &PgPool,
+    user_id: Uuid,
+    params: &ListParams,
+) -> Result<Vec<EntrySummary>, ModelError> {
     let per_page = params.per_page.unwrap_or(20).min(100);
     let offset = (params.page.unwrap_or(1) - 1).max(0) * per_page;
 
-    let mut sql = String::from(
-        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NULL"
+    let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+        "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, \
+         preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at \
+         FROM entries WHERE user_id = ",
     );
-    let mut param_idx = 2u32;
-    if params.is_archived.is_some() { sql.push_str(&format!(" AND is_archived = ${}", param_idx)); param_idx += 1; }
-    if params.is_starred.is_some() { sql.push_str(&format!(" AND is_starred = ${}", param_idx)); param_idx += 1; }
-    if params.domain.is_some() { sql.push_str(&format!(" AND domain_name = ${}", param_idx)); param_idx += 1; }
-    sql.push_str(&format!(" ORDER BY created_at DESC LIMIT ${} OFFSET ${}", param_idx, param_idx + 1));
+    qb.push_bind(user_id);
+    qb.push(" AND deleted_at IS NULL");
 
-    let mut query = sqlx::query_as::<_, EntrySummary>(&sql).bind(user_id);
-    if let Some(archived) = params.is_archived { query = query.bind(archived); }
-    if let Some(starred) = params.is_starred { query = query.bind(starred); }
-    if let Some(ref domain) = params.domain { query = query.bind(domain); }
-    query = query.bind(per_page).bind(offset);
-    query.fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+    if let Some(b) = params.is_archived {
+        qb.push(" AND is_archived = ");
+        qb.push_bind(b);
+    }
+    // is_read is an alias for is_archived (CLI Filter DSL compatibility).
+    if let Some(b) = params.is_read {
+        qb.push(" AND is_archived = ");
+        qb.push_bind(b);
+    }
+    if let Some(b) = params.is_starred {
+        qb.push(" AND is_starred = ");
+        qb.push_bind(b);
+    }
+    if let Some(d) = &params.domain {
+        qb.push(" AND domain_name = ");
+        qb.push_bind(d.clone());
+    }
+    if let Some(t) = params.since {
+        qb.push(" AND created_at >= ");
+        qb.push_bind(t);
+    }
+    if let Some(t) = params.before {
+        qb.push(" AND created_at < ");
+        qb.push_bind(t);
+    }
+    if let Some(true) = params.untagged {
+        qb.push(
+            " AND NOT EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = entries.id)",
+        );
+    }
+    if let Some(tags_csv) = &params.tag {
+        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
+            qb.push(
+                " AND EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
+                 WHERE et.entry_id = entries.id AND tg.user_id = ",
+            );
+            qb.push_bind(user_id);
+            qb.push(" AND tg.label = ");
+            qb.push_bind(t.trim().to_string());
+            qb.push(")");
+        }
+    }
+    if let Some(tags_csv) = &params.exclude_tag {
+        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
+            qb.push(
+                " AND NOT EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
+                 WHERE et.entry_id = entries.id AND tg.user_id = ",
+            );
+            qb.push_bind(user_id);
+            qb.push(" AND tg.label = ");
+            qb.push_bind(t.trim().to_string());
+            qb.push(")");
+        }
+    }
+    // NOTE: `search` is intentionally NOT handled here. The API handler intercepts non-empty
+    // search queries and routes them through tantivy full-text search instead. This function
+    // only sees search=None in normal API flows. The ILIKE fallback below covers any direct
+    // model-layer callers that pass a search string without tantivy.
+    if let Some(s) = &params.search {
+        if !s.is_empty() {
+            qb.push(" AND (title ILIKE ");
+            qb.push_bind(format!("%{s}%"));
+            qb.push(" OR content ILIKE ");
+            qb.push_bind(format!("%{s}%"));
+            qb.push(")");
+        }
+    }
+
+    qb.push(" ORDER BY created_at DESC LIMIT ");
+    qb.push_bind(per_page);
+    qb.push(" OFFSET ");
+    qb.push_bind(offset);
+
+    qb.build_query_as::<EntrySummary>()
+        .fetch_all(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 #[derive(Debug, Deserialize)]
