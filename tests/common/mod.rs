@@ -52,6 +52,15 @@ impl TestApp {
             db_acquire_timeout_secs: 30,
             cors_origins: "*".to_string(),
             metrics_enabled: false,
+            user_agent: "Mozilla/5.0 (test)".to_string(),
+            fetch_timeout_secs: 30,
+            fetch_max_retries: 3,
+            proxy: None,
+            site_configs_path: None,
+            rendering_enabled: "false".to_string(),
+            chromium_path: None,
+            render_concurrency: 1,
+            render_timeout_ms: 15000,
         };
 
         let (app, _, _) = lettura::api::router_with_search(
