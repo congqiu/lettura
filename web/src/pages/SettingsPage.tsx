@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import api from '../api/client';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import TokensPanel from '../components/settings/TokensPanel';
 
 export default function SettingsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -67,6 +68,14 @@ export default function SettingsPage() {
         >
           {exportAll.isPending ? '导出中...' : '导出全部数据 (JSON)'}
         </Button>
+      </section>
+
+      <section className="mb-8">
+        <h3 className="font-medium mb-3 text-foreground">API 令牌</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          管理用于 lettura-cli 或其他第三方客户端访问你数据的个人访问令牌。
+        </p>
+        <TokensPanel />
       </section>
     </div>
   );
