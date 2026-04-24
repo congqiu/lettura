@@ -1,4 +1,5 @@
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -69,4 +70,28 @@ pub async fn delete_tag(
         return Err(ApiError::NotFound("tag not found".to_string()));
     }
     Ok(Json(serde_json::json!({"message": "deleted"})))
+}
+
+pub async fn remove_tag_from_entry_by_label(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((entry_id, label)): Path<(Uuid, String)>,
+) -> Result<StatusCode, ApiError> {
+    let (tag_id,): (Uuid,) = sqlx::query_as(
+        "SELECT id FROM tags WHERE user_id = $1 AND label = $2"
+    )
+    .bind(auth.user_id)
+    .bind(&label)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?
+    .ok_or_else(|| ApiError::NotFound(format!("tag with label '{label}'")))?;
+
+    if tag::remove_tag_from_entry(&state.pool, entry_id, tag_id).await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+    {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound(format!("tag '{label}' not on entry")))
+    }
 }

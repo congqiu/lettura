@@ -7,6 +7,7 @@ use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
+use crate::models::tag;
 use crate::tasks::fetcher::FetchJob;
 
 use super::validate::{deserialize_bool_from_string, ValidatedJson};
@@ -23,6 +24,18 @@ pub struct ListQueryParams {
 pub struct CreateEntryRequest {
     #[validate(url(message = "invalid URL format"))]
     pub url: String,
+    pub title: Option<String>,
+    #[serde(default)]
+    pub tag: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct CreateEntryResponse {
+    #[serde(flatten)]
+    pub entry: entry::Entry,
+    pub already_existed: bool,
+    pub tags: Vec<String>,
+    pub status: String,
 }
 
 #[tracing::instrument(skip(state, req), err)]
@@ -30,11 +43,51 @@ pub async fn create_entry(
     State(state): State<AppState>,
     auth: AuthUser,
     ValidatedJson(req): ValidatedJson<CreateEntryRequest>,
-) -> Result<Json<entry::Entry>, ApiError> {
-    let new_entry = entry::create_entry(&state.pool, auth.user_id, &req.url).await?;
-    let _ = state.fetch_queue.send(FetchJob { entry_id: new_entry.id, user_id: auth.user_id, url: new_entry.url.clone() }).await;
-    tracing::info!(entry_id = %new_entry.id, url = %req.url, "entry created");
-    Ok(Json(new_entry))
+) -> Result<Json<CreateEntryResponse>, ApiError> {
+    let r = entry::create_or_get_entry(&state.pool, auth.user_id, &req.url).await?;
+
+    // Apply title override only for brand new entries
+    if !r.already_existed {
+        if let Some(title) = req.title.as_ref() {
+            sqlx::query("UPDATE entries SET title = $1 WHERE id = $2")
+                .bind(title)
+                .bind(r.entry.id)
+                .execute(&state.pool)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
+        }
+    }
+
+    // Union-merge tags
+    for label in &req.tag {
+        let tag = tag::find_or_create_tag(&state.pool, auth.user_id, label).await?;
+        tag::add_tag_to_entry(&state.pool, r.entry.id, tag.id).await?;
+    }
+
+    // Fetch tag labels for response
+    let tag_rows = tag::list_tags_for_entry(&state.pool, r.entry.id).await?;
+    let tag_labels: Vec<String> = tag_rows.iter().map(|t| t.label.clone()).collect();
+
+    // Only enqueue for new entries
+    let status = if r.already_existed {
+        "existing".to_string()
+    } else {
+        let _ = state.fetch_queue.send(FetchJob {
+            entry_id: r.entry.id,
+            user_id: auth.user_id,
+            url: r.entry.url.clone(),
+        }).await;
+        "queued".to_string()
+    };
+
+    tracing::info!(entry_id = %r.entry.id, already_existed = r.already_existed, "entry save");
+
+    Ok(Json(CreateEntryResponse {
+        entry: r.entry,
+        already_existed: r.already_existed,
+        tags: tag_labels,
+        status,
+    }))
 }
 
 pub async fn get_entry(

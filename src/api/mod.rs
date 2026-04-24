@@ -17,6 +17,7 @@ pub mod admin;
 pub mod annotations;
 pub mod auth;
 pub mod backup;
+pub mod bulk;
 pub mod entries;
 pub mod error;
 pub mod export;
@@ -114,6 +115,11 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/entries/{id}/refetch", post(entries::refetch_entry))
         .route("/api/v1/entries/{id}/restore", post(entries::restore_entry))
         .route("/api/v1/entries/{id}/permanent", delete(entries::permanently_delete_entry))
+        // Bulk operations
+        .route("/api/v1/entries/bulk/tag", post(bulk::bulk_tag_add))
+        .route("/api/v1/entries/bulk/untag", post(bulk::bulk_untag))
+        .route("/api/v1/entries/bulk/archive", post(bulk::bulk_archive))
+        .route("/api/v1/entries/bulk/star", post(bulk::bulk_star))
         // Tags
         .route("/api/v1/tags", get(tags::list_tags))
         .route("/api/v1/entries/{id}/tags", get(tags::list_tags_for_entry))
@@ -121,6 +127,10 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route(
             "/api/v1/entries/{entry_id}/tags/{tag_id}",
             delete(tags::remove_tag_from_entry),
+        )
+        .route(
+            "/api/v1/entries/{entry_id}/tags/by-label/{label}",
+            delete(tags::remove_tag_from_entry_by_label),
         )
         .route("/api/v1/tags/{id}", delete(tags::delete_tag))
         // Annotations

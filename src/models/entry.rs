@@ -43,17 +43,60 @@ pub fn extract_domain(url_str: &str) -> Option<String> {
     Url::parse(url_str).ok().and_then(|u| u.host_str().map(String::from))
 }
 
-pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Result<Entry, ModelError> {
-    let url = given_url.to_string();
-    let hashed_url = hash_url(&url);
-    let hashed_given_url = hash_url(given_url);
-    let domain_name = extract_domain(&url);
+pub struct CreateEntryResult {
+    pub entry: Entry,
+    pub already_existed: bool,
+}
 
-    Ok(sqlx::query_as::<_, Entry>(
-        "INSERT INTO entries (user_id, url, given_url, hashed_url, hashed_given_url, domain_name) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *"
+/// Idempotent entry creation: returns existing entry on URL conflict.
+/// Uses ON CONFLICT (user_id, hashed_url) DO NOTHING + fallback SELECT.
+pub async fn create_or_get_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    given_url: &str,
+) -> Result<CreateEntryResult, ModelError> {
+    let hashed_url = hash_url(given_url);
+    let hashed_given_url = hash_url(given_url);
+    let domain_name = extract_domain(given_url);
+
+    // Try insert; ON CONFLICT return None
+    let inserted: Option<Entry> = sqlx::query_as(
+        "INSERT INTO entries (user_id, url, given_url, hashed_url, hashed_given_url, domain_name) \
+         VALUES ($1,$2,$3,$4,$5,$6) \
+         ON CONFLICT (user_id, hashed_url) DO NOTHING \
+         RETURNING *",
     )
-    .bind(user_id).bind(&url).bind(given_url).bind(&hashed_url).bind(&hashed_given_url).bind(&domain_name)
-    .fetch_one(pool).await?)
+    .bind(user_id)
+    .bind(given_url)
+    .bind(given_url)
+    .bind(&hashed_url)
+    .bind(&hashed_given_url)
+    .bind(&domain_name)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    if let Some(entry) = inserted {
+        return Ok(CreateEntryResult { entry, already_existed: false });
+    }
+
+    // Fallback: look up the existing entry
+    let existing: Entry = sqlx::query_as(
+        "SELECT * FROM entries WHERE user_id = $1 AND hashed_url = $2 AND deleted_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(&hashed_url)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    Ok(CreateEntryResult { entry: existing, already_existed: true })
+}
+
+pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Result<Entry, ModelError> {
+    create_or_get_entry(pool, user_id, given_url)
+        .await
+        .map(|r| r.entry)
 }
 
 pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ModelError> {
@@ -308,6 +351,87 @@ pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uu
         return Err(ModelError::NotFound("entry not found".to_string()));
     }
     Ok(())
+}
+
+/// Find all entry IDs matching the given filter params (no pagination).
+/// Uses the same WHERE-clause logic as `list_entries` but returns only IDs.
+pub async fn find_ids_matching(
+    pool: &PgPool,
+    user_id: Uuid,
+    params: &ListParams,
+) -> Result<Vec<Uuid>, ModelError> {
+    let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+        "SELECT id FROM entries WHERE user_id = ",
+    );
+    qb.push_bind(user_id);
+    qb.push(" AND deleted_at IS NULL");
+
+    if let Some(b) = params.is_archived {
+        qb.push(" AND is_archived = ");
+        qb.push_bind(b);
+    }
+    if let Some(b) = params.is_read {
+        qb.push(" AND is_archived = ");
+        qb.push_bind(b);
+    }
+    if let Some(b) = params.is_starred {
+        qb.push(" AND is_starred = ");
+        qb.push_bind(b);
+    }
+    if let Some(d) = &params.domain {
+        qb.push(" AND domain_name = ");
+        qb.push_bind(d.clone());
+    }
+    if let Some(t) = params.since {
+        qb.push(" AND created_at >= ");
+        qb.push_bind(t);
+    }
+    if let Some(t) = params.before {
+        qb.push(" AND created_at < ");
+        qb.push_bind(t);
+    }
+    if let Some(true) = params.untagged {
+        qb.push(
+            " AND NOT EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = entries.id)",
+        );
+    }
+    if let Some(tags_csv) = &params.tag {
+        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
+            qb.push(
+                " AND EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
+                 WHERE et.entry_id = entries.id AND tg.user_id = ",
+            );
+            qb.push_bind(user_id);
+            qb.push(" AND tg.label = ");
+            qb.push_bind(t.trim().to_string());
+            qb.push(")");
+        }
+    }
+    if let Some(tags_csv) = &params.exclude_tag {
+        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
+            qb.push(
+                " AND NOT EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
+                 WHERE et.entry_id = entries.id AND tg.user_id = ",
+            );
+            qb.push_bind(user_id);
+            qb.push(" AND tg.label = ");
+            qb.push_bind(t.trim().to_string());
+            qb.push(")");
+        }
+    }
+    if let Some(s) = &params.search {
+        if !s.is_empty() {
+            qb.push(" AND (title ILIKE ");
+            qb.push_bind(format!("%{s}%"));
+            qb.push(" OR content ILIKE ");
+            qb.push_bind(format!("%{s}%"));
+            qb.push(")");
+        }
+    }
+
+    let rows: Vec<(Uuid,)> = qb.build_query_as().fetch_all(pool).await
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(rows.into_iter().map(|(id,)| id).collect())
 }
 
 pub async fn update_entry_content(

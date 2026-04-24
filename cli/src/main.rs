@@ -35,8 +35,28 @@ async fn run(args: Cli) -> i32 {
             Ok(c) => commands::get::run(&c, get_args).await,
             Err(e) => Err(e),
         },
+        Command::Save(save_args) => match resolved_client(&args) {
+            Ok(c) => commands::save::run(&c, save_args).await,
+            Err(e) => Err(e),
+        },
         Command::Tags => match resolved_client(&args) {
             Ok(c) => commands::tags::run(&c, args.output, args.pretty).await,
+            Err(e) => Err(e),
+        },
+        Command::Tag(tag_args) => match resolved_client(&args) {
+            Ok(c) => commands::tag::run_tag(&c, tag_args).await,
+            Err(e) => Err(e),
+        },
+        Command::Untag(untag_args) => match resolved_client(&args) {
+            Ok(c) => commands::tag::run_untag(&c, untag_args).await,
+            Err(e) => Err(e),
+        },
+        Command::Archive(sc_args) => match resolved_client(&args) {
+            Ok(c) => commands::state::run_archive(&c, sc_args).await,
+            Err(e) => Err(e),
+        },
+        Command::Star(sc_args) => match resolved_client(&args) {
+            Ok(c) => commands::state::run_star(&c, sc_args).await,
             Err(e) => Err(e),
         },
 

@@ -78,6 +78,21 @@ impl ApiClient {
         Err(map_status(status, body))
     }
 
+    pub async fn http_patch<B: Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        let resp = self
+            .http
+            .patch(format!("{}{}", self.base, path))
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| CliError::Network(e.to_string()))?;
+        handle_response(resp).await
+    }
+
     pub async fn get_text(
         &self,
         path: &str,

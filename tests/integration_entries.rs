@@ -26,14 +26,21 @@ async fn create_entry_returns_ok() {
 }
 
 #[tokio::test]
-async fn duplicate_url_returns_conflict() {
+async fn duplicate_url_returns_already_existed() {
     let app = common::TestApp::new().await;
     let token = get_auth_token(&app).await;
-    app.client.post(app.url("/api/v1/entries")).header("Authorization", format!("Bearer {}", token))
+    let first = app.client.post(app.url("/api/v1/entries")).header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/dup"})).send().await.unwrap();
+    assert_eq!(first.status(), 200);
+    let first_body: serde_json::Value = first.json().await.unwrap();
+    let id1 = first_body["id"].as_str().unwrap().to_string();
+
     let res = app.client.post(app.url("/api/v1/entries")).header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/dup"})).send().await.unwrap();
-    assert_eq!(res.status(), 409);
+    assert_eq!(res.status(), 200);
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["already_existed"], true);
+    assert_eq!(body["id"].as_str().unwrap(), id1);
     app.cleanup().await;
 }
 
