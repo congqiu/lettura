@@ -1090,7 +1090,7 @@ docker run --rm --network=host \
   -v lettura-cargo-registry:/usr/local/cargo/registry \
   -v lettura-cargo-target:/app/target \
   -w /app \
-  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5432/lettura \
+  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5436/lettura \
   rust:latest \
   cargo test --test integration_entries 2>&1
 ```

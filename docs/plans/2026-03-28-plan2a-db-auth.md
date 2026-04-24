@@ -17,7 +17,7 @@ docker run --rm -v "$HOME/workspace/lettura":/app -v lettura-cargo-registry:/usr
 docker run --rm -v "$HOME/workspace/lettura":/app -v lettura-cargo-registry:/usr/local/cargo/registry -v lettura-cargo-target:/app/target -w /app rust:1.87-slim cargo test --lib 2>&1
 
 # 运行集成测试（需要 DB，用 --network=host 连接宿主机上的 PG）
-docker run --rm --network=host -v "$HOME/workspace/lettura":/app -v lettura-cargo-registry:/usr/local/cargo/registry -v lettura-cargo-target:/app/target -w /app -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5432/lettura_test rust:1.87-slim cargo test --test integration_auth 2>&1
+docker run --rm --network=host -v "$HOME/workspace/lettura":/app -v lettura-cargo-registry:/usr/local/cargo/registry -v lettura-cargo-target:/app/target -w /app -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5436/lettura_test rust:1.87-slim cargo test --test integration_auth 2>&1
 ```
 
 ---
@@ -133,7 +133,7 @@ services:
       POSTGRES_PASSWORD: lettura
       POSTGRES_DB: lettura
     ports:
-      - "5432:5432"
+      - "5436:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -144,7 +144,7 @@ volumes:
 - [ ] **Step 3: 创建 .env.example**
 
 ```
-DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5432/lettura
+DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5436/lettura
 JWT_SECRET=change-me-in-production-use-at-least-32-chars
 LISTEN_ADDR=0.0.0.0:3000
 ```
@@ -1298,7 +1298,7 @@ pub struct TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let base_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://lettura:lettura@127.0.0.1:5432/lettura".to_string());
+            .unwrap_or_else(|_| "postgres://lettura:lettura@127.0.0.1:5436/lettura".to_string());
 
         // Create a unique test database
         let db_name = format!("lettura_test_{}", Uuid::new_v4().simple());
@@ -1596,7 +1596,7 @@ docker run --rm --network=host \
   -v lettura-cargo-registry:/usr/local/cargo/registry \
   -v lettura-cargo-target:/app/target \
   -w /app \
-  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5432/lettura \
+  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5436/lettura \
   rust:1.87-slim \
   cargo test --test integration_auth 2>&1
 ```
@@ -1611,7 +1611,7 @@ docker run --rm --network=host \
   -v lettura-cargo-registry:/usr/local/cargo/registry \
   -v lettura-cargo-target:/app/target \
   -w /app \
-  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5432/lettura \
+  -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5436/lettura \
   rust:1.87-slim \
   cargo test 2>&1
 ```

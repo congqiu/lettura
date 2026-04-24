@@ -8,57 +8,41 @@ use lettura_cli::error::{emit_error_to_stderr, CliError};
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
+    lettura_cli::output::set_quiet(args.quiet);
     let code = run(args).await;
     std::process::exit(code);
+}
+
+macro_rules! with_client {
+    ($args:expr, $call:expr) => {
+        match resolved_client($args) {
+            Ok(c) => $call(&c).await,
+            Err(e) => Err(e),
+        }
+    };
 }
 
 async fn run(args: Cli) -> i32 {
     let result: Result<i32, CliError> = match &args.cmd {
         Command::Login => commands::login::run(args.profile.as_deref()).await,
-        Command::Whoami => {
-            match load_resolved(&args) {
-                Ok(r) => commands::whoami::run(&r).await,
-                Err(e) => Err(e),
-            }
-        }
+        Command::Whoami => with_client!(&args, commands::whoami::run),
         Command::Config { cmd } => commands::config::run(cmd),
 
-        Command::List(list_args) => match resolved_client(&args) {
-            Ok(c) => commands::list::run(&c, list_args, args.output, args.pretty).await,
-            Err(e) => Err(e),
-        },
-        Command::Search(search_args) => match resolved_client(&args) {
-            Ok(c) => commands::search::run(&c, search_args, args.output, args.pretty).await,
-            Err(e) => Err(e),
-        },
-        Command::Get(get_args) => match resolved_client(&args) {
-            Ok(c) => commands::get::run(&c, get_args).await,
-            Err(e) => Err(e),
-        },
-        Command::Save(save_args) => match resolved_client(&args) {
-            Ok(c) => commands::save::run(&c, save_args).await,
-            Err(e) => Err(e),
-        },
-        Command::Tags => match resolved_client(&args) {
-            Ok(c) => commands::tags::run(&c, args.output, args.pretty).await,
-            Err(e) => Err(e),
-        },
-        Command::Tag(tag_args) => match resolved_client(&args) {
-            Ok(c) => commands::tag::run_tag(&c, tag_args).await,
-            Err(e) => Err(e),
-        },
-        Command::Untag(untag_args) => match resolved_client(&args) {
-            Ok(c) => commands::tag::run_untag(&c, untag_args).await,
-            Err(e) => Err(e),
-        },
-        Command::Archive(sc_args) => match resolved_client(&args) {
-            Ok(c) => commands::state::run_archive(&c, sc_args).await,
-            Err(e) => Err(e),
-        },
-        Command::Star(sc_args) => match resolved_client(&args) {
-            Ok(c) => commands::state::run_star(&c, sc_args).await,
-            Err(e) => Err(e),
-        },
+        Command::List(list_args) => with_client!(&args, |c| {
+            commands::list::run(c, list_args, args.output, args.pretty)
+        }),
+        Command::Search(search_args) => with_client!(&args, |c| {
+            commands::search::run(c, search_args, args.output, args.pretty)
+        }),
+        Command::Get(get_args) => with_client!(&args, |c| commands::get::run(c, get_args)),
+        Command::Save(save_args) => with_client!(&args, |c| commands::save::run(c, save_args)),
+        Command::Tags => with_client!(&args, |c| commands::tags::run(c, args.output, args.pretty)),
+        Command::Tag(tag_args) => with_client!(&args, |c| commands::tag::run_tag(c, tag_args)),
+        Command::Untag(untag_args) => with_client!(&args, |c| commands::tag::run_untag(c, untag_args)),
+        Command::Archive(sc_args) => with_client!(&args, |c| commands::state::run_archive(c, sc_args)),
+        Command::Unarchive(sc_args) => with_client!(&args, |c| commands::state::run_unarchive(c, sc_args)),
+        Command::Star(sc_args) => with_client!(&args, |c| commands::state::run_star(c, sc_args)),
+        Command::Unstar(sc_args) => with_client!(&args, |c| commands::state::run_unstar(c, sc_args)),
 
         Command::Skill { cmd } => match cmd {
             lettura_cli::cli::SkillCmd::Print => commands::skill::run_print(),

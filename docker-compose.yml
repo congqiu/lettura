@@ -8,7 +8,7 @@ services:
     ports:
       - "3330:3330"
     environment:
-      DATABASE_URL: postgres://lettura:lettura@postgres:5432/lettura
+      DATABASE_URL: postgres://lettura:lettura@postgres:5436/lettura
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
       LISTEN_ADDR: 0.0.0.0:3330
       INDEX_PATH: /data/tantivy
@@ -51,8 +51,9 @@ services:
       POSTGRES_USER: lettura
       POSTGRES_PASSWORD: lettura
       POSTGRES_DB: lettura
+      PGPORT: 5436
     ports:
-      - "5432:5432"
+      - "5436:5436"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -119,7 +119,7 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 ### 服务端口
 
 - 应用: `http://localhost:3330`
-- PostgreSQL: `localhost:5432`（用户名/密码: lettura/lettura）
+- PostgreSQL: `localhost:5436`（用户名/密码: lettura/lettura）
 
 ## CLI (`lettura-cli`)
 

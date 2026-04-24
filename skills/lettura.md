@@ -86,7 +86,8 @@ Saving the same URL twice is safe: the server returns `already_existed: true`, a
 | `tag <id> <name>...` | Add tags (single entry) |
 | `tag --add X --filter E [--dry-run|--yes]` | Batch add tag |
 | `untag <id> <name>...` | Remove tags (single entry) |
-| `archive <id>` / `star <id>` | State change |
+| `archive <id>` / `unarchive <id>` | Archive state toggle |
+| `star <id>` / `unstar <id>` | Star state toggle |
 | `tags` | List all tags |
 | `whoami` | Verify login |
 

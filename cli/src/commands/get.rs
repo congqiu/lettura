@@ -20,7 +20,7 @@ pub async fn run(
             let text = entry
                 .content
                 .as_deref()
-                .map(|h| html2text::from_read(h.as_bytes(), 80))
+                .map(|h| html2text::from_read(h.as_bytes(), text_width()))
                 .unwrap_or_default();
             print!("{text}");
         }
@@ -48,5 +48,12 @@ pub async fn run(
 }
 
 fn html_to_markdown(html: &str) -> String {
-    html2text::from_read(html.as_bytes(), 80)
+    html2text::from_read(html.as_bytes(), text_width())
+}
+
+fn text_width() -> usize {
+    terminal_size::terminal_size()
+        .map(|(w, _)| w.0 as usize)
+        .unwrap_or(80)
+        .max(40)
 }

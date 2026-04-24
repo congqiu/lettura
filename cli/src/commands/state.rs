@@ -35,7 +35,12 @@ async fn toggle_batch(
     let filter = crate::filter::parse(filter_expr)
         .map_err(|e| CliError::BadArgs(e.to_string()))?;
     let filter_json = crate::commands::tag::filter_to_server_shape(&filter);
-    let endpoint = if field == "is_archived" { "archive" } else { "star" };
+    let endpoint = match field {
+        "is_archived" if value => "archive",
+        "is_archived" => "unarchive",
+        _ if value => "star",
+        _ => "unstar",
+    };
     let body = serde_json::json!({
         "filter": filter_json,
         "value": value,
@@ -51,6 +56,14 @@ pub async fn run_archive(client: &ApiClient, args: &StateChangeArgs) -> Result<i
     toggle(client, args, "is_archived", true).await
 }
 
+pub async fn run_unarchive(client: &ApiClient, args: &StateChangeArgs) -> Result<i32, CliError> {
+    toggle(client, args, "is_archived", false).await
+}
+
 pub async fn run_star(client: &ApiClient, args: &StateChangeArgs) -> Result<i32, CliError> {
     toggle(client, args, "is_starred", true).await
+}
+
+pub async fn run_unstar(client: &ApiClient, args: &StateChangeArgs) -> Result<i32, CliError> {
+    toggle(client, args, "is_starred", false).await
 }

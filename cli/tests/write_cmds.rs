@@ -144,6 +144,48 @@ async fn bulk_tag_dry_run_posts_to_bulk_endpoint() {
 }
 
 #[tokio::test]
+async fn unarchive_patches_is_archived_false() {
+    let server = MockServer::start();
+    let m = server.mock(|when, then| {
+        when.method(PATCH)
+            .path("/api/v1/entries/abc")
+            .json_body_partial(r#"{"is_archived":false}"#);
+        then.status(200).body(r#"{"id":"abc","is_archived":false}"#);
+    });
+    let client = ApiClient::new(server.base_url(), "lta_x").unwrap();
+    let args = StateChangeArgs {
+        id: Some("abc".into()),
+        filter: None,
+        dry_run: false,
+        yes: false,
+    };
+    let code = commands::state::run_unarchive(&client, &args).await.unwrap();
+    assert_eq!(code, 0);
+    m.assert();
+}
+
+#[tokio::test]
+async fn unstar_patches_is_starred_false() {
+    let server = MockServer::start();
+    let m = server.mock(|when, then| {
+        when.method(PATCH)
+            .path("/api/v1/entries/abc")
+            .json_body_partial(r#"{"is_starred":false}"#);
+        then.status(200).body(r#"{"id":"abc","is_starred":false}"#);
+    });
+    let client = ApiClient::new(server.base_url(), "lta_x").unwrap();
+    let args = StateChangeArgs {
+        id: Some("abc".into()),
+        filter: None,
+        dry_run: false,
+        yes: false,
+    };
+    let code = commands::state::run_unstar(&client, &args).await.unwrap();
+    assert_eq!(code, 0);
+    m.assert();
+}
+
+#[tokio::test]
 async fn bulk_archive_requires_safety_flag() {
     let client = ApiClient::new("http://localhost:1".into(), "lta_x").unwrap();
     let args = StateChangeArgs {

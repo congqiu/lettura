@@ -2,7 +2,7 @@ use crate::api_types::Tag;
 use crate::cli::OutputFormat;
 use crate::client::ApiClient;
 use crate::error::CliError;
-use crate::output::emit_json;
+use crate::output::{emit_human_tags, emit_json};
 
 pub async fn run(
     client: &ApiClient,
@@ -11,8 +11,8 @@ pub async fn run(
 ) -> Result<i32, CliError> {
     let tags: Vec<Tag> = client.get("/api/v1/tags", &[]).await?;
     match output {
-        _ => emit_json(&tags, pretty || matches!(output, OutputFormat::Human))
-            .map_err(CliError::from)?,
+        OutputFormat::Human => emit_human_tags(&tags).map_err(CliError::from)?,
+        _ => emit_json(&tags, pretty).map_err(CliError::from)?,
     }
     Ok(0)
 }

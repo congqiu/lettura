@@ -36,7 +36,9 @@ pub enum Command {
     Tag(TagArgs),
     Untag(UntagArgs),
     Archive(StateChangeArgs),
+    Unarchive(StateChangeArgs),
     Star(StateChangeArgs),
+    Unstar(StateChangeArgs),
 
     Tags,
     Skill { #[command(subcommand)] cmd: SkillCmd },

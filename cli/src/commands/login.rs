@@ -3,6 +3,7 @@ use std::io::{BufRead, Write};
 use crate::client::ApiClient;
 use crate::config::{Config, Profile};
 use crate::error::CliError;
+use crate::output;
 
 pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
     let mut stdout = std::io::stdout();
@@ -27,18 +28,24 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
         return Err(CliError::BadArgs("URL required".into()));
     }
 
-    // probe health
-    let probe = reqwest::get(format!("{}/api/health", url.trim_end_matches('/')))
+    // probe health with a short-timeout client
+    let probe_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| CliError::Network(e.to_string()))?;
+    let probe = probe_client
+        .get(format!("{}/api/health", url.trim_end_matches('/')))
+        .send()
         .await
         .map_err(|e| CliError::Network(format!("cannot reach {url}: {e}")))?;
     if !probe.status().is_success() {
         return Err(CliError::Network(format!("health check failed: HTTP {}", probe.status())));
     }
 
-    println!(
+    output::info(&format!(
         "Open {}/settings and generate an API token, then paste it below.",
         url.trim_end_matches('/')
-    );
+    ));
     write!(stdout, "Paste token: ").map_err(CliError::from)?;
     stdout.flush().map_err(CliError::from)?;
 
@@ -62,6 +69,6 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
     cfg.profiles.insert(profile_name.clone(), Profile { url, token });
     cfg.save_to(&path).map_err(|e| CliError::ServerError(e.to_string()))?;
 
-    println!("Saved profile '{profile_name}'.");
+    output::info(&format!("Saved profile '{profile_name}'."));
     Ok(0)
 }

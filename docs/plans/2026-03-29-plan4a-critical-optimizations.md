@@ -702,7 +702,7 @@ Expected: 全部 PASS
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgres://lettura:lettura@postgres:5432/lettura
+      DATABASE_URL: postgres://lettura:lettura@postgres:5436/lettura
       JWT_SECRET: change-me-in-production
       LISTEN_ADDR: 0.0.0.0:3000
       INDEX_PATH: /data/tantivy

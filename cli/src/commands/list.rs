@@ -3,7 +3,7 @@ use crate::cli::{ListArgs, OutputFormat};
 use crate::client::ApiClient;
 use crate::error::CliError;
 use crate::filter;
-use crate::output::{emit_ids, emit_json};
+use crate::output::{emit_human_entries, emit_ids, emit_json};
 
 pub async fn run(
     client: &ApiClient,
@@ -29,9 +29,11 @@ pub async fn run(
         OutputFormat::Ids => {
             emit_ids(entries.iter().map(|e| e.id)).map_err(CliError::from)?;
         }
-        OutputFormat::Json | OutputFormat::Human => {
-            emit_json(&entries, pretty || matches!(output, OutputFormat::Human))
-                .map_err(CliError::from)?;
+        OutputFormat::Json => {
+            emit_json(&entries, pretty).map_err(CliError::from)?;
+        }
+        OutputFormat::Human => {
+            emit_human_entries(&entries).map_err(CliError::from)?;
         }
     }
     Ok(0)

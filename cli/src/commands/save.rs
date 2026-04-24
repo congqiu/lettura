@@ -22,6 +22,7 @@ pub async fn run(client: &ApiClient, args: &SaveArgs) -> Result<i32, CliError> {
         .to_string();
 
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let mut interval_ms = 500u64;
     loop {
         if std::time::Instant::now() > deadline {
             return Err(CliError::ServerError(format!(
@@ -39,6 +40,7 @@ pub async fn run(client: &ApiClient, args: &SaveArgs) -> Result<i32, CliError> {
             emit_json(&entry, true).map_err(CliError::from)?;
             return Ok(0);
         }
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
+        interval_ms = (interval_ms * 2).min(4000); // exponential backoff, cap at 4s
     }
 }
