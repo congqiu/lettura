@@ -61,6 +61,7 @@ impl TestApp {
             chromium_path: None,
             render_concurrency: 1,
             render_timeout_ms: 15000,
+            public_base_url: None,
         };
 
         let (app, _, _) = lettura::api::router_with_search(

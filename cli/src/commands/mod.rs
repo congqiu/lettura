@@ -4,6 +4,7 @@ pub mod list;
 pub mod login;
 pub mod save;
 pub mod search;
+pub mod skill;
 pub mod state;
 pub mod tag;
 pub mod tags;

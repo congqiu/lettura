@@ -36,6 +36,8 @@ pub struct Config {
     pub chromium_path: Option<String>,
     pub render_concurrency: usize,
     pub render_timeout_ms: u64,
+    // Public base URL for skill endpoint and other public resources
+    pub public_base_url: Option<String>,
 }
 
 impl Config {
@@ -86,6 +88,7 @@ impl Config {
             chromium_path: env::var("LETTURA_CHROMIUM_PATH").ok(),
             render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
             render_timeout_ms: env::var("LETTURA_RENDER_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(15000),
+            public_base_url: env::var("LETTURA_PUBLIC_BASE_URL").ok(),
         })
     }
 

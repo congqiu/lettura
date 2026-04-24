@@ -39,6 +39,7 @@ RUN rm -rf src cli/src
 # 2b: Build actual application (only src/ changes invalidate this layer)
 COPY src/ src/
 COPY cli/src/ cli/src/
+COPY skills/ skills/
 COPY --from=frontend-builder /app/web/dist web/dist
 RUN touch src/main.rs && \
     if [ "$RENDERING" = "1" ]; then \

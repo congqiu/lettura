@@ -6,3 +6,4 @@ pub mod config;
 pub mod error;
 pub mod filter;
 pub mod output;
+pub mod skill_asset;

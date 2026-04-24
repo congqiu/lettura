@@ -1,0 +1,11 @@
+FROM rust:bookworm
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY cli/Cargo.toml cli/Cargo.toml
+COPY migrations/ migrations/
+COPY src/ src/
+COPY cli/src/ cli/src/
+COPY skills/ skills/
+COPY tests/ tests/
+RUN mkdir -p /app/web/dist && echo "placeholder" > /app/web/dist/index.html
+CMD ["cargo", "test", "--test", "entries_filter", "--test", "pat_auth", "--test", "tokens_api", "--", "--nocapture"]

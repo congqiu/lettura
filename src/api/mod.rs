@@ -26,6 +26,7 @@ pub mod health;
 pub mod import;
 pub mod memos;
 pub mod site_rules;
+pub mod skills;
 pub mod tagging_rules;
 pub mod tags;
 pub mod tokens;
@@ -90,6 +91,8 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
     let router = Router::new()
         // Health (no auth required, no version prefix)
         .route("/api/health", get(health::health_check))
+        // Skills (no auth required)
+        .route("/skills/lettura.md", get(skills::skill_lettura))
         // Auth (other endpoints — normal rate limit)
         .route("/api/v1/auth/refresh", post(auth::refresh))
         .route("/api/v1/auth/logout", post(auth::logout))

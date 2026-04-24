@@ -60,10 +60,12 @@ async fn run(args: Cli) -> i32 {
             Err(e) => Err(e),
         },
 
-        _ => {
-            eprintln!("command not yet implemented");
-            return 4;
-        }
+        Command::Skill { cmd } => match cmd {
+            lettura_cli::cli::SkillCmd::Print => commands::skill::run_print(),
+            lettura_cli::cli::SkillCmd::Install { path } => {
+                commands::skill::run_install(path.as_deref())
+            }
+        },
     };
     match result {
         Ok(code) => code,
