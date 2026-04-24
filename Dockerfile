@@ -1,3 +1,8 @@
+# Optional render fallback: set `--build-arg RENDERING=0` to compile without
+# chromiumoxide and skip installing chromium in the runtime image (image size
+# drops from ~350MB to ~100MB).
+ARG RENDERING=1
+
 # Stage 1: Build frontend
 FROM node:24 AS frontend-builder
 
@@ -10,7 +15,11 @@ COPY web/ ./
 RUN pnpm run build
 
 # Stage 2: Build Rust binary
-FROM rust:latest AS backend-builder
+# Pinning to -bookworm keeps the builder's glibc in sync with the
+# debian:bookworm-slim runtime; rust:latest floats to a newer Debian whose
+# glibc 2.39 symbols won't resolve at runtime.
+FROM rust:bookworm AS backend-builder
+ARG RENDERING
 
 WORKDIR /app
 
@@ -18,21 +27,36 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY migrations/ migrations/
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release 2>/dev/null || true
+RUN if [ "$RENDERING" = "1" ]; then \
+      cargo build --release 2>/dev/null || true; \
+    else \
+      cargo build --release --no-default-features 2>/dev/null || true; \
+    fi
 RUN rm -rf src
 
 # 2b: Build actual application (only src/ changes invalidate this layer)
 COPY src/ src/
-COPY site-configs/ site-configs/
 COPY --from=frontend-builder /app/web/dist web/dist
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs && \
+    if [ "$RENDERING" = "1" ]; then \
+      cargo build --release; \
+    else \
+      cargo build --release --no-default-features; \
+    fi
 
 # Stage 3: Runtime
 FROM debian:bookworm-slim
+ARG RENDERING
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    && if [ "$RENDERING" = "1" ]; then \
+         apt-get install -y --no-install-recommends \
+           chromium \
+           fonts-noto-cjk \
+           fonts-noto-color-emoji; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -40,7 +64,7 @@ WORKDIR /app
 COPY --from=backend-builder /app/target/release/lettura ./lettura
 COPY --from=backend-builder /app/migrations ./migrations
 
-RUN mkdir -p /data/tantivy
+RUN mkdir -p /data/tantivy /data/site-configs
 
 EXPOSE 3330
 

@@ -18,14 +18,14 @@ jobs:
           POSTGRES_PASSWORD: lettura
           POSTGRES_DB: lettura
         ports:
-          - 5432:5432
+          - 5436:5436
         options: >-
           --health-cmd "pg_isready -U lettura"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://lettura:lettura@localhost:5432/lettura
+      DATABASE_URL: postgres://lettura:lettura@localhost:5436/lettura
       JWT_SECRET: ci-test-secret-at-least-32-characters-long
     steps:
       - uses: actions/checkout@v4

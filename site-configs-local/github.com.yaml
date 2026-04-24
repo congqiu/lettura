@@ -1,0 +1,12 @@
+# GitHub repository / file / readme pages
+# Most useful content lives inside .markdown-body or #readme.
+response:
+  type: html
+  html:
+    title: "article h1, title"
+    body:
+      - "article.markdown-body"
+      - "#readme"
+    strip:
+      - ".anchor"
+      - ".sr-only"

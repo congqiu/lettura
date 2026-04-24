@@ -1,0 +1,17 @@
+# Medium articles
+# The static HTML response is paywalled / minimal — force the render path so
+# we get the post-client-side-hydration DOM.
+render:
+  mode: force
+  wait_for: "article"
+  timeout_ms: 20000
+response:
+  type: html
+  html:
+    title: "article h1"
+    body:
+      - "article"
+    strip:
+      - "nav"
+      - "[data-testid='footer']"
+      - "[aria-hidden='true']"

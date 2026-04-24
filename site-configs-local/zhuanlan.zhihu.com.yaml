@@ -1,0 +1,22 @@
+# Zhihu column articles
+# The /p/<id> pages are SPA-rendered, but the API at /api/articles/<id>
+# returns fully-rendered HTML in the `content` field — fetch that directly
+# instead of bringing up Chromium.
+match:
+  - "^/p/"
+rewrite:
+  - from: "^/p/(\\d+)"
+    to: "/api/articles/$1"
+request:
+  headers:
+    Referer: "https://zhuanlan.zhihu.com/"
+    X-Requested-With: "XMLHttpRequest"
+response:
+  type: json
+  json:
+    title: "/title"
+    content: "/content"
+    content_is_html: true
+    author: "/author/name"
+render:
+  mode: auto

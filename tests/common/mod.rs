@@ -15,7 +15,7 @@ pub struct TestApp {
 impl TestApp {
     pub async fn new() -> Self {
         let base_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://lettura:lettura@127.0.0.1:5432/lettura".to_string());
+            .unwrap_or_else(|_| "postgres://lettura:lettura@127.0.0.1:5436/lettura".to_string());
 
         let db_name = format!("lettura_test_{}", Uuid::new_v4().simple());
         let base_pool = PgPool::connect(&base_url).await.unwrap();

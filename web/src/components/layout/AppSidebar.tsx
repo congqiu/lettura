@@ -15,7 +15,7 @@ import {
 const navItems = [
   { to: '/', label: '未读', icon: BookOpen, end: true },
   { to: '/archived', label: '归档', icon: Archive, end: false },
-  { to: '/starred', label: '收藏', icon: Star, end: false },
+  { to: '/starred', label: '收藏', icon: Star, end: true },
   { to: '/memos', label: '便签', icon: StickyNote, end: false },
 ];
 

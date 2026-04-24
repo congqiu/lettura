@@ -1,6 +1,10 @@
 services:
   lettura:
-    build: .
+    build:
+      context: .
+      args:
+        # Set RENDERING=0 to build a slim image without chromiumoxide + chromium.
+        RENDERING: ${RENDERING:-1}
     ports:
       - "3330:3330"
     environment:
@@ -14,8 +18,13 @@ services:
       LETTURA_FETCH_TIMEOUT: ${LETTURA_FETCH_TIMEOUT:-30}
       LETTURA_FETCH_MAX_RETRIES: ${LETTURA_FETCH_MAX_RETRIES:-3}
       LETTURA_PROXY: ${LETTURA_PROXY:-}
-      LETTURA_RENDERING_URL: ${LETTURA_RENDERING_URL:-}
-      LETTURA_SITE_CONFIGS_PATH: ${LETTURA_SITE_CONFIGS_PATH:-}
+      # Site rules: YAML files mounted at /data/site-configs
+      LETTURA_SITE_CONFIGS_PATH: ${LETTURA_SITE_CONFIGS_PATH:-/data/site-configs}
+      # Render fallback (honored when RENDERING=1 was used at build time)
+      LETTURA_RENDERING_ENABLED: ${LETTURA_RENDERING_ENABLED:-auto}
+      LETTURA_CHROMIUM_PATH: ${LETTURA_CHROMIUM_PATH:-}
+      LETTURA_RENDER_CONCURRENCY: ${LETTURA_RENDER_CONCURRENCY:-2}
+      LETTURA_RENDER_TIMEOUT_MS: ${LETTURA_RENDER_TIMEOUT_MS:-15000}
     volumes:
       - lettura_data:/data/tantivy
       - lettura_pages:/data/pages

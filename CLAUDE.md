@@ -95,27 +95,26 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 | `LETTURA_FETCH_TIMEOUT` | 30 | 抓取超时（秒） |
 | `LETTURA_FETCH_MAX_RETRIES` | 3 | 抓取失败最大重试次数 |
 | `LETTURA_PROXY` | 无 | HTTP/SOCKS5 代理地址 |
-| `LETTURA_RENDERING_URL` | 无 | JS 渲染服务地址（如 `http://browserless:3000`） |
-| `LETTURA_SITE_CONFIGS_PATH` | 无 | 用户自定义站点配置文件目录 |
+| `LETTURA_SITE_CONFIGS_PATH` | `/data/site-configs` | 用户站点规则 YAML 目录 |
+| `LETTURA_RENDERING_ENABLED` | `auto` | 渲染兜底开关：`auto` / `true` / `false` |
+| `LETTURA_CHROMIUM_PATH` | 自动搜索 PATH | Chromium 可执行文件绝对路径 |
+| `LETTURA_RENDER_CONCURRENCY` | 2 | 并发渲染上限 |
+| `LETTURA_RENDER_TIMEOUT_MS` | 15000 | 单次渲染总超时（毫秒） |
 
 ### 站点配置系统
 
-内置配置文件在 `site-configs/` 目录下（编译时嵌入二进制），格式为 FTR 简洁文本：
+详见 `docs/specs/2026-04-23-fetch-pipeline-redesign.md`。
 
-```
-# site-configs/example.com.txt
-render: true
-title: h1.article-title
-body: div.content, article
-strip: div.ads, div.sidebar
-author: span.author
-match: /article/
-exclude: /video/
-```
+规则文件放 `site-configs-local/<domain>.yaml`（docker-compose 会把该目录挂到容器内 `/data/site-configs`）。YAML 字段：`match` / `exclude`（URL path 正则）、`rewrite`（path 重写）、`request.headers` / `request.cookies` / `request.user_agent`、`response.type: html|json` + `response.html|json` 提取规则、`render.mode: never|auto|force` + `wait_for` / `timeout_ms`。
 
-用户可通过 `site-configs-local/` 目录添加本地覆盖配置（通过 docker-compose volume 挂载到 `/data/site-configs`）。
+规则优先级：本地 YAML → 数据库 `site_rules` → readability 自动提取。
 
-规则优先级：本地覆盖文件 → 内置配置库 → 数据库 site_rules → readability 自动提取
+### 构建选项
+
+| 构建命令 | 说明 | 镜像大小 |
+|----------|------|----------|
+| `docker compose build lettura` | 完整版，带 chromiumoxide + chromium | ~350MB |
+| `RENDERING=0 docker compose build lettura` | 精简版，不含 Chromium | ~100MB |
 
 ### 服务端口
 

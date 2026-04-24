@@ -9,7 +9,7 @@ import { useState } from 'react';
 
 const bottomNavItems = [
   { to: '/', label: '未读', icon: BookOpen, end: true },
-  { to: '/starred', label: '收藏', icon: Star, end: false },
+  { to: '/starred', label: '收藏', icon: Star, end: true },
   { to: '/pages', label: 'Pages', icon: Globe, end: false },
   { to: '/memos', label: '便签', icon: StickyNote, end: false },
 ];
