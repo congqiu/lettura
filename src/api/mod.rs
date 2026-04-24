@@ -94,6 +94,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/auth/logout", post(auth::logout))
         .route("/api/v1/auth/regenerate-feed-token", post(auth::regenerate_feed_token))
         .route("/api/v1/auth/change-password", post(auth::change_password))
+        .route("/api/v1/auth/me", get(auth::me))
         // Tokens (PAT management — requires JWT)
         .route("/api/v1/tokens", get(tokens::list_tokens).post(tokens::create_token))
         .route("/api/v1/tokens/{id}", delete(tokens::delete_token))

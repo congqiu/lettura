@@ -6,7 +6,7 @@ use validator::Validate;
 
 use crate::api::error::ApiError;
 use crate::auth::jwt;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
 use crate::auth::password;
 use crate::models::user;
@@ -145,6 +145,41 @@ pub async fn regenerate_feed_token(
 ) -> Result<Json<FeedTokenResponse>, ApiError> {
     let new_token = user::regenerate_feed_token(&state.pool, auth.user_id).await?;
     Ok(Json(FeedTokenResponse { feed_token: new_token }))
+}
+
+#[derive(Serialize)]
+pub struct MeResponse {
+    pub user_id: uuid::Uuid,
+    pub username: String,
+    pub email: String,
+    pub is_admin: bool,
+    pub auth_source: &'static str,
+}
+
+pub async fn me(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<MeResponse>, ApiError> {
+    let (username, email): (String, String) = sqlx::query_as(
+        "SELECT username, email FROM users WHERE id = $1",
+    )
+    .bind(auth.user_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt",
+        AuthSource::Pat { .. } => "pat",
+    };
+
+    Ok(Json(MeResponse {
+        user_id: auth.user_id,
+        username,
+        email,
+        is_admin: auth.is_admin,
+        auth_source,
+    }))
 }
 
 #[derive(Deserialize, Validate)]
