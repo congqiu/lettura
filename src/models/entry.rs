@@ -105,6 +105,52 @@ pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> R
         .map_err(|e| ModelError::Database(e.to_string()))
 }
 
+fn deserialize_i64_from_string<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+    use std::fmt;
+
+    struct I64OrString;
+
+    impl<'de> de::Visitor<'de> for I64OrString {
+        type Value = Option<i64>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("an integer or a numeric string")
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_some<D2: de::Deserializer<'de>>(self, d: D2) -> Result<Self::Value, D2::Error> {
+            d.deserialize_any(I64OrString)
+        }
+
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+            Ok(Some(v))
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+            Ok(Some(v as i64))
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            v.parse::<i64>().map(Some).map_err(|_| {
+                de::Error::invalid_value(de::Unexpected::Str(v), &self)
+            })
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+    }
+
+    deserializer.deserialize_option(I64OrString)
+}
+
 fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -151,7 +197,9 @@ where
 
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
+    #[serde(default, deserialize_with = "deserialize_i64_from_string")]
     pub page: Option<i64>,
+    #[serde(default, deserialize_with = "deserialize_i64_from_string")]
     pub per_page: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_bool_from_string")]
     pub is_archived: Option<bool>,

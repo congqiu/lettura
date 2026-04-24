@@ -80,6 +80,8 @@ pub enum GetFormat { Markdown, Json, Html, Text }
 
 #[derive(clap::Args)]
 pub struct SaveArgs {
+    // Use a distinct clap ID to avoid shadowing the global `--url` flag.
+    #[arg(id = "entry_url")]
     pub url: String,
     #[arg(long)] pub title: Option<String>,
     #[arg(long, value_delimiter = ',')] pub tag: Vec<String>,

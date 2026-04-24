@@ -121,6 +121,17 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 - 应用: `http://localhost:3330`
 - PostgreSQL: `localhost:5432`（用户名/密码: lettura/lettura）
 
+## CLI (`lettura-cli`)
+
+新增的 `lettura-cli` 面向 AI agent，位于 `cli/` 子 crate 中。
+
+- **Workspace**: 项目已拆为 Cargo workspace（根 crate 为 server，`cli/` 为 CLI）。`cargo test` 默认只覆盖 server crate；CLI 测试用 `cargo test -p lettura-cli`，整套用 `cargo test --workspace`。
+- **认证**: 通过 Personal Access Token (PAT) 认证。明文令牌以 `lta_` 前缀识别；数据库只存 SHA-256。PAT 与 JWT 通过同一 `Authorization: Bearer` 头路由，`src/auth/middleware.rs` 根据前缀分流。
+- **Skill**: AI 指令位于 `skills/lettura.md`（源文件，含 `{{BASE_URL}}` 和 `{{SERVER_VERSION}}` 占位符）。服务器通过 `GET /skills/lettura.md` 动态渲染，CLI 通过 `lettura-cli skill install` 分发已绑定的版本。
+- **Release**: 打 `v*` tag 触发 `.github/workflows/release.yml` 构建 3 平台 binaries（linux-x86_64, darwin-x86_64, darwin-aarch64）。
+- **契约测试**: `tests/cli_contract.rs` 用真实 CLI binary 打真实 server，跑 save/list/tag/markdown/bulk 全链路。维护 CLI 或服务器 API 时注意保持兼容。
+- **Skill lint**: `cli/tests/skill_lint.rs` 会对 `skills/lettura.md` 中的每个命令示例用 clap 校验一遍，防止 skill 漂移。
+
 ## 不要做的事
 
 - 不要引入 boa_engine（JS 引擎），已明确放弃此方案

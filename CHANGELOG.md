@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Personal Access Tokens (PAT) management UI and API (`POST/GET /api/v1/tokens`, `DELETE /api/v1/tokens/:id`). Tokens authenticate alongside JWT via `Authorization: Bearer lta_...`. Fine-grained scope: `read` (GET-only) or `write` (full API).
+- `lettura-cli` AI-first CLI with subcommands: `login`, `whoami`, `config`, `list`, `search`, `get` (markdown/json/html/text), `save` (with `--wait`), `tag` / `untag` / `archive` / `star` (single + batch via `--filter`), `tags`, `skill print` / `skill install`.
+- Filter DSL for `list` / batch operations: AND-combined conditions like `tag:rust,untagged,since:7d`.
+- Bulk endpoints `POST /api/v1/entries/bulk/{tag,untag,archive,star}` with required `dry_run` preview step.
+- Skill source `skills/lettura.md`, served publicly at `GET /skills/lettura.md` with server-version + base-URL substitution, and bundled into the CLI binary via rust-embed (`lettura-cli skill install`).
+- GitHub Actions release workflow building `lettura-cli` for linux-x86_64, darwin-x86_64, and darwin-aarch64; `scripts/install-cli.sh` downloads the matching tarball.
+
+### Changed
+- Entry save (`POST /api/v1/entries`) is now idempotent: same URL returns existing entry with `already_existed: true`, tag set merged as union.
+- `GET /api/v1/entries` list endpoint gained filters: `tag`, `exclude_tag`, `untagged`, `domain`, `since`, `before`, `is_read` (alias for `is_archived`).
+- Repo is now a Cargo workspace (`.` and `cli/`); server crate is still `lettura`.
+
+### Security
+- PAT tokens stored as SHA-256 hash only; only the first 12 bytes (`lta_…`) kept in plaintext for UI display.
+
 ## [0.1.0] - 2026-03-29
 
 ### Added

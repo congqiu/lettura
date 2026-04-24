@@ -57,6 +57,61 @@ docker compose up -d
 
 详细 API 文档见 [docs/api.md](docs/api.md)。
 
+## CLI (`lettura-cli`)
+
+AI-first 命令行工具，通过 Personal Access Token 与 Lettura HTTP API 通信。
+
+### 安装
+
+```sh
+curl -sSL https://raw.githubusercontent.com/qiu/lettura/main/scripts/install-cli.sh | sh
+```
+
+或指定版本 / Fork：
+
+```sh
+LETTURA_CLI_VERSION=v0.1.0 LETTURA_REPO=my-org/lettura ./scripts/install-cli.sh
+```
+
+默认安装到 `~/.local/bin/lettura-cli`（可通过 `LETTURA_INSTALL_DIR` 覆盖）。
+
+### 认证
+
+1. 打开 Lettura Web UI → Settings → API Tokens → Generate token
+2. 复制令牌（仅显示一次）
+3. `lettura-cli login` — 输入服务器地址并粘贴令牌
+
+### 常用命令
+
+```sh
+lettura-cli save https://example.com/post --tag rust
+lettura-cli list --filter "tag:rust,since:7d" --limit 10
+lettura-cli get <id> --format markdown
+lettura-cli tag <id> ai research
+lettura-cli tag --add ai --filter "domain:example.com,untagged" --dry-run
+lettura-cli tag --add ai --filter "domain:example.com,untagged" --yes
+```
+
+完整命令参考可通过 `lettura-cli --help` 查看，或安装 AI skill：
+
+```sh
+lettura-cli skill install    # 将 skill 写入 ~/.claude/skills/lettura.md
+```
+
+### 配置
+
+`~/.config/lettura/config.toml`（权限 0600）：
+
+```toml
+default_profile = "default"
+
+[profiles.default]
+url   = "https://lettura.example.com"
+token = "lta_..."
+```
+
+通过 `--profile <name>`、`--url <url>` 或环境变量 `LETTURA_PROFILE`、`LETTURA_URL`、`LETTURA_TOKEN` 可覆盖配置。
+
 ## Development
 
 ```bash
