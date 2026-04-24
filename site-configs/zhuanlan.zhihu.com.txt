@@ -1,4 +1,0 @@
-render: true
-title: h1.ArticleTitle
-body: div.RichText
-author: span.AuthorInfo-name

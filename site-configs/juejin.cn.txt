@@ -1,5 +1,0 @@
-render: true
-match: /post/
-title: h1.article-title
-body: div.article-content
-author: span.author-name

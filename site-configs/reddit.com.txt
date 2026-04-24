@@ -1,4 +1,0 @@
-render: true
-title: h1
-body: div[data-testid="post-container"]
-author: a[href*="/user/"]

@@ -30,8 +30,12 @@ pub struct Config {
     pub fetch_timeout_secs: u64,
     pub fetch_max_retries: u32,
     pub proxy: Option<String>,
-    pub rendering_url: Option<String>,
     pub site_configs_path: Option<String>,
+    // Render fallback (honored when the `rendering` feature is compiled in)
+    pub rendering_enabled: String, // "auto" | "true" | "false"
+    pub chromium_path: Option<String>,
+    pub render_concurrency: usize,
+    pub render_timeout_ms: u64,
 }
 
 impl Config {
@@ -77,9 +81,28 @@ impl Config {
             fetch_timeout_secs: env::var("LETTURA_FETCH_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
             fetch_max_retries: env::var("LETTURA_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
             proxy: env::var("LETTURA_PROXY").ok(),
-            rendering_url: env::var("LETTURA_RENDERING_URL").ok(),
             site_configs_path: env::var("LETTURA_SITE_CONFIGS_PATH").ok(),
+            rendering_enabled: env::var("LETTURA_RENDERING_ENABLED").unwrap_or_else(|_| "auto".to_string()),
+            chromium_path: env::var("LETTURA_CHROMIUM_PATH").ok(),
+            render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
+            render_timeout_ms: env::var("LETTURA_RENDER_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(15000),
         })
+    }
+
+    /// Returns true when rendering should be attempted at runtime. Always false
+    /// when the `rendering` feature is compiled out.
+    pub fn rendering_runtime_enabled(&self) -> bool {
+        #[cfg(not(feature = "rendering"))]
+        {
+            return false;
+        }
+        #[cfg(feature = "rendering")]
+        {
+            match self.rendering_enabled.as_str() {
+                "false" | "0" | "off" => false,
+                _ => true,
+            }
+        }
     }
 }
 
@@ -123,8 +146,11 @@ mod tests {
             env::remove_var("LETTURA_FETCH_TIMEOUT");
             env::remove_var("LETTURA_FETCH_MAX_RETRIES");
             env::remove_var("LETTURA_PROXY");
-            env::remove_var("LETTURA_RENDERING_URL");
             env::remove_var("LETTURA_SITE_CONFIGS_PATH");
+            env::remove_var("LETTURA_RENDERING_ENABLED");
+            env::remove_var("LETTURA_CHROMIUM_PATH");
+            env::remove_var("LETTURA_RENDER_CONCURRENCY");
+            env::remove_var("LETTURA_RENDER_TIMEOUT_MS");
         }
     }
 
@@ -158,5 +184,23 @@ mod tests {
             result.unwrap().jwt_secret,
             "a-very-secure-secret-that-is-at-least-32-chars!"
         );
+    }
+
+    #[test]
+    fn render_concurrency_parses() {
+        set_env("a-very-secure-secret-that-is-at-least-32-chars!");
+        unsafe { env::set_var("LETTURA_RENDER_CONCURRENCY", "4"); }
+        let cfg = Config::from_env().unwrap();
+        assert_eq!(cfg.render_concurrency, 4);
+        cleanup_env();
+    }
+
+    #[test]
+    fn rendering_enabled_disabled_via_env() {
+        set_env("a-very-secure-secret-that-is-at-least-32-chars!");
+        unsafe { env::set_var("LETTURA_RENDERING_ENABLED", "false"); }
+        let cfg = Config::from_env().unwrap();
+        assert!(!cfg.rendering_runtime_enabled());
+        cleanup_env();
     }
 }

@@ -1,4 +1,0 @@
-title: h1.ArticleTitle
-body: div.Article-content
-author: span.ArticleAuthor
-strip: div.Article-sideAction

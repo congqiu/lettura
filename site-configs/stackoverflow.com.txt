@@ -1,5 +1,0 @@
-match: /questions/
-title: h1 a.question-hyperlink, h1
-body: div.answer, div.post-layout
-strip: div.vote, div.post-menu
-author: div.user-details a

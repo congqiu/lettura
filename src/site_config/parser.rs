@@ -1,217 +1,166 @@
 use super::SiteConfig;
+use regex::Regex;
+use std::env;
 
-/// Parse a site config file content into a SiteConfig.
-/// `domain` is derived from the filename (e.g., "medium.com").
+/// Parse a YAML site config file content into a `SiteConfig`.
+///
+/// `domain` is derived from the filename (e.g., "medium.com") and overrides
+/// whatever is written inside the YAML file. Placeholders of the form
+/// `${ENV_XXX}` in string values are replaced with the value of the matching
+/// process environment variable; unset vars are left as-is.
 pub fn parse_config(domain: &str, content: &str) -> Result<SiteConfig, String> {
-    let mut config = SiteConfig {
-        domain: domain.to_string(),
-        ..Default::default()
-    };
+    let substituted = substitute_env(content);
 
-    for line in content.lines() {
-        let line = line.trim();
-
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        // Split on first ": "
-        let (key, value) = line
-            .split_once(": ")
-            .ok_or_else(|| format!("invalid config line (missing ': '): {}", line))?;
-
-        match key {
-            "render" => {
-                config.render = value.trim().eq_ignore_ascii_case("true");
-            }
-            "header" => {
-                let (name, val) = value
-                    .split_once(": ")
-                    .ok_or_else(|| format!("invalid header format: {}", value))?;
-                config
-                    .extra_headers
-                    .push((name.trim().to_string(), val.trim().to_string()));
-            }
-            "user_agent" => {
-                config.user_agent = Some(value.trim().to_string());
-            }
-            "timeout" => {
-                config.timeout = Some(
-                    value
-                        .trim()
-                        .parse::<u64>()
-                        .map_err(|_| format!("invalid timeout value: {}", value))?,
-                );
-            }
-            "title" => {
-                config.title_selectors = split_selectors(value);
-            }
-            "body" => {
-                config.body_selectors = split_selectors(value);
-            }
-            "strip" => {
-                config.strip_selectors.extend(split_selectors(value));
-            }
-            "author" => {
-                config.author_selector = Some(value.trim().to_string());
-            }
-            "date" => {
-                config.date_selector = Some(value.trim().to_string());
-            }
-            "image" => {
-                config.image_selector = Some(value.trim().to_string());
-            }
-            "match" => {
-                config.match_patterns.push(value.trim().to_string());
-            }
-            "exclude" => {
-                config.exclude_patterns.push(value.trim().to_string());
-            }
-            _ => {
-                return Err(format!("unknown config key: {}", key));
-            }
-        }
-    }
-
+    let mut config: SiteConfig = serde_yaml::from_str(&substituted)
+        .map_err(|e| format!("invalid YAML: {}", e))?;
+    config.domain = domain.to_string();
     Ok(config)
 }
 
-/// Split a comma-separated selector string into individual selectors.
-fn split_selectors(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
+/// Replace `${ENV_NAME}` placeholders with the value of the matching process
+/// environment variable. Placeholders whose variable is unset are left as-is
+/// (to avoid silent config corruption).
+fn substitute_env(input: &str) -> String {
+    // The regex captures the variable name inside ${...}. Names are limited
+    // to [A-Z0-9_] to avoid matching unrelated YAML syntax.
+    static RE_STR: &str = r"\$\{([A-Z][A-Z0-9_]*)\}";
+    let re = Regex::new(RE_STR).expect("static regex compiles");
+
+    re.replace_all(input, |caps: &regex::Captures| {
+        let var_name = &caps[1];
+        env::var(var_name).unwrap_or_else(|_| caps[0].to_string())
+    })
+    .to_string()
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::{RenderMode, ResponseType};
     use super::*;
 
     #[test]
     fn parse_minimal_config() {
-        let config = parse_config(
-            "example.com",
-            r#"
-title: h1.article-title
-body: div.content
-"#,
-        )
-        .unwrap();
-
+        let yaml = r#"
+response:
+  type: html
+  html:
+    title: h1.article-title
+    body: [div.content]
+"#;
+        let config = parse_config("example.com", yaml).unwrap();
         assert_eq!(config.domain, "example.com");
-        assert!(!config.render);
-        assert!(config.extra_headers.is_empty());
-        assert_eq!(config.title_selectors, vec!["h1.article-title"]);
-        assert_eq!(config.body_selectors, vec!["div.content"]);
+        assert_eq!(config.response.response_type, ResponseType::Html);
+        let html = config.response.html.unwrap();
+        assert_eq!(html.title.as_deref(), Some("h1.article-title"));
+        assert_eq!(html.body, vec!["div.content"]);
+        assert_eq!(config.render.mode, RenderMode::Auto);
     }
 
     #[test]
-    fn parse_full_config() {
-        let config = parse_config(
-            "medium.com",
-            r#"
-# This is a comment
-render: true
-header: Cookie: session=abc
-header: Referer: https://example.com
-user_agent: Mozilla/5.0 Custom
-timeout: 60
-
-title: h1, .title
-body: article, div.post-body, main
-strip: div.ads
-strip: nav.sidebar
-author: span.author
-date: time
-image: img.hero
-match: /article/
-exclude: /video/
-"#,
-        )
-        .unwrap();
-
-        assert_eq!(config.domain, "medium.com");
-        assert!(config.render);
+    fn parse_full_json_config() {
+        let yaml = r#"
+match:
+  - "^/p/"
+exclude:
+  - "^/video/"
+rewrite:
+  - from: "^/p/(\\d+)"
+    to: "/api/articles/$1"
+request:
+  headers:
+    Referer: "https://example.com/"
+  cookies:
+    session: "abc123"
+  user_agent: "CustomBot/1.0"
+response:
+  type: json
+  json:
+    title: "/data/title"
+    content: "/data/content"
+    content_is_html: true
+    author: "/data/author/name"
+render:
+  mode: auto
+  wait_for: "article"
+  timeout_ms: 20000
+"#;
+        let config = parse_config("zhuanlan.zhihu.com", yaml).unwrap();
+        assert_eq!(config.url_match, vec!["^/p/"]);
+        assert_eq!(config.exclude, vec!["^/video/"]);
+        assert_eq!(config.rewrite.len(), 1);
+        assert_eq!(config.rewrite[0].from, "^/p/(\\d+)");
+        assert_eq!(config.rewrite[0].to, "/api/articles/$1");
         assert_eq!(
-            config.extra_headers,
-            vec![
-                ("Cookie".to_string(), "session=abc".to_string()),
-                ("Referer".to_string(), "https://example.com".to_string()),
-            ]
+            config.request.headers.get("Referer"),
+            Some(&"https://example.com/".to_string())
         );
-        assert_eq!(config.user_agent, Some("Mozilla/5.0 Custom".to_string()));
-        assert_eq!(config.timeout, Some(60));
-        assert_eq!(config.title_selectors, vec!["h1", ".title"]);
         assert_eq!(
-            config.body_selectors,
-            vec!["article", "div.post-body", "main"]
+            config.request.cookies.get("session"),
+            Some(&"abc123".to_string())
         );
-        assert_eq!(config.strip_selectors, vec!["div.ads", "nav.sidebar"]);
-        assert_eq!(config.author_selector, Some("span.author".to_string()));
-        assert_eq!(config.date_selector, Some("time".to_string()));
-        assert_eq!(config.image_selector, Some("img.hero".to_string()));
-        assert_eq!(config.match_patterns, vec!["/article/"]);
-        assert_eq!(config.exclude_patterns, vec!["/video/"]);
+        assert_eq!(config.request.user_agent.as_deref(), Some("CustomBot/1.0"));
+        assert_eq!(config.response.response_type, ResponseType::Json);
+        let json = config.response.json.unwrap();
+        assert_eq!(json.title.as_deref(), Some("/data/title"));
+        assert!(json.content_is_html);
+        assert_eq!(config.render.mode, RenderMode::Auto);
+        assert_eq!(config.render.wait_for.as_deref(), Some("article"));
+        assert_eq!(config.render.timeout_ms, Some(20000));
     }
 
     #[test]
-    fn parse_empty_config() {
+    fn parse_render_force() {
+        let yaml = r#"
+render:
+  mode: force
+"#;
+        let config = parse_config("medium.com", yaml).unwrap();
+        assert_eq!(config.render.mode, RenderMode::Force);
+    }
+
+    #[test]
+    fn parse_empty_yaml_is_ok() {
         let config = parse_config("empty.com", "").unwrap();
         assert_eq!(config.domain, "empty.com");
-        assert!(config.title_selectors.is_empty());
-        assert!(config.body_selectors.is_empty());
+        assert_eq!(config.render.mode, RenderMode::Auto);
     }
 
     #[test]
-    fn parse_comments_and_blank_lines() {
-        let config = parse_config(
-            "test.com",
-            r#"
-# Full line comment
-title: h1
-
-# Another comment
-body: div.content
-"#,
-        )
-        .unwrap();
-        assert_eq!(config.title_selectors, vec!["h1"]);
-        assert_eq!(config.body_selectors, vec!["div.content"]);
-    }
-
-    #[test]
-    fn parse_invalid_line() {
-        let result = parse_config("bad.com", "no colon here");
+    fn parse_invalid_yaml_errors() {
+        let result = parse_config("bad.com", "this: is: invalid");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("missing ': '"));
+        assert!(result.unwrap_err().contains("invalid YAML"));
     }
 
     #[test]
-    fn parse_unknown_key() {
-        let result = parse_config("bad.com", "unknown_key: value");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("unknown config key"));
+    fn env_placeholder_substituted_when_set() {
+        // SAFETY: tests run with --test-threads=1 via .cargo/config.toml
+        unsafe { env::set_var("TEST_COOKIE_TOKEN", "secret-value"); }
+        let yaml = r#"
+request:
+  cookies:
+    auth: "${TEST_COOKIE_TOKEN}"
+"#;
+        let config = parse_config("any.com", yaml).unwrap();
+        assert_eq!(
+            config.request.cookies.get("auth"),
+            Some(&"secret-value".to_string())
+        );
+        unsafe { env::remove_var("TEST_COOKIE_TOKEN"); }
     }
 
     #[test]
-    fn parse_invalid_timeout() {
-        let result = parse_config("bad.com", "timeout: abc");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("invalid timeout"));
-    }
-
-    #[test]
-    fn parse_render_false() {
-        let config = parse_config("test.com", "render: false").unwrap();
-        assert!(!config.render);
-    }
-
-    #[test]
-    fn parse_render_case_insensitive() {
-        let config = parse_config("test.com", "render: True").unwrap();
-        assert!(config.render);
+    fn env_placeholder_kept_verbatim_when_unset() {
+        unsafe { env::remove_var("DEFINITELY_UNSET_VAR_XYZ"); }
+        let yaml = r#"
+request:
+  cookies:
+    auth: "${DEFINITELY_UNSET_VAR_XYZ}"
+"#;
+        let config = parse_config("any.com", yaml).unwrap();
+        assert_eq!(
+            config.request.cookies.get("auth"),
+            Some(&"${DEFINITELY_UNSET_VAR_XYZ}".to_string())
+        );
     }
 }

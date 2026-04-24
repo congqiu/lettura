@@ -3,6 +3,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod extract;
+pub mod fetch;
 pub mod metrics;
 pub mod models;
 pub mod rate_limit;

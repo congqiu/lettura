@@ -192,7 +192,7 @@ fn extract_title_with_selector(document: &scraper::Html, selector: &str) -> Opti
     if text.is_empty() { None } else { Some(text) }
 }
 
-fn html_to_text(html: &str) -> String {
+pub fn html_to_text(html: &str) -> String {
     let frag = scraper::Html::parse_fragment(html);
     frag.root_element()
         .text()
@@ -203,7 +203,7 @@ fn html_to_text(html: &str) -> String {
         .join(" ")
 }
 
-fn estimate_reading_time(text: &str) -> u32 {
+pub fn estimate_reading_time(text: &str) -> u32 {
     use unicode_segmentation::UnicodeSegmentation;
     let word_count = text.unicode_words().count();
     let minutes = (word_count as f64 / 230.0).ceil() as u32;
