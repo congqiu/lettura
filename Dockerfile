@@ -25,17 +25,20 @@ WORKDIR /app
 
 # 2a: Cache Rust dependencies (rebuilds only when Cargo.toml/Cargo.lock change)
 COPY Cargo.toml Cargo.lock ./
+COPY cli/Cargo.toml cli/Cargo.toml
 COPY migrations/ migrations/
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir src && echo "fn main() {}" > src/main.rs && \
+    mkdir -p cli/src && echo "fn main() {}" > cli/src/main.rs
 RUN if [ "$RENDERING" = "1" ]; then \
       cargo build --release 2>/dev/null || true; \
     else \
       cargo build --release --no-default-features 2>/dev/null || true; \
     fi
-RUN rm -rf src
+RUN rm -rf src cli/src
 
 # 2b: Build actual application (only src/ changes invalidate this layer)
 COPY src/ src/
+COPY cli/src/ cli/src/
 COPY --from=frontend-builder /app/web/dist web/dist
 RUN touch src/main.rs && \
     if [ "$RENDERING" = "1" ]; then \

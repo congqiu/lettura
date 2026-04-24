@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createToken, CreateTokenPayload } from '@/api/tokens';
+import { createToken } from '@/api/tokens';
+import type { CreateTokenPayload } from '@/api/tokens';
 
 interface Props {
   open: boolean;

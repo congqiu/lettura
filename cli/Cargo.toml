@@ -1,0 +1,28 @@
+[package]
+name = "lettura-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "lettura-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-std"] }
+toml = "0.8"
+directories = "5"
+chrono = { version = "0.4", features = ["serde"] }
+rust-embed = "8"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+httpmock = "0.7"

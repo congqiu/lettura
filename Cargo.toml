@@ -1,7 +1,15 @@
+[workspace]
+members = [".", "cli"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+
 [package]
 name = "lettura"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [features]
 # Enable the optional Chromium-based render fallback. Turning it off removes
