@@ -152,19 +152,23 @@ async fn process_body(
             let body_owned = body.to_string();
             let url_owned = job.url.clone();
             let cfg_owned = site_rule_config.clone();
-            let extracted = tokio::task::spawn_blocking(move || {
+            let start = std::time::Instant::now();
+            let extract_outcome = tokio::task::spawn_blocking(move || {
                 extract::extract_with_fallback(&body_owned, Some(&url_owned), cfg_owned.as_ref())
             })
             .await;
-            let result = match extracted {
+            let elapsed = start.elapsed().as_secs_f64();
+            let extract_result = match extract_outcome {
                 Ok(r) => r,
                 Err(e) => {
                     tracing::error!(entry_id = %job.entry_id, error = %e, "extract task panicked");
+                    metrics::histogram!("extract_duration_seconds", "method" => "panic")
+                        .record(elapsed);
                     mark_failed(&ctx.pool, job.entry_id, status).await;
                     return;
                 }
             };
-            match result {
+            match extract_result {
                 Ok(result) => {
                     let method = match result.method {
                         extract::ExtractMethod::SiteRule => "site_rule",
@@ -173,6 +177,8 @@ async fn process_body(
                             "fallback"
                         }
                     };
+                    metrics::histogram!("extract_duration_seconds", "method" => method)
+                        .record(elapsed);
                     // Content too short → try rendering (if allowed by config + available).
                     if result.inner.text_content.len() < SHORT_CONTENT_THRESHOLD {
                         if let Some(sc) = site_config {
@@ -186,6 +192,8 @@ async fn process_body(
                     save(ctx, job, &result.inner, status, method).await;
                 }
                 Err(_) => {
+                    metrics::histogram!("extract_duration_seconds", "method" => "error")
+                        .record(elapsed);
                     tracing::warn!(entry_id = %job.entry_id, status, "all HTML extraction methods failed");
                     if !fallback_render(ctx, job, site_config, status).await {
                         mark_failed(&ctx.pool, job.entry_id, status).await;
@@ -367,23 +375,31 @@ async fn try_render_then_extract(
             let site_rule_config = html_rules_from_config(ctx, job, Some(sc)).await;
             let url_owned = job.url.clone();
             let cfg_owned = site_rule_config.clone();
-            let extracted = tokio::task::spawn_blocking(move || {
+            let start = std::time::Instant::now();
+            let extract_outcome = tokio::task::spawn_blocking(move || {
                 extract::extract_with_fallback(&html, Some(&url_owned), cfg_owned.as_ref())
             })
             .await;
-            let result = match extracted {
+            let elapsed = start.elapsed().as_secs_f64();
+            let extract_result = match extract_outcome {
                 Ok(r) => r,
                 Err(e) => {
                     tracing::warn!(entry_id = %job.entry_id, error = %e, "render-path extract task panicked");
+                    metrics::histogram!("extract_duration_seconds", "method" => "render_panic")
+                        .record(elapsed);
                     return false;
                 }
             };
-            match result {
+            match extract_result {
                 Ok(result) => {
+                    metrics::histogram!("extract_duration_seconds", "method" => "rendering")
+                        .record(elapsed);
                     save(ctx, job, &result.inner, status, "rendering").await;
                     true
                 }
                 Err(_) => {
+                    metrics::histogram!("extract_duration_seconds", "method" => "render_error")
+                        .record(elapsed);
                     tracing::warn!(entry_id = %job.entry_id, "rendered HTML extraction failed");
                     false
                 }

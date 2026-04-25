@@ -61,11 +61,15 @@ impl RenderService {
     ) -> Result<String, String> {
         // Circuit breaker check.
         {
-            let guard = self.cooldown_until.lock().await;
+            let mut guard = self.cooldown_until.lock().await;
             if let Some(until) = *guard {
                 if Instant::now() < until {
                     return Err("render circuit breaker open".to_string());
                 }
+                // Cooldown elapsed: clear it and the open-gauge so the dashboard
+                // reflects the closed state even if the next attempt fails again.
+                *guard = None;
+                metrics::gauge!("render_circuit_breaker_open").set(0.0);
             }
         }
 
@@ -89,6 +93,7 @@ impl RenderService {
         match result {
             Ok(html) => {
                 self.failures.store(0, Ordering::Relaxed);
+                metrics::gauge!("render_circuit_breaker_open").set(0.0);
                 Ok(html)
             }
             Err(e) => {
@@ -130,6 +135,7 @@ impl RenderService {
             let mut cooldown_guard = self.cooldown_until.lock().await;
             *cooldown_guard = Some(Instant::now() + COOLDOWN);
             drop(cooldown_guard);
+            metrics::gauge!("render_circuit_breaker_open").set(1.0);
             tracing::warn!(
                 consecutive_failures = n,
                 cooldown_secs = COOLDOWN.as_secs(),

@@ -82,6 +82,7 @@ async fn main() {
         // Background task to periodically report gauge metrics
         let fetch_depth = fetch_queue.queue_depth.clone();
         let search_idx = search_index.clone();
+        let pool_for_metrics = pool.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
             loop {
@@ -91,6 +92,8 @@ async fn main() {
                 if let Ok(count) = search_idx.doc_count() {
                     metrics::gauge!("search_index_documents").set(count as f64);
                 }
+                metrics::gauge!("db_pool_size").set(pool_for_metrics.size() as f64);
+                metrics::gauge!("db_pool_idle").set(pool_for_metrics.num_idle() as f64);
             }
         });
 
