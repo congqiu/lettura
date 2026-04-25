@@ -23,29 +23,23 @@ ARG RENDERING
 
 WORKDIR /app
 
-# 2a: Cache Rust dependencies (rebuilds only when Cargo.toml/Cargo.lock change)
 COPY Cargo.toml Cargo.lock ./
 COPY cli/Cargo.toml cli/Cargo.toml
 COPY migrations/ migrations/
-RUN mkdir src && echo "fn main() {}" > src/main.rs && \
-    mkdir -p cli/src && echo "fn main() {}" > cli/src/main.rs
-RUN if [ "$RENDERING" = "1" ]; then \
-      cargo build --release 2>/dev/null || true; \
-    else \
-      cargo build --release --no-default-features 2>/dev/null || true; \
-    fi
-RUN rm -rf src cli/src
-
-# 2b: Build actual application (only src/ changes invalidate this layer)
 COPY src/ src/
 COPY cli/src/ cli/src/
 COPY skills/ skills/
 COPY --from=frontend-builder /app/web/dist web/dist
-RUN touch src/main.rs && \
+
+# BuildKit cache mounts: registry caches downloaded crates,
+# target caches incremental compilation outputs. Both survive across
+# rebuilds in the same CI runner.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
     if [ "$RENDERING" = "1" ]; then \
-      cargo build --release; \
+      cargo build --release && cp target/release/lettura /lettura; \
     else \
-      cargo build --release --no-default-features; \
+      cargo build --release --no-default-features && cp target/release/lettura /lettura; \
     fi
 
 # Stage 3: Runtime
@@ -65,7 +59,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=backend-builder /app/target/release/lettura ./lettura
+COPY --from=backend-builder /lettura ./lettura
 COPY --from=backend-builder /app/migrations ./migrations
 
 RUN mkdir -p /data/tantivy /data/site-configs
