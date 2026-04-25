@@ -14,9 +14,18 @@
 - Entry save (`POST /api/v1/entries`) is now idempotent: same URL returns existing entry with `already_existed: true`, tag set merged as union.
 - `GET /api/v1/entries` list endpoint gained filters: `tag`, `exclude_tag`, `untagged`, `domain`, `since`, `before`, `is_read` (alias for `is_archived`).
 - Repo is now a Cargo workspace (`.` and `cli/`); server crate is still `lettura`.
+- Search index switched to buffered writes with a 3-second background flush and graceful-shutdown flush, eliminating per-write fsync. Permanent-delete and admin reindex still commit synchronously.
+- `process_images` downloads images in parallel (max 8 in flight) and applies URL replacements longest-first to avoid substring collisions.
+
+### Fixed
+- `admin reindex` now commits the index clear before the rebuild, preventing a half-cleared index if the rebuild phase fails.
+- PAT `last_used_at` update no longer aborts the request on transient DB errors.
 
 ### Security
 - PAT tokens stored as SHA-256 hash only; only the first 12 bytes (`lta_…`) kept in plaintext for UI display.
+- PAT and feed tokens now use `OsRng` with rejection sampling for uniform character distribution (replaces biased modulo over `thread_rng`).
+- Path-traversal hardening on `/storage/*` and `/p/<slug>/<file>`: reject parent/root/empty path segments and percent-encoded escapes.
+- Prometheus metric labels normalize `/p/<slug>` → `/p/{slug}` and `/feed/<token>` → `/feed/{token}` to prevent unbounded label cardinality and feed-token leakage.
 
 ## [0.1.0] - 2026-03-29
 

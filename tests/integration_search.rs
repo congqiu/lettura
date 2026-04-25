@@ -28,13 +28,14 @@ async fn setup_with_entries(app: &common::TestApp) -> String {
         .execute(&app.pool).await.unwrap();
 
     // Index them in search
-    let entries: Vec<(uuid::Uuid, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, title, COALESCE(text_content, ''), url, domain_name FROM entries WHERE user_id = (SELECT id FROM users LIMIT 1)"
+    let entries: Vec<(uuid::Uuid, uuid::Uuid, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, user_id, title, COALESCE(text_content, ''), url, domain_name FROM entries WHERE user_id = (SELECT id FROM users LIMIT 1)"
     ).fetch_all(&app.pool).await.unwrap();
 
-    for (id, title, text_content, url, domain) in &entries {
-        app.search_index.upsert(*id, title, text_content, url, domain.as_deref().unwrap_or("")).await.unwrap();
+    for (id, user_id, title, text_content, url, domain) in &entries {
+        app.search_index.upsert(*id, *user_id, title, text_content, url, domain.as_deref().unwrap_or("")).await.unwrap();
     }
+    app.search_index.commit().await.unwrap();
     app.search_index.reader().reload().unwrap();
 
     token

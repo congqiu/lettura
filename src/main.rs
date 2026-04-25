@@ -25,6 +25,35 @@ async fn main() {
     let (app, search_index, fetch_queue) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
 
+    // Background task: flush search index every 3 seconds. Documents become
+    // searchable within this window after a write. Critical paths (e.g.
+    // permanent delete) call commit() directly for stronger guarantees.
+    {
+        let idx = search_index.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+            let mut consecutive_failures: u64 = 0;
+            loop {
+                interval.tick().await;
+                match idx.commit().await {
+                    Ok(()) => consecutive_failures = 0,
+                    Err(e) => {
+                        consecutive_failures += 1;
+                        metrics::counter!("search_index_commit_failures_total").increment(1);
+                        if consecutive_failures.is_power_of_two() {
+                            tracing::error!(
+                                consecutive_failures,
+                                "search index commit failed: {e}"
+                            );
+                        } else {
+                            tracing::warn!("search index commit failed: {e}");
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     {
         let cleanup_pool = pool.clone();
         tokio::spawn(async move {
@@ -79,5 +108,40 @@ async fn main() {
         .expect("failed to bind listener");
 
     tracing::info!("listening on {}", config.listen_addr);
-    axum::serve(listener, app).await.expect("server error");
+    let shutdown_idx = search_index.clone();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            // Final flush so writes buffered since the last periodic commit
+            // are not lost when the process exits.
+            if let Err(e) = shutdown_idx.commit().await {
+                tracing::warn!("final search index commit failed: {e}");
+            } else {
+                tracing::info!("search index flushed on shutdown");
+            }
+        })
+        .await
+        .expect("server error");
+}
+
+async fn shutdown_signal() {
+    use tokio::signal;
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }

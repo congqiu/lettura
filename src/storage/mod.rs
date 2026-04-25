@@ -120,7 +120,7 @@ fn url_extension(url: &str) -> Option<&'static str> {
 /// Process HTML content: download all images and rewrite URLs
 pub async fn process_images(
     html: &str,
-    storage: &dyn ImageStorage,
+    storage: std::sync::Arc<dyn ImageStorage>,
 ) -> String {
     // Collect image URLs in a sync block to avoid holding non-Send scraper types across await
     let img_urls: Vec<String> = {
@@ -136,26 +136,51 @@ pub async fn process_images(
         return html.to_string();
     }
 
-    let mut result = html.to_string();
+    // Download images in parallel under a concurrency cap, then rewrite URLs
+    // sequentially. Concurrency is bounded so a single entry with many images
+    // can't open hundreds of connections at once.
+    const MAX_PARALLEL_DOWNLOADS: usize = 8;
+    let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(MAX_PARALLEL_DOWNLOADS));
+    let mut handles = Vec::with_capacity(img_urls.len());
 
-    for url in &img_urls {
-        match download_image(url).await {
-            Ok((data, content_type)) => {
-                let key = image_key_from_url(url, Some(&content_type));
-                match storage.store(&key, &data, &content_type).await {
-                    Ok(new_url) => {
-                        result = result.replace(url, &new_url);
-                    }
-                    Err(e) => {
-                        tracing::warn!("failed to store image {}: {}", url, e);
+    for url in img_urls {
+        let s = storage.clone();
+        let sem = semaphore.clone();
+        handles.push(tokio::spawn(async move {
+            let _permit = sem.acquire_owned().await.ok()?;
+            match download_image(&url).await {
+                Ok((data, content_type)) => {
+                    let key = image_key_from_url(&url, Some(&content_type));
+                    match s.store(&key, &data, &content_type).await {
+                        Ok(new_url) => Some((url, new_url)),
+                        Err(e) => {
+                            tracing::warn!("failed to store image {}: {}", url, e);
+                            None
+                        }
                     }
                 }
+                Err(e) => {
+                    tracing::warn!("failed to download image {}: {}", url, e);
+                    None
+                }
             }
-            Err(e) => {
-                tracing::warn!("failed to download image {}: {}", url, e);
-            }
+        }));
+    }
+
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for h in handles {
+        if let Ok(Some(pair)) = h.await {
+            replacements.push(pair);
         }
     }
 
+    // Apply longest-URL-first so a shorter URL that is a substring of a
+    // longer one cannot accidentally match inside the already-rewritten text.
+    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
+    let mut result = html.to_string();
+    for (old_url, new_url) in replacements {
+        result = result.replace(&old_url, &new_url);
+    }
     result
 }

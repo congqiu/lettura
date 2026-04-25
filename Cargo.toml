@@ -95,3 +95,5 @@ futures-util = { version = "0.3", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
+# Tests for /api/v1/pages/upload exercise multipart bodies via reqwest.
+reqwest = { version = "0.12", features = ["json", "cookies", "socks", "multipart"] }

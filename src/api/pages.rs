@@ -424,9 +424,7 @@ pub async fn update_page_handler(
         let slug = existing.slug.clone();
 
         // Delete old files and copy new ones
-    let password_for_url = req.password.clone();
-
-    if state.config.storage_type == "local" {
+        if state.config.storage_type == "local" {
             let pages_base = pages_storage_path(&state).join(&slug);
             // Remove old files (ignore if directory doesn't exist)
             tokio::fs::remove_dir_all(&pages_base).await.ok();

@@ -4,6 +4,7 @@ pub mod error;
 pub mod memo;
 pub mod page;
 pub mod pat;
+pub mod serde_helpers;
 pub mod site_rule;
 pub mod tag;
 pub mod tagging_rule;

@@ -225,7 +225,7 @@ async fn save(
     status: i16,
     method: &str,
 ) {
-    let content = storage::process_images(&result.content, ctx.image_storage.as_ref()).await;
+    let content = storage::process_images(&result.content, ctx.image_storage.clone()).await;
 
     entry::update_entry_content(
         &ctx.pool,

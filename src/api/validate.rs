@@ -49,48 +49,5 @@ where
     }
 }
 
-/// Deserialize `Option<bool>` from query strings where booleans arrive as strings
-/// (e.g. `?is_archived=false` — serde_urlencoded passes "false" as a string).
-pub fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de;
-    use std::fmt;
-
-    struct BoolOrString;
-
-    impl<'de> de::Visitor<'de> for BoolOrString {
-        type Value = Option<bool>;
-
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("a boolean or a string \"true\"/\"false\"")
-        }
-
-        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-
-        fn visit_some<D2: de::Deserializer<'de>>(self, d: D2) -> Result<Self::Value, D2::Error> {
-            d.deserialize_any(BoolOrString)
-        }
-
-        fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
-            Ok(Some(v))
-        }
-
-        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-            match v {
-                "true" => Ok(Some(true)),
-                "false" => Ok(Some(false)),
-                _ => Err(de::Error::invalid_value(de::Unexpected::Str(v), &self)),
-            }
-        }
-
-        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-    }
-
-    deserializer.deserialize_option(BoolOrString)
-}
+/// Re-export for backward compatibility.
+pub use crate::models::serde_helpers::deserialize_bool_from_string;

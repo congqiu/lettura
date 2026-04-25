@@ -12,7 +12,6 @@ pub struct SearchIndex {
     index: Index,
     writer: Arc<Mutex<IndexWriter>>,
     reader: IndexReader,
-    schema: Schema,
     // Field handles
     f_id: Field,
     f_title: Field,
@@ -52,7 +51,6 @@ impl SearchIndex {
             index,
             writer: Arc::new(Mutex::new(writer)),
             reader,
-            schema,
             f_id,
             f_title,
             f_content,
@@ -84,7 +82,6 @@ impl SearchIndex {
             index,
             writer: Arc::new(Mutex::new(writer)),
             reader,
-            schema,
             f_id,
             f_title,
             f_content,
@@ -94,7 +91,9 @@ impl SearchIndex {
         })
     }
 
-    /// Add or update a document in the index
+    /// Add or update a document in the index. Writes to the in-memory buffer
+    /// without committing — call `commit()` or rely on the background flush
+    /// task to persist changes.
     pub async fn upsert(
         &self,
         id: Uuid,
@@ -104,7 +103,7 @@ impl SearchIndex {
         url: &str,
         domain: &str,
     ) -> Result<(), tantivy::TantivyError> {
-        let mut writer = self.writer.lock().await;
+        let writer = self.writer.lock().await;
         let id_str = id.to_string();
         let id_term = tantivy::Term::from_field_text(self.f_id, &id_str);
         writer.delete_term(id_term);
@@ -116,15 +115,20 @@ impl SearchIndex {
             self.f_domain => domain,
             self.f_user_id => user_id.to_string(),
         ))?;
-        writer.commit()?;
         Ok(())
     }
 
-    /// Remove a document from the index
+    /// Remove a document from the index (buffered, not committed).
     pub async fn delete(&self, id: Uuid) -> Result<(), tantivy::TantivyError> {
-        let mut writer = self.writer.lock().await;
+        let writer = self.writer.lock().await;
         let id_term = tantivy::Term::from_field_text(self.f_id, &id.to_string());
         writer.delete_term(id_term);
+        Ok(())
+    }
+
+    /// Flush pending changes to disk. Expensive — use sparingly.
+    pub async fn commit(&self) -> Result<(), tantivy::TantivyError> {
+        let mut writer = self.writer.lock().await;
         writer.commit()?;
         Ok(())
     }
@@ -173,11 +177,10 @@ impl SearchIndex {
         Ok(searcher.num_docs())
     }
 
-    /// Clear index and rebuild from scratch
+    /// Clear index (buffered, not committed).
     pub async fn clear(&self) -> Result<(), tantivy::TantivyError> {
-        let mut writer = self.writer.lock().await;
+        let writer = self.writer.lock().await;
         writer.delete_all_documents()?;
-        writer.commit()?;
         Ok(())
     }
 }
@@ -203,6 +206,7 @@ mod tests {
 
         idx.upsert(id1, uid, "Rust Ownership", "Learn about ownership and borrowing in Rust", "https://example.com/rust", "example.com").await.unwrap();
         idx.upsert(id2, uid, "Python Guide", "A beginner guide to Python programming", "https://example.com/python", "example.com").await.unwrap();
+        idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
 
@@ -223,6 +227,7 @@ mod tests {
 
         idx.upsert(id, uid, "Old Title", "old content", "https://example.com", "example.com").await.unwrap();
         idx.upsert(id, uid, "New Title", "new content about Rust", "https://example.com", "example.com").await.unwrap();
+        idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
 
@@ -241,10 +246,12 @@ mod tests {
         let uid = test_user_id();
 
         idx.upsert(id, uid, "Title", "searchable content", "https://example.com", "example.com").await.unwrap();
+        idx.commit().await.unwrap();
         idx.reader.reload().unwrap();
         assert_eq!(idx.search("searchable", Some(uid), 10).unwrap().len(), 1);
 
         idx.delete(id).await.unwrap();
+        idx.commit().await.unwrap();
         idx.reader.reload().unwrap();
         assert_eq!(idx.search("searchable", Some(uid), 10).unwrap().len(), 0);
     }
@@ -259,6 +266,7 @@ mod tests {
 
         idx.upsert(id1, uid1, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
         idx.upsert(id2, uid2, "Rust Guide", "Another Rust tutorial", "https://example.com/rust2", "example.com").await.unwrap();
+        idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
 

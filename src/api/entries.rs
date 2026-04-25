@@ -183,8 +183,10 @@ pub async fn permanently_delete_entry(
     Path(entry_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     entry::permanently_delete_entry(&state.pool, entry_id, auth.user_id).await?;
-    // Ensure removed from search index
+    // Ensure removed from search index. Commit immediately so a stale doc
+    // pointing at a deleted entry can never surface (data-privacy guarantee).
     let _ = state.search_index.delete(entry_id).await;
+    let _ = state.search_index.commit().await;
     tracing::info!(entry_id = %entry_id, "entry permanently deleted");
     Ok(Json(serde_json::json!({"message": "permanently deleted"})))
 }

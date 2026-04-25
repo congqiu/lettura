@@ -26,9 +26,14 @@ pub async fn track_metrics(req: Request, next: Next) -> Response {
     response
 }
 
-/// Replace UUID segments with {id} to prevent high cardinality
+static SLUG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/p/[^/]+").unwrap());
+static FEED_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/feed/[^/]+").unwrap());
+
+/// Replace dynamic path segments with placeholders to prevent high cardinality.
 fn normalize_path(path: &str) -> String {
-    UUID_RE.replace_all(path, "{id}").to_string()
+    let path = SLUG_RE.replace(path, "/p/{slug}").into_owned();
+    let path = FEED_RE.replace(&path, "/feed/{token}").into_owned();
+    UUID_RE.replace_all(&path, "{id}").to_string()
 }
 
 #[cfg(test)]

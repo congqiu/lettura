@@ -147,7 +147,8 @@ pub async fn update_password(pool: &PgPool, user_id: Uuid, password_hash: &str) 
 }
 
 fn generate_feed_token() -> String {
-    use rand::Rng;
-    let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().r#gen::<u8>()).collect();
+    use rand::RngCore;
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }

@@ -254,6 +254,18 @@ async fn serve_storage(
     State(state): State<AppState>,
     Path(path): Path<String>,
 ) -> impl axum::response::IntoResponse {
+    // Prevent path traversal: reject any segment that escapes the base
+    // directory or anchors to root. `path.contains("..")` would also reject
+    // legitimate filenames like `foo..bar.png`, so check Components instead.
+    let candidate = std::path::Path::new(&path);
+    for c in candidate.components() {
+        match c {
+            std::path::Component::Normal(_) => {}
+            _ => {
+                return (axum::http::StatusCode::FORBIDDEN, "invalid path").into_response();
+            }
+        }
+    }
     let file_path = std::path::Path::new(&state.config.storage_local_path).join(&path);
     match tokio::fs::read(&file_path).await {
         Ok(data) => {

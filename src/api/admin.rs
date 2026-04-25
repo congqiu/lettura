@@ -50,10 +50,16 @@ pub async fn reindex(
         return Err(ApiError::Forbidden("admin required".to_string()));
     }
 
-    // Clear and rebuild index
+    // Clear and rebuild index. Commit the clear immediately so a panic during
+    // the upsert phase below cannot leave the index in a half-cleared state.
     state
         .search_index
         .clear()
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    state
+        .search_index
+        .commit()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -80,6 +86,9 @@ pub async fn reindex(
             .await
             .ok();
     }
+
+    // Flush the bulk changes immediately so they are searchable.
+    state.search_index.commit().await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({
         "message": "reindex complete",

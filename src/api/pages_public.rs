@@ -1,9 +1,8 @@
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use chrono::Utc;
 use serde::Deserialize;
 
 use crate::state::AppState;
@@ -94,7 +93,9 @@ async fn serve_page_file_inner(
         None => &page_record.entry_file,
     };
 
-    if file_name.contains("..") || file_name.contains('\0') {
+    // Reject path traversal attempts. Axum's Path extractor already decodes
+    // percent-encoding, so %2e%2e becomes ".." and is caught here.
+    if file_name.contains("..") || file_name.contains('\0') || file_name.starts_with('/') {
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
     }
 

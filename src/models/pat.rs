@@ -39,12 +39,24 @@ const TOKEN_PREFIX: &str = "lta_";
 const TOKEN_BODY_LEN: usize = 40;
 
 pub fn generate_token() -> String {
-    use rand::Rng;
+    use rand::RngCore;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let mut rng = rand::thread_rng();
-    let body: String = (0..TOKEN_BODY_LEN)
-        .map(|_| CHARSET[rng.gen_range(0..CHARSET.len())] as char)
-        .collect();
+    // Rejection sampling: only accept bytes < 256 - (256 % 62) = 248 so the
+    // resulting modulo distribution over CHARSET is exactly uniform.
+    const ACCEPT_THRESHOLD: u8 = (256 - (256 % CHARSET.len())) as u8;
+    let mut body = String::with_capacity(TOKEN_BODY_LEN);
+    let mut buf = [0u8; 64];
+    while body.len() < TOKEN_BODY_LEN {
+        rand::rngs::OsRng.fill_bytes(&mut buf);
+        for &b in &buf {
+            if b < ACCEPT_THRESHOLD {
+                body.push(CHARSET[(b as usize) % CHARSET.len()] as char);
+                if body.len() == TOKEN_BODY_LEN {
+                    break;
+                }
+            }
+        }
+    }
     format!("{TOKEN_PREFIX}{body}")
 }
 

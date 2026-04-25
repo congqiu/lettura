@@ -105,109 +105,19 @@ pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> R
         .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-fn deserialize_i64_from_string<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de;
-    use std::fmt;
-
-    struct I64OrString;
-
-    impl<'de> de::Visitor<'de> for I64OrString {
-        type Value = Option<i64>;
-
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("an integer or a numeric string")
-        }
-
-        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-
-        fn visit_some<D2: de::Deserializer<'de>>(self, d: D2) -> Result<Self::Value, D2::Error> {
-            d.deserialize_any(I64OrString)
-        }
-
-        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-            Ok(Some(v))
-        }
-
-        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-            Ok(Some(v as i64))
-        }
-
-        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-            v.parse::<i64>().map(Some).map_err(|_| {
-                de::Error::invalid_value(de::Unexpected::Str(v), &self)
-            })
-        }
-
-        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-    }
-
-    deserializer.deserialize_option(I64OrString)
-}
-
-fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de;
-    use std::fmt;
-
-    struct BoolOrString;
-
-    impl<'de> de::Visitor<'de> for BoolOrString {
-        type Value = Option<bool>;
-
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("a boolean or a string \"true\"/\"false\"")
-        }
-
-        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-
-        fn visit_some<D: de::Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
-            d.deserialize_any(BoolOrString)
-        }
-
-        fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
-            Ok(Some(v))
-        }
-
-        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-            match v {
-                "true" => Ok(Some(true)),
-                "false" => Ok(Some(false)),
-                _ => Err(de::Error::invalid_value(de::Unexpected::Str(v), &self)),
-            }
-        }
-
-        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-    }
-
-    deserializer.deserialize_option(BoolOrString)
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
-    #[serde(default, deserialize_with = "deserialize_i64_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string")]
     pub page: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_i64_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string")]
     pub per_page: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
     pub is_archived: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
     pub is_starred: Option<bool>,
     /// Alias for `is_archived` (CLI Filter DSL compatibility).
     /// `is_read=true` → `is_archived = true`, `is_read=false` → `is_archived = false`.
-    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
     pub is_read: Option<bool>,
     pub domain: Option<String>,
     /// Comma-separated tag labels; AND semantics (entry must have ALL listed tags).
@@ -215,7 +125,7 @@ pub struct ListParams {
     /// Comma-separated tag labels to exclude; entry must NOT have any of these tags.
     pub exclude_tag: Option<String>,
     /// When true, return only entries with no tags.
-    #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
     pub untagged: Option<bool>,
     /// Return entries created at or after this timestamp.
     pub since: Option<DateTime<Utc>>,
@@ -240,6 +150,25 @@ pub async fn list_entries(
          preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at \
          FROM entries WHERE user_id = ",
     );
+    build_where_clause(&mut qb, user_id, params);
+
+    qb.push(" ORDER BY created_at DESC LIMIT ");
+    qb.push_bind(per_page);
+    qb.push(" OFFSET ");
+    qb.push_bind(offset);
+
+    qb.build_query_as::<EntrySummary>()
+        .fetch_all(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))
+}
+
+/// Build the shared WHERE clause for entry list queries.
+fn build_where_clause(
+    qb: &mut sqlx::QueryBuilder<'static, sqlx::Postgres>,
+    user_id: Uuid,
+    params: &ListParams,
+) {
     qb.push_bind(user_id);
     qb.push(" AND deleted_at IS NULL");
 
@@ -247,7 +176,6 @@ pub async fn list_entries(
         qb.push(" AND is_archived = ");
         qb.push_bind(b);
     }
-    // is_read is an alias for is_archived (CLI Filter DSL compatibility).
     if let Some(b) = params.is_read {
         qb.push(" AND is_archived = ");
         qb.push_bind(b);
@@ -297,10 +225,6 @@ pub async fn list_entries(
             qb.push(")");
         }
     }
-    // NOTE: `search` is intentionally NOT handled here. The API handler intercepts non-empty
-    // search queries and routes them through tantivy full-text search instead. This function
-    // only sees search=None in normal API flows. The ILIKE fallback below covers any direct
-    // model-layer callers that pass a search string without tantivy.
     if let Some(s) = &params.search {
         if !s.is_empty() {
             qb.push(" AND (title ILIKE ");
@@ -310,16 +234,6 @@ pub async fn list_entries(
             qb.push(")");
         }
     }
-
-    qb.push(" ORDER BY created_at DESC LIMIT ");
-    qb.push_bind(per_page);
-    qb.push(" OFFSET ");
-    qb.push_bind(offset);
-
-    qb.build_query_as::<EntrySummary>()
-        .fetch_all(pool)
-        .await
-        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -402,7 +316,6 @@ pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uu
 }
 
 /// Find all entry IDs matching the given filter params (no pagination).
-/// Uses the same WHERE-clause logic as `list_entries` but returns only IDs.
 pub async fn find_ids_matching(
     pool: &PgPool,
     user_id: Uuid,
@@ -411,71 +324,7 @@ pub async fn find_ids_matching(
     let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
         "SELECT id FROM entries WHERE user_id = ",
     );
-    qb.push_bind(user_id);
-    qb.push(" AND deleted_at IS NULL");
-
-    if let Some(b) = params.is_archived {
-        qb.push(" AND is_archived = ");
-        qb.push_bind(b);
-    }
-    if let Some(b) = params.is_read {
-        qb.push(" AND is_archived = ");
-        qb.push_bind(b);
-    }
-    if let Some(b) = params.is_starred {
-        qb.push(" AND is_starred = ");
-        qb.push_bind(b);
-    }
-    if let Some(d) = &params.domain {
-        qb.push(" AND domain_name = ");
-        qb.push_bind(d.clone());
-    }
-    if let Some(t) = params.since {
-        qb.push(" AND created_at >= ");
-        qb.push_bind(t);
-    }
-    if let Some(t) = params.before {
-        qb.push(" AND created_at < ");
-        qb.push_bind(t);
-    }
-    if let Some(true) = params.untagged {
-        qb.push(
-            " AND NOT EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = entries.id)",
-        );
-    }
-    if let Some(tags_csv) = &params.tag {
-        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
-            qb.push(
-                " AND EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
-                 WHERE et.entry_id = entries.id AND tg.user_id = ",
-            );
-            qb.push_bind(user_id);
-            qb.push(" AND tg.label = ");
-            qb.push_bind(t.trim().to_string());
-            qb.push(")");
-        }
-    }
-    if let Some(tags_csv) = &params.exclude_tag {
-        for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
-            qb.push(
-                " AND NOT EXISTS (SELECT 1 FROM entry_tags et JOIN tags tg ON tg.id = et.tag_id \
-                 WHERE et.entry_id = entries.id AND tg.user_id = ",
-            );
-            qb.push_bind(user_id);
-            qb.push(" AND tg.label = ");
-            qb.push_bind(t.trim().to_string());
-            qb.push(")");
-        }
-    }
-    if let Some(s) = &params.search {
-        if !s.is_empty() {
-            qb.push(" AND (title ILIKE ");
-            qb.push_bind(format!("%{s}%"));
-            qb.push(" OR content ILIKE ");
-            qb.push_bind(format!("%{s}%"));
-            qb.push(")");
-        }
-    }
+    build_where_clause(&mut qb, user_id, params);
 
     let rows: Vec<(Uuid,)> = qb.build_query_as().fetch_all(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;

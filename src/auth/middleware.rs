@@ -62,7 +62,8 @@ impl FromRequestParts<AppState> for AuthUser {
                     "token scope 'read' cannot perform write".into(),
                 ));
             }
-            pat::touch_last_used(&state.pool, row.id).await;
+            // Best-effort update; don't block the request on it.
+            let _ = pat::touch_last_used(&state.pool, row.id).await;
             Ok(AuthUser {
                 user_id: row.user_id,
                 is_admin: false, // admin capability requires interactive JWT login

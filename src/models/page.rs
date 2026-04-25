@@ -43,6 +43,10 @@ impl Serialize for PageSummary {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
+        // The plaintext password is intentionally returned to the owner so the
+        // UI can render a copy-ready share URL (`/p/<slug>?p=<password>`).
+        // This endpoint is owner-authenticated; the password never leaves the
+        // owner's session.
         let mut state = serializer.serialize_struct("PageSummary", 11)?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("slug", &self.slug)?;
