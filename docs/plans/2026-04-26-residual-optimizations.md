@@ -1266,3 +1266,12 @@ Task 6 只做了「>50 页直接 400」的守门。完整方案是 cursor `(crea
 **Placeholder 扫描：** 全部 step 的代码块都是可执行的真实代码；少量地方注明"如果签名不一致按真实签名调整"是因为我没有读完 scoring.rs / parser.rs / http.rs 全部正文，那是为了测试稳健，不是 placeholder。
 
 **类型一致性：** `tag::ensure_and_link(pool, user_id, &[Uuid], &[String])` 在 Task 1/2/3 三处调用签名一致。`SiteRuleConfig` clone 在 Task 4 两处都使用 `.clone()`（已确认 `derive(Clone)`）。Metrics 名字 `db_pool_size` / `db_pool_idle` / `extract_duration_seconds` / `render_circuit_breaker_open` 在 Task 10 内部一致。
+
+---
+
+## 实施期修订
+
+执行期间发现两处计划基于过时认知，按实情调整：
+
+- **Task 7（scoring 单测）：** 实际上 `src/extract/scoring.rs` 已有 3 个集成级单测（`paragraph_heavy_div_scores_high` / `article_tag_gets_bonus` / `high_link_density_scores_low`）。改为追加 6 个针对私有 helper 的边界测试（`compute_link_density` 0/1/empty + `compute_content_score` 标点/长度上限/中文标点）。最终共 9 个单测全过。commit `1b62bc7`。
+- **Task 8（site_config parser 单测）：** 实际 `parser.rs` 7 + `mod.rs` 6 + `store.rs` 4 共 17 个单测，覆盖 happy/error/env-placeholder/url-match 各路径。Task 标记完成，**不引入新代码**。
