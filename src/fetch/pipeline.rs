@@ -149,8 +149,22 @@ async fn process_body(
         }
         ResponseType::Html => {
             let site_rule_config = html_rules_from_config(ctx, job, site_config).await;
-            match extract::extract_with_fallback(body, Some(&job.url), site_rule_config.as_ref())
-            {
+            let body_owned = body.to_string();
+            let url_owned = job.url.clone();
+            let cfg_owned = site_rule_config.clone();
+            let extracted = tokio::task::spawn_blocking(move || {
+                extract::extract_with_fallback(&body_owned, Some(&url_owned), cfg_owned.as_ref())
+            })
+            .await;
+            let result = match extracted {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::error!(entry_id = %job.entry_id, error = %e, "extract task panicked");
+                    mark_failed(&ctx.pool, job.entry_id, status).await;
+                    return;
+                }
+            };
+            match result {
                 Ok(result) => {
                     let method = match result.method {
                         extract::ExtractMethod::SiteRule => "site_rule",
@@ -351,11 +365,20 @@ async fn try_render_then_extract(
     match rs.render(&job.url, wait_for, timeout_override).await {
         Ok(html) => {
             let site_rule_config = html_rules_from_config(ctx, job, Some(sc)).await;
-            match extract::extract_with_fallback(
-                &html,
-                Some(&job.url),
-                site_rule_config.as_ref(),
-            ) {
+            let url_owned = job.url.clone();
+            let cfg_owned = site_rule_config.clone();
+            let extracted = tokio::task::spawn_blocking(move || {
+                extract::extract_with_fallback(&html, Some(&url_owned), cfg_owned.as_ref())
+            })
+            .await;
+            let result = match extracted {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(entry_id = %job.entry_id, error = %e, "render-path extract task panicked");
+                    return false;
+                }
+            };
+            match result {
                 Ok(result) => {
                     save(ctx, job, &result.inner, status, "rendering").await;
                     true
