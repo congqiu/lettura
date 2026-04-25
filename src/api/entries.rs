@@ -58,10 +58,9 @@ pub async fn create_entry(
         }
     }
 
-    // Union-merge tags
-    for label in &req.tag {
-        let tag = tag::find_or_create_tag(&state.pool, auth.user_id, label).await?;
-        tag::add_tag_to_entry(&state.pool, r.entry.id, tag.id).await?;
+    // Union-merge tags (single transaction, batch insert).
+    if !req.tag.is_empty() {
+        tag::ensure_and_link(&state.pool, auth.user_id, &[r.entry.id], &req.tag).await?;
     }
 
     // Fetch tag labels for response
