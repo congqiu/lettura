@@ -1,6 +1,7 @@
 mod common;
 use common::TestApp;
 use lettura::models::entry::{self, ListParams};
+use serde_json::json;
 
 async fn create_test_entry_with_domain(
     pool: &sqlx::PgPool,
@@ -267,5 +268,31 @@ async fn is_read_is_alias_for_is_archived() {
         .unwrap();
     assert_eq!(res.len(), 1);
     assert_eq!(res[0].id, e1);
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn list_rejects_excessive_page() {
+    let app = TestApp::new().await;
+    app.client.post(app.url("/api/v1/auth/register"))
+        .json(&json!({"username":"tester","email":"t@e.com","password":"password123"}))
+        .send().await.unwrap();
+    let login: serde_json::Value = app.client.post(app.url("/api/v1/auth/login"))
+        .json(&json!({"email":"t@e.com","password":"password123"}))
+        .send().await.unwrap().json().await.unwrap();
+    let token = login["access_token"].as_str().unwrap();
+
+    // page=51 should return 400
+    let res = app.client.get(app.url("/api/v1/entries?page=51&per_page=100"))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 400, "page=51 should be rejected");
+
+    // page=50 is the boundary, must succeed
+    let res = app.client.get(app.url("/api/v1/entries?page=50&per_page=100"))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200, "page=50 is the boundary, must succeed");
+
     app.cleanup().await;
 }

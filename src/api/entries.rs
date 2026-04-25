@@ -106,6 +106,16 @@ pub async fn list_entries(
     auth: AuthUser,
     Query(params): Query<ListQueryParams>,
 ) -> Result<Json<Vec<entry::EntrySummary>>, ApiError> {
+    const MAX_PAGE: i64 = 50;
+    if let Some(p) = params.inner.page {
+        if p > MAX_PAGE {
+            return Err(ApiError::BadRequest(format!(
+                "page {} exceeds max {} — narrow filter or use cursor",
+                p, MAX_PAGE
+            )));
+        }
+    }
+
     // If deleted=true, return soft-deleted entries
     if params.deleted == Some(true) {
         let entries = entry::list_deleted_entries(&state.pool, auth.user_id).await?;
