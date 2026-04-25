@@ -110,10 +110,7 @@ pub async fn fetch_with_retry(
 ) -> Result<reqwest::Response, reqwest::Error> {
     for attempt in 0..=max_retries {
         if attempt > 0 {
-            let delay = Duration::from_millis(1000 * 2u64.pow(attempt - 1));
-            let jitter =
-                (delay.as_millis() as f64 * 0.25 * (rand_simple() - 0.5).abs()) as u64;
-            let actual = delay + Duration::from_millis(jitter);
+            let actual = backoff_delay(attempt, rand_simple());
             tracing::debug!(attempt, delay_ms = actual.as_millis(), url = %url, "retrying fetch");
             tokio::time::sleep(actual).await;
         }
@@ -155,10 +152,8 @@ pub async fn fetch_with_retry(
         if status.as_u16() == 429 || status.is_server_error() {
             tracing::warn!(attempt, status = status.as_u16(), url = %url, "retryable HTTP error");
             if status.as_u16() == 429 {
-                if let Some(retry_after) = response.headers().get("retry-after") {
-                    if let Ok(secs) = retry_after.to_str().unwrap_or("0").parse::<u64>() {
-                        tokio::time::sleep(Duration::from_secs(secs)).await;
-                    }
+                if let Some(d) = parse_retry_after_header(response.headers().get("retry-after")) {
+                    tokio::time::sleep(d).await;
                 }
             }
             // Drop the response and retry; last attempt returns it to the caller.
@@ -172,6 +167,23 @@ pub async fn fetch_with_retry(
     }
 
     unreachable!("for 0..=max_retries must produce at least one iteration")
+}
+
+/// Capped exponential backoff with ±25% jitter. `attempt` must be >= 1.
+fn backoff_delay(attempt: u32, jitter: f64) -> Duration {
+    let base_ms = 1000u64.saturating_mul(2u64.pow(attempt.saturating_sub(1).min(10)));
+    let jitter_ms = (base_ms as f64 * 0.25 * (jitter - 0.5).abs()) as u64;
+    Duration::from_millis(base_ms.saturating_add(jitter_ms))
+}
+
+/// Parse a `Retry-After` header value. Currently supports the
+/// "seconds-from-now" form only (RFC 7231 also allows http-date, which we
+/// don't honor). Returns None when the header is missing or malformed.
+fn parse_retry_after_header(value: Option<&reqwest::header::HeaderValue>) -> Option<Duration> {
+    let v = value?;
+    let s = v.to_str().ok()?;
+    let secs: u64 = s.trim().parse().ok()?;
+    Some(Duration::from_secs(secs))
 }
 
 /// Simple deterministic pseudo-random in [0.0, 1.0) using the current nanosecond.
@@ -291,5 +303,75 @@ mod tests {
         let start = Instant::now();
         rl.wait_if_needed("b.example").await;
         assert!(start.elapsed() < Duration::from_millis(100));
+    }
+
+    #[test]
+    fn backoff_delay_grows_exponentially() {
+        // Use jitter=0.5 to make the jitter component zero (.5 - .5 = 0).
+        let d1 = backoff_delay(1, 0.5);
+        let d2 = backoff_delay(2, 0.5);
+        let d3 = backoff_delay(3, 0.5);
+        assert_eq!(d1, Duration::from_millis(1000));
+        assert_eq!(d2, Duration::from_millis(2000));
+        assert_eq!(d3, Duration::from_millis(4000));
+    }
+
+    #[test]
+    fn backoff_delay_jitter_within_25_percent() {
+        // Worst case jitter (jitter=0.0 or 1.0) yields .5 in `(jitter - 0.5).abs()`,
+        // so jitter_ms = base * 0.25 * 0.5 = base * 0.125. Wait — review:
+        // (jitter - 0.5).abs() max is 0.5 (when jitter=0 or 1).
+        // jitter_ms = base * 0.25 * 0.5 = base * 0.125
+        // So upper bound is base * 1.125.
+        let base = backoff_delay(3, 0.5).as_millis() as f64; // 4000
+        let max_jitter = backoff_delay(3, 0.0).as_millis() as f64;
+        let max_jitter2 = backoff_delay(3, 1.0).as_millis() as f64;
+        assert!(max_jitter <= base * 1.13, "got {max_jitter}, base {base}");
+        assert!(max_jitter2 <= base * 1.13, "got {max_jitter2}, base {base}");
+    }
+
+    #[test]
+    fn backoff_delay_caps_growth_for_large_attempts() {
+        // attempt=20 should not panic or produce something silly.
+        // Helper caps at attempt-1 capped at 10, so base = 1000 * 2^10 = 1024000ms ~17min.
+        let d = backoff_delay(100, 0.5);
+        assert!(d <= Duration::from_secs(2_000), "got {d:?}");
+        assert!(d >= Duration::from_secs(60), "got {d:?}");
+    }
+
+    #[test]
+    fn parse_retry_after_seconds_form() {
+        let v = reqwest::header::HeaderValue::from_static("30");
+        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn parse_retry_after_zero_is_valid() {
+        let v = reqwest::header::HeaderValue::from_static("0");
+        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(0)));
+    }
+
+    #[test]
+    fn parse_retry_after_returns_none_for_missing() {
+        assert_eq!(parse_retry_after_header(None), None);
+    }
+
+    #[test]
+    fn parse_retry_after_returns_none_for_garbage() {
+        let v = reqwest::header::HeaderValue::from_static("garbage");
+        assert_eq!(parse_retry_after_header(Some(&v)), None);
+    }
+
+    #[test]
+    fn parse_retry_after_returns_none_for_http_date() {
+        // RFC 7231 also allows IMF-fixdate, but we don't support that — confirm None.
+        let v = reqwest::header::HeaderValue::from_static("Wed, 21 Oct 2099 07:28:00 GMT");
+        assert_eq!(parse_retry_after_header(Some(&v)), None);
+    }
+
+    #[test]
+    fn parse_retry_after_trims_whitespace() {
+        let v = reqwest::header::HeaderValue::from_static("  42  ");
+        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(42)));
     }
 }
