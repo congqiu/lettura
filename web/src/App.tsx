@@ -13,7 +13,16 @@ const MemosPage = lazy(() => import('./pages/MemosPage'));
 const PagesPage = lazy(() => import('./pages/PagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function App() {
   return (
