@@ -62,8 +62,12 @@ impl FromRequestParts<AppState> for AuthUser {
                     "token scope 'read' cannot perform write".into(),
                 ));
             }
-            // Best-effort update; don't block the request on it.
-            let _ = pat::touch_last_used(&state.pool, row.id).await;
+            // Fire-and-forget: don't block the request on the last_used_at update.
+            let pool = state.pool.clone();
+            let id = row.id;
+            tokio::spawn(async move {
+                pat::touch_last_used(&pool, id).await;
+            });
             Ok(AuthUser {
                 user_id: row.user_id,
                 is_admin: false, // admin capability requires interactive JWT login
