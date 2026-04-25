@@ -92,3 +92,35 @@ async fn bulk_max_rejects_when_exceeded() {
     assert_eq!(r.status(), 400);
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn bulk_tag_applies_all_labels_to_all_matched_entries() {
+    let app = TestApp::new().await;
+    let (jwt, _ids) = login_and_create_entries(&app, &["https://a.test", "https://b.test", "https://c.test"]).await;
+
+    let r: serde_json::Value = app.client.post(app.url("/api/v1/entries/bulk/tag"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .json(&json!({"filter": {}, "add": ["rust", "tokio"]}))
+        .send().await.unwrap().json().await.unwrap();
+    assert_eq!(r["matched"].as_i64().unwrap(), 3);
+    assert_eq!(r["updated"].as_i64().unwrap(), 3);
+
+    // Both labels should be applied to all 3 entries
+    let with_rust: Vec<serde_json::Value> = app.client.get(app.url("/api/v1/entries?tag=rust"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .send().await.unwrap().json().await.unwrap();
+    assert_eq!(with_rust.len(), 3);
+
+    let with_tokio: Vec<serde_json::Value> = app.client.get(app.url("/api/v1/entries?tag=tokio"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .send().await.unwrap().json().await.unwrap();
+    assert_eq!(with_tokio.len(), 3);
+
+    // Only 2 unique tags should exist
+    let all_tags: Vec<serde_json::Value> = app.client.get(app.url("/api/v1/tags"))
+        .header("Authorization", format!("Bearer {jwt}"))
+        .send().await.unwrap().json().await.unwrap();
+    assert_eq!(all_tags.len(), 2);
+
+    app.cleanup().await;
+}

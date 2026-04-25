@@ -66,12 +66,7 @@ pub async fn bulk_tag_add(
     if req.dry_run {
         return Ok(Json(BulkResult { matched: ids.len(), updated: 0, ids }));
     }
-    for id in &ids {
-        for label in &req.add {
-            let t = tag::find_or_create_tag(&state.pool, auth.user_id, label).await?;
-            tag::add_tag_to_entry(&state.pool, *id, t.id).await?;
-        }
-    }
+    tag::ensure_and_link(&state.pool, auth.user_id, &ids, &req.add).await?;
     let count = ids.len();
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
 }
