@@ -189,4 +189,58 @@ mod tests {
             .and_then(|el| scores.get(&el.id()).copied())
             .unwrap_or(0.0)
     }
+
+    #[test]
+    fn compute_link_density_zero_for_no_links() {
+        let html = r#"<div>plain text without any anchor tags at all in this content</div>"#;
+        let doc = Html::parse_document(html);
+        let sel = Selector::parse("div").unwrap();
+        let el = doc.select(&sel).next().unwrap();
+        let density = compute_link_density(el);
+        assert!(density < 0.01, "expected ~0, got {density}");
+    }
+
+    #[test]
+    fn compute_link_density_one_when_all_text_is_link() {
+        let html = r#"<div><a href="x">click here for everything in this div</a></div>"#;
+        let doc = Html::parse_document(html);
+        let sel = Selector::parse("div").unwrap();
+        let el = doc.select(&sel).next().unwrap();
+        let density = compute_link_density(el);
+        assert!(density > 0.99, "expected ~1, got {density}");
+    }
+
+    #[test]
+    fn compute_link_density_handles_empty_element() {
+        let html = r#"<div></div>"#;
+        let doc = Html::parse_document(html);
+        let sel = Selector::parse("div").unwrap();
+        let el = doc.select(&sel).next().unwrap();
+        let density = compute_link_density(el);
+        assert_eq!(density, 0.0, "empty element must return 0 (no division by zero)");
+    }
+
+    #[test]
+    fn compute_content_score_rewards_punctuation() {
+        let bare = compute_content_score("just some words without any punctuation in the middle here");
+        let with_commas = compute_content_score("words, with, several, commas, scattered, throughout, here");
+        assert!(with_commas > bare, "comma-rich text should outscore plain ({} vs {})", with_commas, bare);
+    }
+
+    #[test]
+    fn compute_content_score_caps_length_bonus_at_three() {
+        // 100 chars × 100 = 10,000 chars. Length bonus is min(len/100, 3) = 3.
+        let huge = "a".repeat(10_000);
+        let score = compute_content_score(&huge);
+        // Base 1.0 + 0 commas/periods + length bonus capped at 3.0 = 4.0
+        assert!((score - 4.0).abs() < 0.01, "expected ~4.0, got {score}");
+    }
+
+    #[test]
+    fn compute_content_score_handles_chinese_punctuation() {
+        let chinese = "这是一个测试，包含中文逗号，和句号。还有更多内容。";
+        let score = compute_content_score(chinese);
+        // 2 commas + 2 periods + base 1.0 + length bonus
+        assert!(score > 5.0, "Chinese punctuation should score, got {score}");
+    }
 }
