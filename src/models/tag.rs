@@ -73,3 +73,80 @@ pub async fn list_tags_for_entry(pool: &PgPool, entry_id: Uuid) -> Result<Vec<Ta
     .await
     .map_err(|e| ModelError::Database(e.to_string()))
 }
+
+/// Ensure each label exists as a tag for `user_id`, then link every (entry, tag)
+/// pair in a single transaction. Idempotent: re-linking an existing pair is a
+/// no-op (ON CONFLICT DO NOTHING).
+///
+/// Returns once all rows are committed. Empty `entry_ids` or empty `labels`
+/// is a no-op.
+pub async fn ensure_and_link(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_ids: &[Uuid],
+    labels: &[String],
+) -> Result<(), ModelError> {
+    if entry_ids.is_empty() || labels.is_empty() {
+        return Ok(());
+    }
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Dedup labels by slug, then ensure each tag exists. ON CONFLICT DO NOTHING
+    // means a RETURNING clause would only emit newly-inserted rows, so we use
+    // a separate SELECT to fetch the full id set (new + pre-existing).
+    let mut seen = std::collections::HashSet::new();
+    let mut unique_labels: Vec<&str> = Vec::new();
+    let mut unique_slugs: Vec<String> = Vec::new();
+    for label in labels {
+        let slug = slugify(label);
+        if seen.insert(slug.clone()) {
+            unique_labels.push(label.as_str());
+            unique_slugs.push(slug);
+        }
+    }
+
+    sqlx::query(
+        "INSERT INTO tags (user_id, label, slug) \
+         SELECT $1, l, s FROM UNNEST($2::text[], $3::text[]) AS t(l, s) \
+         ON CONFLICT (user_id, slug) DO NOTHING",
+    )
+    .bind(user_id)
+    .bind(&unique_labels)
+    .bind(&unique_slugs)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    let tag_id_vec: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM tags WHERE user_id = $1 AND slug = ANY($2)",
+    )
+    .bind(user_id)
+    .bind(&unique_slugs)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Cross-product link, single statement. CROSS JOIN UNNEST builds the
+    // cartesian product; ON CONFLICT skips already-linked pairs.
+    sqlx::query(
+        "INSERT INTO entry_tags (entry_id, tag_id) \
+         SELECT e, t \
+         FROM UNNEST($1::uuid[]) AS e \
+         CROSS JOIN UNNEST($2::uuid[]) AS t \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(entry_ids)
+    .bind(&tag_id_vec)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
+}
