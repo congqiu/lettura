@@ -87,7 +87,7 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
             let status = response.status().as_u16() as i16;
             match response.text().await {
                 Ok(body) => {
-                    process_body(ctx, job, &body, status, site_config.as_ref()).await;
+                    process_body(ctx, job, body, status, site_config.as_ref()).await;
                 }
                 Err(e) => {
                     tracing::warn!(entry_id = %job.entry_id, status, error = %e, "failed to read response body");
@@ -114,10 +114,13 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
 }
 
 /// Decide how to extract content based on site config response type and dispatch.
+/// Takes `body` by value so the HTML path can move it into `spawn_blocking`
+/// without an extra clone — for large pages this is the heaviest allocation
+/// in the fetch pipeline.
 async fn process_body(
     ctx: &FetchContext,
     job: &FetchJob,
-    body: &str,
+    body: String,
     status: i16,
     site_config: Option<&SiteConfig>,
 ) {
@@ -137,7 +140,7 @@ async fn process_body(
                 mark_failed(&ctx.pool, job.entry_id, status).await;
                 return;
             };
-            match json_extract::extract(body, rules) {
+            match json_extract::extract(&body, rules) {
                 Ok(result) => {
                     save(ctx, job, &result, status, "site_rule").await;
                 }
@@ -149,12 +152,11 @@ async fn process_body(
         }
         ResponseType::Html => {
             let site_rule_config = html_rules_from_config(ctx, job, site_config).await;
-            let body_owned = body.to_string();
             let url_owned = job.url.clone();
             let cfg_owned = site_rule_config.clone();
             let start = std::time::Instant::now();
             let extract_outcome = tokio::task::spawn_blocking(move || {
-                extract::extract_with_fallback(&body_owned, Some(&url_owned), cfg_owned.as_ref())
+                extract::extract_with_fallback(&body, Some(&url_owned), cfg_owned.as_ref())
             })
             .await;
             let elapsed = start.elapsed().as_secs_f64();
