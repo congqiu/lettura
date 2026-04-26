@@ -1,4 +1,5 @@
 use axum::extract::{Path, Query, State};
+use axum::response::IntoResponse;
 use axum::Json;
 use uuid::Uuid;
 use validator::Validate;
@@ -105,21 +106,31 @@ pub async fn list_entries(
     State(state): State<AppState>,
     auth: AuthUser,
     Query(params): Query<ListQueryParams>,
-) -> Result<Json<Vec<entry::EntrySummary>>, ApiError> {
+) -> Result<axum::response::Response, ApiError> {
     const MAX_PAGE: i64 = 50;
-    if let Some(p) = params.inner.page {
-        if p > MAX_PAGE {
-            return Err(ApiError::BadRequest(format!(
-                "page {} exceeds max {} — narrow filter or use cursor",
-                p, MAX_PAGE
-            )));
+    if params.inner.cursor.is_none() {
+        if let Some(p) = params.inner.page {
+            if p > MAX_PAGE {
+                return Err(ApiError::BadRequest(format!(
+                    "page {} exceeds max {} — narrow filter or use cursor",
+                    p, MAX_PAGE
+                )));
+            }
+        }
+    }
+
+    // Pre-validate the cursor at the API boundary so a malformed cursor turns
+    // into a 400 (rather than relying on the model's Database error → 500).
+    if let Some(c) = params.inner.cursor.as_deref() {
+        if entry::cursor::decode(c).is_none() {
+            return Err(ApiError::BadRequest(format!("invalid cursor: {}", c)));
         }
     }
 
     // If deleted=true, return soft-deleted entries
     if params.deleted == Some(true) {
         let entries = entry::list_deleted_entries(&state.pool, auth.user_id).await?;
-        return Ok(Json(entries));
+        return Ok(Json(entries).into_response());
     }
 
     // If search query provided, use tantivy to get matching IDs first
@@ -130,14 +141,33 @@ pub async fn list_entries(
                 .search(query, Some(auth.user_id), 100)
                 .unwrap_or_default();
             if ids.is_empty() {
-                return Ok(Json(vec![]));
+                return Ok(Json(Vec::<entry::EntrySummary>::new()).into_response());
             }
             let entries = entry::list_entries_by_ids(&state.pool, auth.user_id, &ids).await?;
-            return Ok(Json(entries));
+            return Ok(Json(entries).into_response());
         }
     }
+
+    let per_page = params.inner.per_page.unwrap_or(20).min(100);
     let entries = entry::list_entries(&state.pool, auth.user_id, &params.inner).await?;
-    Ok(Json(entries))
+
+    // X-Next-Cursor header is only meaningful when the caller is using cursor
+    // mode. Page-mode callers simply don't read this header.
+    let next = if params.inner.cursor.is_some() {
+        entry::next_cursor_from(&entries, per_page)
+    } else {
+        None
+    };
+
+    let mut response = Json(entries).into_response();
+    if let Some(c) = next {
+        response.headers_mut().insert(
+            "X-Next-Cursor",
+            axum::http::HeaderValue::from_str(&c)
+                .map_err(|e| ApiError::Internal(format!("cursor header: {e}")))?,
+        );
+    }
+    Ok(response)
 }
 
 pub async fn update_entry(

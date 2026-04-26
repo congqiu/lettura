@@ -67,6 +67,7 @@ async fn filter_untagged_returns_only_entries_without_tags() {
         before: None,
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -104,6 +105,7 @@ async fn filter_by_tag_requires_match() {
         before: None,
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -156,6 +158,7 @@ async fn filter_exclude_tag() {
         before: None,
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -201,6 +204,7 @@ async fn filter_since_and_before() {
         before: None,
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -222,6 +226,7 @@ async fn filter_since_and_before() {
         before: Some(chrono::Utc::now() - chrono::Duration::days(30)),
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -262,6 +267,7 @@ async fn is_read_is_alias_for_is_archived() {
         before: None,
         search: None,
         fields: None,
+        cursor: None,
     };
     let res = entry::list_entries(&app.pool, user_id, &params)
         .await
@@ -293,6 +299,127 @@ async fn list_rejects_excessive_page() {
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(res.status(), 200, "page=50 is the boundary, must succeed");
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn list_with_cursor_returns_next_page_via_header() {
+    let app = TestApp::new().await;
+    let token = {
+        app.client.post(app.url("/api/v1/auth/register"))
+            .json(&json!({"username":"cursor1","email":"c1@e.com","password":"password123"}))
+            .send().await.unwrap();
+        let login: serde_json::Value = app.client.post(app.url("/api/v1/auth/login"))
+            .json(&json!({"email":"c1@e.com","password":"password123"}))
+            .send().await.unwrap().json().await.unwrap();
+        login["access_token"].as_str().unwrap().to_string()
+    };
+
+    // Save 5 entries
+    for i in 0..5 {
+        app.client.post(app.url("/api/v1/entries"))
+            .header("Authorization", format!("Bearer {}", token))
+            .json(&json!({"url": format!("https://example.com/{}", i)}))
+            .send().await.unwrap();
+    }
+
+    // First request: per_page=2, no cursor
+    let res = app.client.get(app.url("/api/v1/entries?per_page=2"))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let _next_header_first = res.headers().get("x-next-cursor").map(|v| v.to_str().unwrap().to_string());
+    let first: Vec<serde_json::Value> = res.json().await.unwrap();
+    assert_eq!(first.len(), 2);
+
+    // Now request with cursor=<last entry's encoded cursor>. Construct one
+    // from the last item's created_at + id (manual %3A to avoid a dep).
+    let last = &first[1];
+    let last_id = last["id"].as_str().unwrap();
+    let last_created = last["created_at"].as_str().unwrap();
+    let ts = chrono::DateTime::parse_from_rfc3339(last_created).unwrap();
+    let cursor = format!("{}:{}", ts.timestamp_micros(), last_id);
+    let url_cursor = cursor.replace(':', "%3A");
+
+    let res = app.client.get(app.url(&format!("/api/v1/entries?per_page=2&cursor={}", url_cursor)))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let next_header = res.headers().get("x-next-cursor").map(|v| v.to_str().unwrap().to_string());
+    let second: Vec<serde_json::Value> = res.json().await.unwrap();
+    // Expect 2 more items (we have 5 total, used 2 in page 1)
+    assert_eq!(second.len(), 2);
+    // The two pages should not overlap
+    let ids_first: Vec<&str> = first.iter().map(|e| e["id"].as_str().unwrap()).collect();
+    for item in &second {
+        assert!(!ids_first.contains(&item["id"].as_str().unwrap()),
+                "cursor result overlaps with first page");
+    }
+    // Header should be present (page is full)
+    assert!(next_header.is_some(), "X-Next-Cursor expected on full page in cursor mode");
+
+    // Final cursor request: use second page's last as cursor. Should return 1 item, no next cursor.
+    let last2 = &second[1];
+    let last2_id = last2["id"].as_str().unwrap();
+    let last2_created = last2["created_at"].as_str().unwrap();
+    let ts2 = chrono::DateTime::parse_from_rfc3339(last2_created).unwrap();
+    let cursor2 = format!("{}:{}", ts2.timestamp_micros(), last2_id);
+    let url_cursor2 = cursor2.replace(':', "%3A");
+
+    let res = app.client.get(app.url(&format!("/api/v1/entries?per_page=2&cursor={}", url_cursor2)))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let final_header = res.headers().get("x-next-cursor").map(|v| v.to_str().unwrap().to_string());
+    let third: Vec<serde_json::Value> = res.json().await.unwrap();
+    assert_eq!(third.len(), 1, "5 items / per_page=2: third page has 1 item");
+    assert!(final_header.is_none(), "X-Next-Cursor must NOT be set when page is short");
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cursor_bypasses_page_50_guard() {
+    let app = TestApp::new().await;
+    let token = {
+        app.client.post(app.url("/api/v1/auth/register"))
+            .json(&json!({"username":"cursor2","email":"c2@e.com","password":"password123"}))
+            .send().await.unwrap();
+        let login: serde_json::Value = app.client.post(app.url("/api/v1/auth/login"))
+            .json(&json!({"email":"c2@e.com","password":"password123"}))
+            .send().await.unwrap().json().await.unwrap();
+        login["access_token"].as_str().unwrap().to_string()
+    };
+
+    // Use a far-future cursor so the result is empty but the request itself succeeds.
+    let cursor = format!("{}:{}", 9_999_999_999_999_999i64, uuid::Uuid::nil());
+    let url_cursor = cursor.replace(':', "%3A");
+    let res = app.client.get(app.url(&format!("/api/v1/entries?page=999&cursor={}", url_cursor)))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200, "cursor mode must skip the page>50 guard");
+
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn invalid_cursor_returns_400() {
+    let app = TestApp::new().await;
+    let token = {
+        app.client.post(app.url("/api/v1/auth/register"))
+            .json(&json!({"username":"cursor3","email":"c3@e.com","password":"password123"}))
+            .send().await.unwrap();
+        let login: serde_json::Value = app.client.post(app.url("/api/v1/auth/login"))
+            .json(&json!({"email":"c3@e.com","password":"password123"}))
+            .send().await.unwrap().json().await.unwrap();
+        login["access_token"].as_str().unwrap().to_string()
+    };
+
+    let res = app.client.get(app.url("/api/v1/entries?cursor=garbage"))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 400);
 
     app.cleanup().await;
 }

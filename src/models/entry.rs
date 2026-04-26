@@ -7,6 +7,49 @@ use uuid::Uuid;
 
 use super::error::ModelError;
 
+/// Opaque pagination cursor: encodes the (created_at, id) tuple of the last
+/// entry on the current page. Format: "<unix_micros>:<uuid>". Plain text so it's
+/// URL-safe and debuggable; not a security token.
+pub mod cursor {
+    use chrono::{DateTime, TimeZone, Utc};
+    use uuid::Uuid;
+
+    pub fn encode(ts: DateTime<Utc>, id: Uuid) -> String {
+        format!("{}:{}", ts.timestamp_micros(), id)
+    }
+
+    pub fn decode(s: &str) -> Option<(DateTime<Utc>, Uuid)> {
+        let (ts_str, id_str) = s.split_once(':')?;
+        let micros: i64 = ts_str.parse().ok()?;
+        let ts = Utc.timestamp_micros(micros).single()?;
+        let id: Uuid = id_str.parse().ok()?;
+        Some((ts, id))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn round_trip() {
+            let ts = Utc.timestamp_micros(1_714_086_456_123_456).unwrap();
+            let id = Uuid::new_v4();
+            let s = encode(ts, id);
+            let (ts2, id2) = decode(&s).expect("round-trip");
+            assert_eq!(ts.timestamp_micros(), ts2.timestamp_micros());
+            assert_eq!(id, id2);
+        }
+
+        #[test]
+        fn decode_rejects_garbage() {
+            assert!(decode("not-a-cursor").is_none());
+            assert!(decode("123:not-a-uuid").is_none());
+            assert!(decode(":550e8400-e29b-41d4-a716-446655440000").is_none());
+            assert!(decode("").is_none());
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Entry {
     pub id: Uuid, pub user_id: Uuid, pub url: String, pub given_url: String,
@@ -135,6 +178,9 @@ pub struct ListParams {
     pub search: Option<String>,
     /// Field-projection hint — placeholder for Task 15, not used in query construction.
     pub fields: Option<String>,
+    /// Opaque cursor for keyset pagination. When present, page/OFFSET is ignored
+    /// and the result is keyed on `(created_at, id) < cursor` ordering.
+    pub cursor: Option<String>,
 }
 
 pub async fn list_entries(
@@ -143,7 +189,6 @@ pub async fn list_entries(
     params: &ListParams,
 ) -> Result<Vec<EntrySummary>, ModelError> {
     let per_page = params.per_page.unwrap_or(20).min(100);
-    let offset = (params.page.unwrap_or(1) - 1).max(0) * per_page;
 
     let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
         "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, \
@@ -152,15 +197,43 @@ pub async fn list_entries(
     );
     build_where_clause(&mut qb, user_id, params);
 
-    qb.push(" ORDER BY created_at DESC LIMIT ");
+    // Keyset pagination wins over page+OFFSET when cursor is provided.
+    if let Some(cursor_str) = params.cursor.as_deref() {
+        if let Some((cur_ts, cur_id)) = cursor::decode(cursor_str) {
+            qb.push(" AND (created_at, id) < (");
+            qb.push_bind(cur_ts);
+            qb.push(", ");
+            qb.push_bind(cur_id);
+            qb.push(")");
+        } else {
+            return Err(ModelError::Database("invalid cursor".to_string()));
+        }
+    }
+
+    qb.push(" ORDER BY created_at DESC, id DESC LIMIT ");
     qb.push_bind(per_page);
-    qb.push(" OFFSET ");
-    qb.push_bind(offset);
+
+    if params.cursor.is_none() {
+        let offset = (params.page.unwrap_or(1) - 1).max(0) * per_page;
+        qb.push(" OFFSET ");
+        qb.push_bind(offset);
+    }
 
     qb.build_query_as::<EntrySummary>()
         .fetch_all(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))
+}
+
+/// Compute the next cursor from a freshly-fetched result page. Returns Some
+/// when the page is "full" (likely more rows exist) and the last item has a
+/// `created_at`. The caller should emit this as `X-Next-Cursor`.
+pub fn next_cursor_from(items: &[EntrySummary], per_page: i64) -> Option<String> {
+    if (items.len() as i64) < per_page {
+        return None;
+    }
+    let last = items.last()?;
+    Some(cursor::encode(last.created_at, last.id))
 }
 
 /// Build the shared WHERE clause for entry list queries.
