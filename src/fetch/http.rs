@@ -176,14 +176,25 @@ fn backoff_delay(attempt: u32, jitter: f64) -> Duration {
     Duration::from_millis(base_ms.saturating_add(jitter_ms))
 }
 
-/// Parse a `Retry-After` header value. Currently supports the
-/// "seconds-from-now" form only (RFC 7231 also allows http-date, which we
-/// don't honor). Returns None when the header is missing or malformed.
+/// Parse a `Retry-After` header value (RFC 7231 §7.1.3). Supports both
+/// "seconds-from-now" and HTTP-date (IMF-fixdate, e.g. "Wed, 21 Oct 2099
+/// 07:28:00 GMT") forms. Past dates clamp to `Duration::ZERO`. Returns
+/// None when the header is missing or unparseable.
 fn parse_retry_after_header(value: Option<&reqwest::header::HeaderValue>) -> Option<Duration> {
     let v = value?;
-    let s = v.to_str().ok()?;
-    let secs: u64 = s.trim().parse().ok()?;
-    Some(Duration::from_secs(secs))
+    let s = v.to_str().ok()?.trim();
+
+    if let Ok(secs) = s.parse::<u64>() {
+        return Some(Duration::from_secs(secs));
+    }
+
+    let target = chrono::DateTime::parse_from_rfc2822(s).ok()?;
+    let delta = target.signed_duration_since(chrono::Utc::now());
+    if delta <= chrono::Duration::zero() {
+        Some(Duration::ZERO)
+    } else {
+        delta.to_std().ok()
+    }
 }
 
 /// Simple deterministic pseudo-random in [0.0, 1.0) using the current nanosecond.
@@ -363,9 +374,23 @@ mod tests {
     }
 
     #[test]
-    fn parse_retry_after_returns_none_for_http_date() {
-        // RFC 7231 also allows IMF-fixdate, but we don't support that — confirm None.
+    fn parse_retry_after_http_date_future_returns_positive_duration() {
         let v = reqwest::header::HeaderValue::from_static("Wed, 21 Oct 2099 07:28:00 GMT");
+        let d = parse_retry_after_header(Some(&v)).expect("http-date is parseable");
+        // Year 2099 is well beyond 2026 baseline; delta must be > 70 years of secs.
+        assert!(d > Duration::from_secs(70 * 365 * 24 * 3600), "got {d:?}");
+    }
+
+    #[test]
+    fn parse_retry_after_http_date_past_clamps_to_zero() {
+        let v = reqwest::header::HeaderValue::from_static("Mon, 01 Jan 1990 00:00:00 GMT");
+        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::ZERO));
+    }
+
+    #[test]
+    fn parse_retry_after_invalid_date_returns_none() {
+        // Not a valid RFC 2822 date and not a number.
+        let v = reqwest::header::HeaderValue::from_static("Tomorrow at noon");
         assert_eq!(parse_retry_after_header(Some(&v)), None);
     }
 
