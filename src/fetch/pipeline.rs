@@ -384,7 +384,7 @@ async fn try_render_then_extract(
             let extract_result = match extract_outcome {
                 Ok(r) => r,
                 Err(e) => {
-                    tracing::warn!(entry_id = %job.entry_id, error = %e, "render-path extract task panicked");
+                    tracing::error!(entry_id = %job.entry_id, error = %e, "render-path extract task panicked");
                     metrics::histogram!("extract_duration_seconds", "method" => "render_panic")
                         .record(elapsed);
                     return false;

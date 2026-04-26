@@ -37,9 +37,9 @@ COPY --from=frontend-builder /app/web/dist web/dist
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     if [ "$RENDERING" = "1" ]; then \
-      cargo build --release && cp target/release/lettura /lettura; \
+      cargo build --release --bin lettura && cp target/release/lettura /lettura; \
     else \
-      cargo build --release --no-default-features && cp target/release/lettura /lettura; \
+      cargo build --release --no-default-features --bin lettura && cp target/release/lettura /lettura; \
     fi
 
 # Stage 3: Runtime

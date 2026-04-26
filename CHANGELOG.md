@@ -16,6 +16,7 @@
 - Repo is now a Cargo workspace (`.` and `cli/`); server crate is still `lettura`.
 - Search index switched to buffered writes with a 3-second background flush and graceful-shutdown flush, eliminating per-write fsync. Permanent-delete and admin reindex still commit synchronously.
 - `process_images` downloads images in parallel (max 8 in flight) and applies URL replacements longest-first to avoid substring collisions.
+- Web client `staleTime` raised to 30s and `refetchOnWindowFocus` disabled by default. Mutations still call `invalidateQueries` so cache stays fresh after writes; visible behavior change is that switching tabs no longer triggers an immediate refetch.
 
 ### Fixed
 - `admin reindex` now commits the index clear before the rebuild, preventing a half-cleared index if the rebuild phase fails.
