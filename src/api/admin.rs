@@ -2,9 +2,17 @@ use axum::extract::State;
 use axum::Json;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
+use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::user::User;
+
+fn auth_source_str(auth: &AuthUser) -> String {
+    match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    }
+}
 
 pub async fn list_users(
     State(state): State<AppState>,
@@ -29,6 +37,23 @@ pub async fn list_users(
             created_at: u.created_at,
         })
         .collect();
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::AdminListUsers,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"count": summaries.len()}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
 
     Ok(Json(summaries))
 }
@@ -89,6 +114,23 @@ pub async fn reindex(
 
     // Flush the bulk changes immediately so they are searchable.
     state.search_index.commit().await.map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::AdminReindex,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"indexed": count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
 
     Ok(Json(serde_json::json!({
         "message": "reindex complete",

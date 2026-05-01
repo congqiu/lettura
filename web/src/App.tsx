@@ -12,6 +12,7 @@ import EntryDetailPage from './pages/EntryDetailPage';
 const MemosPage = lazy(() => import('./pages/MemosPage'));
 const PagesPage = lazy(() => import('./pages/PagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function App() {
                 <Route path="entry/:id" element={<EntryDetailPage />} />
                 <Route path="memos" element={<MemosPage />} />
                 <Route path="pages" element={<PagesPage />} />
+                <Route path="audit-logs" element={<AuditLogsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

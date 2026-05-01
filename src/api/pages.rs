@@ -8,11 +8,19 @@ use validator::Validate;
 use axum::extract::multipart::MultipartError;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
+use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::page;
 
 use super::validate::ValidatedJson;
+
+fn auth_source_str(auth: &AuthUser) -> String {
+    match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    }
+}
 
 fn pages_storage_path(state: &AppState) -> PathBuf {
     PathBuf::from(&state.config.pages_storage_path)
@@ -283,6 +291,23 @@ pub async fn create_page_handler(
         .filter(|pw| !pw.is_empty())
         .map(|pw| format!("{}?p={}", url, pw));
 
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::CreatePage,
+            resource_type: Some(AuditResourceType::Page),
+            resource_id: Some(new_page.id),
+            status: "success".to_string(),
+            details: serde_json::json!({"slug": new_page.slug, "title": new_page.title}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(serde_json::json!({
         "id": new_page.id,
         "slug": new_page.slug,
@@ -466,6 +491,22 @@ pub async fn update_page_handler(
             file_count,
         },
     ).await?;
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::UpdatePage,
+            resource_type: Some(AuditResourceType::Page),
+            resource_id: Some(page_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
     Ok(Json(updated))
 }
 
@@ -479,6 +520,22 @@ pub async fn delete_page_handler(
     if !deleted {
         return Err(ApiError::NotFound("page not found".to_string()));
     }
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::DeletePage,
+            resource_type: Some(AuditResourceType::Page),
+            resource_id: Some(page_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
     Ok(Json(serde_json::json!({"success": true})))
 }
 
@@ -489,6 +546,22 @@ pub async fn restore_page_handler(
     Path(page_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     page::restore_page(&state.pool, auth.user_id, page_id).await?;
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::RestorePage,
+            resource_type: Some(AuditResourceType::Page),
+            resource_id: Some(page_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
     Ok(Json(serde_json::json!({"success": true})))
 }
 

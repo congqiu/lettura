@@ -1,4 +1,5 @@
 pub mod annotation;
+pub mod audit_log;
 pub mod entry;
 pub mod error;
 pub mod memo;

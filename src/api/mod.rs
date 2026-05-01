@@ -15,6 +15,7 @@ use crate::tasks::fetcher;
 
 pub mod admin;
 pub mod annotations;
+pub mod audit_logs;
 pub mod auth;
 pub mod backup;
 pub mod bulk;
@@ -104,6 +105,8 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/tokens/{id}", delete(tokens::delete_token))
         // Merge auth public routes with strict rate limit
         .merge(auth_public)
+        // Audit logs
+        .route("/api/v1/audit-logs", get(audit_logs::list_audit_logs))
         // Entries
         .route(
             "/api/v1/entries",

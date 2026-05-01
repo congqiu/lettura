@@ -5,9 +5,17 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
+use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry, tag};
+
+fn auth_source_str(auth: &AuthUser) -> String {
+    match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    }
+}
 
 pub async fn list_tags(
     State(state): State<AppState>,
@@ -45,6 +53,24 @@ pub async fn add_tag_to_entry(
         .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
     let t = tag::find_or_create_tag(&state.pool, auth.user_id, &req.label).await?;
     tag::add_tag_to_entry(&state.pool, entry_id, t.id).await?;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::AddTagToEntry,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: Some(entry_id),
+            status: "success".to_string(),
+            details: serde_json::to_value(serde_json::json!({"tag_label": req.label, "tag_id": t.id})).unwrap_or_default(),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(t))
 }
 
@@ -57,6 +83,24 @@ pub async fn remove_tag_from_entry(
         .await?
         .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
     tag::remove_tag_from_entry(&state.pool, entry_id, tag_id).await?;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::RemoveTagFromEntry,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: Some(entry_id),
+            status: "success".to_string(),
+            details: serde_json::to_value(serde_json::json!({"tag_id": tag_id})).unwrap_or_default(),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(serde_json::json!({"message": "removed"})))
 }
 
@@ -69,6 +113,22 @@ pub async fn delete_tag(
     if !deleted {
         return Err(ApiError::NotFound("tag not found".to_string()));
     }
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::DeleteTag,
+            resource_type: Some(AuditResourceType::Tag),
+            resource_id: Some(tag_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 

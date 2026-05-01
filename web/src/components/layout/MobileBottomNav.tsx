@@ -63,6 +63,13 @@ export function MobileBottomNav() {
               >
                 归档
               </NavLink>
+              <NavLink
+                to="/audit-logs"
+                onClick={() => setSheetOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm rounded-lg hover:bg-accent"
+              >
+                操作日志
+              </NavLink>
               <Separator className="my-2" />
               <NavLink
                 to="/settings"

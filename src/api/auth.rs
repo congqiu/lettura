@@ -9,6 +9,7 @@ use crate::auth::jwt;
 use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
 use crate::auth::password;
+use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceType};
 use crate::models::user;
 
 use super::validate::ValidatedJson;
@@ -60,6 +61,27 @@ pub async fn register(
         user::create_user(&state.pool, &req.username, &req.email, &req.password, is_admin).await?;
 
     tracing::info!(user_id = %new_user.id, "user registered");
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(new_user.id),
+            auth_source: "jwt".to_string(),
+            action: AuditAction::Register,
+            resource_type: Some(AuditResourceType::User),
+            resource_id: Some(new_user.id),
+            status: "success".to_string(),
+            details: serde_json::to_value(AuditDetails {
+                after: Some(serde_json::json!({"username": new_user.username, "email": new_user.email})),
+                ..Default::default()
+            }).unwrap_or_default(),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     issue_tokens(&state, new_user.id, new_user.is_admin).await
 }
 
@@ -70,12 +92,30 @@ pub async fn login(
 ) -> Result<Json<AuthResponse>, ApiError> {
     let found = user::find_user_by_email(&state.pool, &req.email)
         .await?
-        .ok_or_else(|| ApiError::Unauthorized("invalid credentials".to_string()))?;
+        .ok_or_else(|| ApiError::Unauthorized("邮箱或密码错误".to_string()))?;
 
     password::verify_password(&req.password, &found.password_hash)
-        .map_err(|_| ApiError::Unauthorized("invalid credentials".to_string()))?;
+        .map_err(|_| ApiError::Unauthorized("邮箱或密码错误".to_string()))?;
 
     tracing::info!(user_id = %found.id, "user logged in");
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(found.id),
+            auth_source: "jwt".to_string(),
+            action: AuditAction::Login,
+            resource_type: Some(AuditResourceType::User),
+            resource_id: Some(found.id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     issue_tokens(&state, found.id, found.is_admin).await
 }
 
@@ -102,11 +142,33 @@ pub async fn refresh(
 
 pub async fn logout(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Json(req): Json<RefreshRequest>,
 ) -> Result<Json<MessageResponse>, ApiError> {
     let token_hash = jwt::hash_refresh_token(&req.refresh_token);
     user::delete_refresh_token(&state.pool, &token_hash).await?;
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::Logout,
+            resource_type: Some(AuditResourceType::User),
+            resource_id: Some(auth.user_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(MessageResponse {
         message: "logged out".to_string(),
     }))
@@ -206,6 +268,27 @@ pub async fn change_password(
         .map_err(|_| ApiError::Internal("failed to hash password".to_string()))?;
 
     user::update_password(&state.pool, auth.user_id, &new_hash).await?;
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::ChangePassword,
+            resource_type: Some(AuditResourceType::User),
+            resource_id: Some(auth.user_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
 
     Ok(Json(MessageResponse {
         message: "password changed".to_string(),

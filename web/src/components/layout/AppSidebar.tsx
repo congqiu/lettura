@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BookOpen, Archive, Star, StickyNote, Globe, Settings, LogOut, Sun, Moon, Monitor } from 'lucide-react';
+import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor } from 'lucide-react';
 import { useAuthStore } from '../../store/auth';
 import { useThemeStore } from '../../store/theme';
 import { logout as apiLogout } from '../../api/auth';
@@ -21,6 +21,7 @@ const navItems = [
 
 const toolItems = [
   { to: '/pages', label: 'Pages', icon: Globe, end: false },
+  { to: '/audit-logs', label: '操作日志', icon: ShieldCheck, end: false },
 ];
 
 export function AppSidebar() {

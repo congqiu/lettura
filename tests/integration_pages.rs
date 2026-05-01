@@ -135,7 +135,11 @@ async fn password_protected_page() {
     let body = res.text().await.unwrap();
     assert!(body.contains("密码错误"));
 
-    let res = app.client.post(app.url(&format!("/p/{}/auth", slug)))
+    let no_redirect = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let res = no_redirect.post(app.url(&format!("/p/{}/auth", slug)))
         .form(&json!({"password": "mypass123"}))
         .send().await.unwrap();
     assert_eq!(res.status(), 302);

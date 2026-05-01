@@ -1,10 +1,12 @@
+use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
+use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::entry;
 use crate::tasks::fetcher::FetchJob;
 
@@ -23,8 +25,12 @@ pub struct WallabagEntry {
 pub async fn import_wallabag(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(entries): Json<Vec<WallabagEntry>>,
+    body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let bytes = axum::body::to_bytes(body, 500 * 1024 * 1024).await
+        .map_err(|_| ApiError::BadRequest("request body too large (max 500MB)".to_string()))?;
+    let entries: Vec<WallabagEntry> = serde_json::from_slice(&bytes)
+        .map_err(|e| ApiError::BadRequest(format!("invalid JSON: {e}")))?;
     let mut imported = 0;
     let mut skipped = 0;
 
@@ -75,6 +81,28 @@ pub async fn import_wallabag(
     }
 
     tracing::info!(imported = imported, skipped = skipped, total = entries.len(), "wallabag import completed");
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::ImportWallabag,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"imported": imported, "skipped": skipped, "total": entries.len()}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(serde_json::json!({
         "imported": imported,
         "skipped": skipped,
@@ -87,15 +115,19 @@ pub async fn import_wallabag(
 pub async fn import_browser(
     State(state): State<AppState>,
     auth: AuthUser,
-    body: String,
+    body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let body_bytes = axum::body::to_bytes(body, 500 * 1024 * 1024).await
+        .map_err(|_| ApiError::BadRequest("request body too large (max 500MB)".to_string()))?;
+    let body_str = std::str::from_utf8(&body_bytes)
+        .map_err(|e| ApiError::BadRequest(format!("invalid UTF-8: {e}")))?;
+
     let mut imported = 0;
     let mut skipped = 0;
 
     // Parse simple bookmark HTML format: <A HREF="...">title</A>
-    // Collect all bookmarks first to avoid holding non-Send ElementRef across await points
     let bookmarks: Vec<(String, String)> = {
-        let doc = scraper::Html::parse_document(&body);
+        let doc = scraper::Html::parse_document(body_str);
         let a_selector = scraper::Selector::parse("a[href]").unwrap();
         doc.select(&a_selector)
             .filter_map(|element| {
@@ -131,6 +163,28 @@ pub async fn import_browser(
     }
 
     tracing::info!(imported = imported, skipped = skipped, "browser import completed");
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::ImportBrowser,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"imported": imported, "skipped": skipped}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(serde_json::json!({
         "imported": imported,
         "skipped": skipped

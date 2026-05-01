@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
-use crate::auth::middleware::AuthUser;
+use crate::auth::middleware::{AuthSource, AuthUser};
 use crate::state::AppState;
+use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 
 // ---------------------------------------------------------------------------
 // Backup data structures
@@ -147,6 +148,7 @@ pub async fn backup(
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let user_count = users.len();
 
     let entries = sqlx::query_as::<_, BackupEntry>(
         "SELECT * FROM entries ORDER BY created_at",
@@ -154,6 +156,7 @@ pub async fn backup(
     .fetch_all(&state.pool)
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let entry_count = entries.len();
 
     let tags = sqlx::query_as::<_, BackupTag>(
         "SELECT * FROM tags ORDER BY created_at",
@@ -214,6 +217,27 @@ pub async fn backup(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     tracing::info!("admin backup created");
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::AdminBackup,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"users": user_count, "entries": entry_count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
 
     let filename = format!(
         "lettura-backup-{}.json",
@@ -494,6 +518,27 @@ pub async fn restore(
     }
 
     tracing::info!("admin restore completed");
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::AdminRestore,
+            resource_type: Some(AuditResourceType::System),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"users": data.users.len(), "entries": data.entries.len()}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
 
     Ok(axum::Json(serde_json::json!({
         "message": "restore complete",
