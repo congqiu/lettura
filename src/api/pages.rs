@@ -147,6 +147,23 @@ pub async fn upload_files(
         tokio::fs::remove_dir_all(&cleanup_path).await.ok();
     });
 
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::UploadPageFiles,
+            resource_type: Some(AuditResourceType::Page),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"upload_id": upload_id, "file_count": file_count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(UploadResponse {
         upload_id,
         html_files,

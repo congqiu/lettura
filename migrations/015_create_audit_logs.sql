@@ -13,7 +13,8 @@ DO $$ BEGIN
         'import_wallabag', 'import_browser', 'export_all',
         'create_page', 'update_page', 'delete_page', 'restore_page',
         'admin_backup', 'admin_restore', 'admin_reindex', 'admin_list_users',
-        'bulk_tag_add', 'bulk_untag', 'bulk_archive', 'bulk_star'
+        'bulk_tag_add', 'bulk_untag', 'bulk_archive', 'bulk_star',
+        'upload_page_files'
     );
 EXCEPTION
     WHEN duplicate_object THEN null;

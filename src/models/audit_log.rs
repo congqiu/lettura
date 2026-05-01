@@ -58,6 +58,7 @@ pub enum AuditAction {
     BulkUntag,
     BulkArchive,
     BulkStar,
+    UploadPageFiles,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]

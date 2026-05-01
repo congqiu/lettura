@@ -211,6 +211,35 @@ pub async fn update_entry(
     Json(params): Json<UpdateEntryParams>,
 ) -> Result<Json<entry::Entry>, ApiError> {
     let updated = entry::update_entry(&state.pool, auth.user_id, entry_id, &params).await?;
+
+    let auth_source = match auth.source {
+        AuthSource::Jwt => "jwt".to_string(),
+        AuthSource::Pat { .. } => "pat".to_string(),
+    };
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source,
+            action: AuditAction::UpdateEntry,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: Some(entry_id),
+            status: "success".to_string(),
+            details: serde_json::to_value(AuditDetails {
+                after: Some(serde_json::json!({
+                    "title": updated.title,
+                    "is_archived": updated.is_archived,
+                    "is_starred": updated.is_starred,
+                })),
+                ..Default::default()
+            }).unwrap_or_default(),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(updated))
 }
 

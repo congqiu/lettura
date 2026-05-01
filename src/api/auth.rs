@@ -206,6 +206,24 @@ pub async fn regenerate_feed_token(
     auth: AuthUser,
 ) -> Result<Json<FeedTokenResponse>, ApiError> {
     let new_token = user::regenerate_feed_token(&state.pool, auth.user_id).await?;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: "jwt".to_string(),
+            action: AuditAction::RegenerateFeedToken,
+            resource_type: Some(AuditResourceType::User),
+            resource_id: Some(auth.user_id),
+            status: "success".to_string(),
+            details: serde_json::json!({}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
     Ok(Json(FeedTokenResponse { feed_token: new_token }))
 }
 
