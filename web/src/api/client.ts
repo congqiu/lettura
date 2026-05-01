@@ -37,6 +37,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Skip token refresh for auth endpoints — they don't have tokens to refresh
+      if (originalRequest.url?.includes('/auth/')) {
+        return Promise.reject(error);
+      }
       originalRequest._retry = true;
 
       // Cooldown check: if refresh failed recently, skip straight to login
