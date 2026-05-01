@@ -1,3 +1,4 @@
+pub mod audit_logs;
 pub mod config;
 pub mod get;
 pub mod list;

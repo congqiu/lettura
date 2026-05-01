@@ -56,6 +56,25 @@ pub fn emit_human_tags(tags: &[crate::api_types::Tag]) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn emit_human_audit_logs(
+    logs: &[crate::api_types::AuditLog],
+    total: i64,
+    limit: i64,
+    offset: i64,
+) -> anyhow::Result<()> {
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    writeln!(lock, "Showing {}-{} of {} audit logs", offset + 1, (offset + limit).min(total), total)?;
+    for log in logs {
+        let ts = log.created_at.map(|d| d.to_rfc3339()).unwrap_or_default();
+        let action = &log.action;
+        let resource = log.resource_type.as_deref().unwrap_or("-");
+        let status = &log.status;
+        writeln!(lock, "{} | {} | {} | {} | {}", log.id, ts, action, resource, status)?;
+    }
+    Ok(())
+}
+
 /// Print an informational message, suppressed by --quiet.
 pub fn info(msg: &str) {
     if !is_quiet() {

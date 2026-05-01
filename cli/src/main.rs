@@ -37,6 +37,9 @@ async fn run(args: Cli) -> i32 {
         Command::Get(get_args) => with_client!(&args, |c| commands::get::run(c, get_args)),
         Command::Save(save_args) => with_client!(&args, |c| commands::save::run(c, save_args)),
         Command::Tags => with_client!(&args, |c| commands::tags::run(c, args.output, args.pretty)),
+        Command::AuditLogs(audit_args) => with_client!(&args, |c| {
+            commands::audit_logs::run(c, audit_args, args.output, args.pretty)
+        }),
         Command::Tag(tag_args) => with_client!(&args, |c| commands::tag::run_tag(c, tag_args)),
         Command::Untag(untag_args) => with_client!(&args, |c| commands::tag::run_untag(c, untag_args)),
         Command::Archive(sc_args) => with_client!(&args, |c| commands::state::run_archive(c, sc_args)),

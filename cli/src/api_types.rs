@@ -43,3 +43,25 @@ pub struct Tag {
     pub label: String,
     pub slug: Option<String>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AuditLog {
+    pub id: uuid::Uuid,
+    pub user_id: Option<uuid::Uuid>,
+    pub auth_source: String,
+    pub action: String,
+    pub resource_type: Option<String>,
+    pub resource_id: Option<uuid::Uuid>,
+    pub status: String,
+    pub details: serde_json::Value,
+    pub error_message: Option<String>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListAuditLogsResponse {
+    pub data: Vec<AuditLog>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}

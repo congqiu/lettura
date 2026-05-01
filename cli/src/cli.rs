@@ -41,6 +41,7 @@ pub enum Command {
     Unstar(StateChangeArgs),
 
     Tags,
+    AuditLogs(AuditLogsArgs),
     Skill { #[command(subcommand)] cmd: SkillCmd },
 }
 
@@ -108,6 +109,15 @@ pub struct UntagArgs {
     #[arg(long)] pub filter: Option<String>,
     #[arg(long)] pub dry_run: bool,
     #[arg(long)] pub yes: bool,
+}
+
+#[derive(clap::Args)]
+pub struct AuditLogsArgs {
+    #[arg(long)] pub action: Option<String>,
+    #[arg(long)] pub resource_type: Option<String>,
+    #[arg(long)] pub status: Option<String>,
+    #[arg(long)] pub limit: Option<i64>,
+    #[arg(long)] pub offset: Option<i64>,
 }
 
 #[derive(clap::Args)]
