@@ -15,22 +15,52 @@ usage() {
 ${B}Usage:${N} $(basename "$0") <command>
 
 ${B}Commands:${N}
-  build     Rebuild image and restart (default)
-  up        Start services (no rebuild)
-  down      Stop and remove containers
-  restart   Restart app container (no rebuild)
-  logs      Tail all service logs
-  status    Show container status and health
-  psql      Open psql shell
-  clean     Remove build artifacts and volumes
+  dev      Start backend (Docker) + frontend (Vite) with combined logs
+  build    Rebuild image and restart
+  up       Start services (no rebuild)
+  down     Stop and remove containers
+  restart  Restart app container (no rebuild)
+  logs     Tail all service logs
+  status   Show container status and health
+  psql     Open psql shell
+  clean    Remove build artifacts and volumes
 EOF
+}
+
+cmd_dev() {
+  if [[ ! -d "web/node_modules" ]]; then
+    warn "web/node_modules not found. Run 'npm install' in web/ first."
+    warn "Starting backend only..."
+    docker compose up -d
+    cmd_status
+    return
+  fi
+
+  log "Starting backend..."
+  docker compose up -d
+
+  log "Starting frontend (Vite)..."
+  (cd web && npm run dev) &
+  local vite_pid=$!
+
+  cleanup() {
+    kill $vite_pid 2>/dev/null || true
+    docker compose stop -t 5 2>/dev/null || true
+  }
+  trap cleanup EXIT
+
+  log "Dev servers running. Backend: http://localhost:3330  Frontend: http://localhost:5173"
+  log "Press Ctrl+C to stop all."
+  echo ""
+
+  docker compose logs -f --tail 10
 }
 
 cmd_build() {
   log "Rebuilding image..."
   docker compose build --pull lettura 2>&1 | tail -1
   log "Restarting services..."
-  docker compose up -d
+  docker compose up -d --force-recreate
   cmd_status
 }
 
@@ -72,6 +102,7 @@ cmd_clean() {
 }
 
 case "${1:-build}" in
+  dev)     cmd_dev     ;;
   build)   cmd_build   ;;
   up)      cmd_up      ;;
   down)    cmd_down    ;;
