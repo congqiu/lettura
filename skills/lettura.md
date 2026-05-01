@@ -89,6 +89,7 @@ Saving the same URL twice is safe: the server returns `already_existed: true`, a
 | `archive <id>` / `unarchive <id>` | Archive state toggle |
 | `star <id>` / `unstar <id>` | Star state toggle |
 | `tags` | List all tags |
+| `audit-logs [--action X] [--resource-type Y] [--status Z] [--limit N] [--offset N]` | Query audit logs |
 | `whoami` | Verify login |
 
 ## Filter DSL
@@ -106,6 +107,21 @@ AND-combined, comma-separated. No OR or parens (use multiple commands if you nee
 | `archived` / `!archived` | archived state |
 | `read` / `unread` | read state (aliased to archived) |
 | `search:<query>` | nested full-text search |
+
+## Audit Logs
+
+Server-side audit log API (`GET /api/v1/audit-logs`). Query params:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `action` | enum | Filter by action e.g. `create_entry`, `delete_entry`, `login`, `bulk_tag_add` |
+| `resource_type` | enum | `entry`, `tag`, `page`, `user`, etc. |
+| `resource_id` | UUID | Exact resource match |
+| `status` | string | `success`, `failure`, `forbidden` |
+| `limit` | int | Page size (1–200, default 50) |
+| `offset` | int | Pagination offset |
+
+Response: `{ data: [...], total: N, limit: N, offset: N }`. Each log has `action`, `auth_source` (`jwt`/`pat`), `resource_type`, `resource_id`, `status`, `details` (JSON), `created_at`.
 
 ## Output schema (list / get fields)
 

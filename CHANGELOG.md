@@ -9,6 +9,10 @@
 - Bulk endpoints `POST /api/v1/entries/bulk/{tag,untag,archive,star}` with required `dry_run` preview step.
 - Skill source `skills/lettura.md`, served publicly at `GET /skills/lettura.md` with server-version + base-URL substitution, and bundled into the CLI binary via rust-embed (`lettura-cli skill install`).
 - GitHub Actions release workflow building `lettura-cli` for linux-x86_64, darwin-x86_64, and darwin-aarch64; `scripts/install-cli.sh` downloads the matching tarball.
+- Cursor-based keyset pagination for `GET /api/v1/entries` (`cursor` query param, `X-Next-Cursor` response header). Cursor mode bypasses the page≤50 guard.
+- Audit log system: migration 015 (`audit_logs` table + ENUMs + indexes), `GET /api/v1/audit-logs` with filtering and pagination, fire-and-forget helper, instrumentation across all major write endpoints.
+- `lettura-cli audit-logs` subcommand for querying audit logs from the terminal.
+- `dev.sh dev` command for combined backend (Docker) + frontend (Vite) development with unified logs.
 
 ### Changed
 - Entry save (`POST /api/v1/entries`) is now idempotent: same URL returns existing entry with `already_existed: true`, tag set merged as union.
@@ -17,6 +21,9 @@
 - Search index switched to buffered writes with a 3-second background flush and graceful-shutdown flush, eliminating per-write fsync. Permanent-delete and admin reindex still commit synchronously.
 - `process_images` downloads images in parallel (max 8 in flight) and applies URL replacements longest-first to avoid substring collisions.
 - Web client `staleTime` raised to 30s and `refetchOnWindowFocus` disabled by default. Mutations still call `invalidateQueries` so cache stays fresh after writes; visible behavior change is that switching tabs no longer triggers an immediate refetch.
+- `process_body` in the fetch pipeline now takes `body` by value, eliminating a full `to_string()` clone for large HTML pages before `spawn_blocking`.
+- `parse_retry_after_header` now supports RFC 7231 HTTP-date form (e.g. "Wed, 21 Oct 2099 07:28:00 GMT") in addition to the seconds-from-now form.
+- Web client token-refresh interceptor now skips auth endpoints (login/register) to prevent infinite retry loops on 401 responses.
 
 ### Fixed
 - `admin reindex` now commits the index clear before the rebuild, preventing a half-cleared index if the rebuild phase fails.
