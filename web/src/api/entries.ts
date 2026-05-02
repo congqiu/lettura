@@ -70,8 +70,13 @@ export async function getEntry(id: string): Promise<Entry> {
   return res.data;
 }
 
-export async function createEntry(url: string): Promise<Entry> {
-  const res = await api.post('/entries', { url });
+export interface CreateEntryOptions {
+  title?: string;
+  tag?: string[];
+}
+
+export async function createEntry(url: string, options?: CreateEntryOptions): Promise<Entry> {
+  const res = await api.post('/entries', { url, ...options });
   return res.data;
 }
 
