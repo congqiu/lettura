@@ -217,7 +217,8 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .layer({
             let cors = CorsLayer::new()
                 .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE, Method::OPTIONS])
-                .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]);
+                .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE])
+                .expose_headers([axum::http::header::HeaderName::from_static("x-next-cursor")]);
             if config.cors_origins == "*" {
                 cors.allow_origin(Any)
             } else {
