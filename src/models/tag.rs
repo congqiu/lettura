@@ -14,6 +14,21 @@ pub struct Tag {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TagStats {
+    pub id: Uuid,
+    pub label: String,
+    pub slug: String,
+    pub entry_count: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TagLabel {
+    pub id: Uuid,
+    pub label: String,
+}
+
 pub fn slugify(label: &str) -> String {
     label
         .to_lowercase()
@@ -181,4 +196,37 @@ pub async fn ensure_and_link(
     crate::cache::TAG_CACHE.invalidate(user_id).await;
 
     Ok(())
+}
+
+impl TagStats {
+    /// List tags with entry counts for a user, only counting non-deleted entries.
+    pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<TagStats>, ModelError> {
+        sqlx::query_as::<_, TagStats>(
+            r#"
+            SELECT t.id, t.label, t.slug, t.created_at,
+                   COUNT(et.entry_id)::int AS entry_count
+            FROM tags t
+            LEFT JOIN entry_tags et ON et.tag_id = t.id
+            LEFT JOIN entries e ON e.id = et.entry_id AND e.deleted_at IS NULL
+            WHERE t.user_id = $1
+            GROUP BY t.id, t.label, t.slug, t.created_at
+            ORDER BY t.label
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))
+    }
+
+    /// Cache-first wrapper for list.
+    pub async fn list_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<TagStats>, ModelError> {
+        if let Some(cached) = crate::cache::TAG_STATS_CACHE.get(user_id).await {
+            return Ok(cached);
+        }
+
+        let stats = Self::list(pool, user_id).await?;
+        crate::cache::TAG_STATS_CACHE.insert(user_id, stats.clone()).await;
+        Ok(stats)
+    }
 }

@@ -61,12 +61,18 @@ impl<T: Clone + Send + Sync + 'static> UserCache<T> {
 // Cache instances for various data types
 // ============================================================================
 
-use crate::models::tag::Tag;
+use crate::models::tag::{Tag, TagStats};
 use crate::models::tagging_rule::TaggingRule;
 use crate::models::site_rule::SiteRule;
 
 /// Cache for user tags (5 minute TTL, 1000 users max).
 pub static TAG_CACHE: once_cell::sync::Lazy<Arc<UserCache<Tag>>> =
+    once_cell::sync::Lazy::new(|| {
+        Arc::new(UserCache::new(1000, Duration::from_secs(300)))
+    });
+
+/// Cache for tag stats (5 minute TTL, 1000 users max).
+pub static TAG_STATS_CACHE: once_cell::sync::Lazy<Arc<UserCache<TagStats>>> =
     once_cell::sync::Lazy::new(|| {
         Arc::new(UserCache::new(1000, Duration::from_secs(300)))
     });
