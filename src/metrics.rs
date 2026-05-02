@@ -4,7 +4,7 @@ use regex::Regex;
 use std::time::Instant;
 
 static UUID_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").unwrap()
+    Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").expect("valid UUID regex")
 });
 
 /// Axum middleware to record HTTP request metrics
@@ -26,8 +26,8 @@ pub async fn track_metrics(req: Request, next: Next) -> Response {
     response
 }
 
-static SLUG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/p/[^/]+").unwrap());
-static FEED_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/feed/[^/]+").unwrap());
+static SLUG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/p/[^/]+").expect("valid slug regex"));
+static FEED_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^/feed/[^/]+").expect("valid feed regex"));
 
 /// Replace dynamic path segments with placeholders to prevent high cardinality.
 fn normalize_path(path: &str) -> String {

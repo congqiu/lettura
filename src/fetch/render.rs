@@ -126,7 +126,7 @@ impl RenderService {
             let browser = launch_browser(self.chromium_path.as_deref()).await?;
             *guard = Some(Arc::new(browser));
         }
-        Ok(guard.as_ref().unwrap().clone())
+        Ok(guard.as_ref().expect("browser initialized in double-checked lock").clone())
     }
 
     async fn record_failure(&self) {

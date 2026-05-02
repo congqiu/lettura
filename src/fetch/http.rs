@@ -23,17 +23,17 @@ pub fn build_client(config: &Config) -> reqwest::Client {
         reqwest::header::ACCEPT,
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
             .parse()
-            .unwrap(),
+            .expect("valid Accept header value"),
     );
     headers.insert(
         reqwest::header::ACCEPT_LANGUAGE,
-        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7".parse().unwrap(),
+        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7".parse().expect("valid Accept-Language header value"),
     );
     headers.insert(
         reqwest::header::HeaderName::from_static("sec-fetch-mode"),
-        "navigate".parse().unwrap(),
+        "navigate".parse().expect("valid sec-fetch-mode header value"),
     );
-    headers.insert(reqwest::header::CACHE_CONTROL, "max-age=0".parse().unwrap());
+    headers.insert(reqwest::header::CACHE_CONTROL, "max-age=0".parse().expect("valid Cache-Control header value"));
 
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(config.fetch_timeout_secs))

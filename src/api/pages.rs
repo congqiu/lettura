@@ -130,10 +130,10 @@ pub async fn upload_files(
     let default_entry = html_files.iter()
         .find(|f| **f == "index.html" || f.ends_with("/index.html"))
         .or_else(|| html_files.first())
-        .unwrap()
+        .expect("html_files is non-empty (checked above)")
         .clone();
 
-    let suggested_title = extract_title(saved_files.get(&default_entry).unwrap(), &default_entry);
+    let suggested_title = extract_title(saved_files.get(&default_entry).expect("default_entry was saved"), &default_entry);
 
     let cleanup_path = temp_base.clone();
     tokio::spawn(async move {

@@ -6,8 +6,8 @@ async fn main() {
     // Initialize structured JSON logging
     // Set RUST_LOG=lettura=info,audit=info to control log levels
     let env_filter = EnvFilter::from_default_env()
-        .add_directive("lettura=info".parse().unwrap())
-        .add_directive("audit=info".parse().unwrap());
+        .add_directive("lettura=info".parse().expect("valid tracing directive"))
+        .add_directive("audit=info".parse().expect("valid tracing directive"));
 
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)

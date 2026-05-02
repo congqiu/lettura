@@ -40,7 +40,7 @@ impl ImageProcessor {
             match image_process_job::claim_pending(&self.pool).await {
                 Ok(Some(job)) => {
                     let processor = self.clone();
-                    let permit = self.semaphore.clone().acquire_owned().await.unwrap();
+                    let permit = self.semaphore.clone().acquire_owned().await.expect("semaphore is never closed");
 
                     tokio::spawn(async move {
                         processor.process_job(&job).await;

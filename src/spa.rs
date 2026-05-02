@@ -67,9 +67,9 @@ fn build_asset_response(
             let mut resp = Response::builder()
                 .status(StatusCode::NOT_MODIFIED)
                 .body(Body::empty())
-                .unwrap();
+                .expect("NOT_MODIFIED response is always valid");
             let h = resp.headers_mut();
-            h.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
+            h.insert(header::ETAG, HeaderValue::from_str(&etag).expect("ETag is valid ASCII"));
             h.insert(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static(cache_control),
@@ -82,13 +82,13 @@ fn build_asset_response(
     let mut resp = Response::builder()
         .status(StatusCode::OK)
         .body(Body::from(file.data.into_owned()))
-        .unwrap();
+        .expect("OK response with body is always valid");
     let h = resp.headers_mut();
     h.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(mime.as_ref()).unwrap(),
+        HeaderValue::from_str(mime.as_ref()).expect("MIME type is valid ASCII"),
     );
-    h.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
+    h.insert(header::ETAG, HeaderValue::from_str(&etag).expect("ETag is valid ASCII"));
     h.insert(
         header::CACHE_CONTROL,
         HeaderValue::from_static(cache_control),

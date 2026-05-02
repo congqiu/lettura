@@ -146,7 +146,7 @@ pub async fn import_browser(
     // Parse simple bookmark HTML format: <A HREF="...">title</A>
     let bookmarks: Vec<(String, String)> = {
         let doc = scraper::Html::parse_document(body_str);
-        let a_selector = scraper::Selector::parse("a[href]").unwrap();
+        let a_selector = scraper::Selector::parse("a[href]").expect("valid CSS selector");
         doc.select(&a_selector)
             .filter_map(|element| {
                 let href = element.value().attr("href")?;

@@ -125,7 +125,7 @@ pub async fn process_images(
     // Collect image URLs in a sync block to avoid holding non-Send scraper types across await
     let img_urls: Vec<String> = {
         let doc = scraper::Html::parse_fragment(html);
-        let img_sel = scraper::Selector::parse("img[src]").unwrap();
+        let img_sel = scraper::Selector::parse("img[src]").expect("valid CSS selector");
         doc.select(&img_sel)
             .filter_map(|el| el.value().attr("src").map(String::from))
             .filter(|src| src.starts_with("http"))

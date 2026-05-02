@@ -17,13 +17,15 @@ pub struct ShareQueryParams {
 }
 
 fn sign_cookie(jwt_secret: &str, slug: &str) -> String {
-    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes()).unwrap();
+    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes())
+        .expect("HMAC key must be valid (JWT secret is always non-empty)");
     mac.update(slug.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }
 
 fn verify_cookie(jwt_secret: &str, slug: &str, value: &str) -> bool {
-    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes()).unwrap();
+    let mut mac = HmacSha256::new_from_slice(jwt_secret.as_bytes())
+        .expect("HMAC key must be valid (JWT secret is always non-empty)");
     mac.update(slug.as_bytes());
     let expected = hex::encode(mac.finalize().into_bytes());
     expected == value
@@ -77,7 +79,7 @@ async fn serve_page_file_inner(
 
     if page_record.password.is_some() {
         let authenticated = if let Some(pw) = query_password {
-            pw == page_record.password.as_ref().unwrap()
+            pw == page_record.password.as_ref().expect("password is Some when is_some() is true")
         } else {
             get_cookie_value(headers, slug)
                 .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))

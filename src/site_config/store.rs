@@ -87,14 +87,14 @@ impl SiteConfigStore {
 /// If `local_path` is `Some`, all YAML files under it are scanned and parsed
 /// into the store; parse errors are logged but non-fatal.
 pub fn init_store(local_path: Option<String>) {
-    let mut store = STORE.write().unwrap();
+    let mut store = STORE.write().expect("site config store lock is not poisoned");
     store.local_path = local_path;
     store.load_local();
 }
 
 /// Look up a site config from the global store.
 pub fn find_config(domain: &str, url: &str) -> Option<SiteConfig> {
-    let store = STORE.read().unwrap();
+    let store = STORE.read().expect("site config store lock is not poisoned");
     store.find(domain, url)
 }
 
