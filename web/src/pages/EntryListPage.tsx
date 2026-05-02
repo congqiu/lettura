@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { Search, Loader2 } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
@@ -6,9 +7,9 @@ import EntryCard from '../components/EntryCard';
 import AddEntryForm from '../components/AddEntryForm';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
+import TagBadge from '../components/TagBadge';
 import { useListKeyboardNav } from '../hooks/useKeyboardShortcuts';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 
 interface Props {
   filter?: 'unread' | 'archived' | 'starred';
@@ -50,6 +51,11 @@ export default function EntryListPage({ filter }: Props) {
   const [search, setSearch] = useState('');
   const [domain, setDomain] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tagFilter = searchParams.get('tag') || '';
+  const excludeTag = searchParams.get('exclude_tag') || '';
+  const untagged = searchParams.get('untagged') === 'true';
 
   const params: Omit<ListParams, 'cursor'> = {};
   if (filter === 'archived') params.is_archived = true;
@@ -57,6 +63,9 @@ export default function EntryListPage({ filter }: Props) {
   if (filter === 'unread') params.is_archived = false;
   if (search) params.search = search;
   if (domain) params.domain = domain;
+  if (tagFilter) params.tag = tagFilter;
+  if (excludeTag) params.exclude_tag = excludeTag;
+  if (untagged) params.untagged = true;
 
   const {
     data,
@@ -91,10 +100,29 @@ export default function EntryListPage({ filter }: Props) {
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
           {domain && (
-            <Badge variant="secondary" className="flex items-center gap-1.5">
-              {domain}
-              <button onClick={() => setDomain('')} className="hover:text-destructive font-bold transition-colors">&times;</button>
-            </Badge>
+            <TagBadge
+              label={domain}
+              onRemove={() => setDomain('')}
+            />
+          )}
+          {tagFilter && (
+            <TagBadge
+              label={tagFilter}
+              onRemove={() => {
+                searchParams.delete('tag');
+                setSearchParams(searchParams);
+              }}
+            />
+          )}
+          {untagged && (
+            <TagBadge
+              label="未标签"
+              clickable={false}
+              onRemove={() => {
+                searchParams.delete('untagged');
+                setSearchParams(searchParams);
+              }}
+            />
           )}
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
