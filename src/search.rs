@@ -138,10 +138,17 @@ impl SearchIndex {
         &self.reader
     }
 
-    /// Search and return matching entry UUIDs
+    /// Search and return matching entry UUIDs.
+    /// Uses fuzzy matching so partial terms match (e.g., "n" matches "n8n", "rus" matches "rust").
     pub fn search(&self, query_str: &str, user_id: Option<Uuid>, limit: usize) -> Result<Vec<Uuid>, tantivy::TantivyError> {
         let searcher = self.reader.searcher();
-        let query_parser = QueryParser::for_index(&self.index, vec![self.f_title, self.f_content]);
+        let mut query_parser = QueryParser::for_index(&self.index, vec![self.f_title, self.f_content]);
+
+        // Enable fuzzy matching on both fields so partial terms match.
+        // transposition_cost_one=true and prefix_length=0 mean the entire term is fuzzy.
+        query_parser.set_field_fuzzy(self.f_title, true, 1, true);
+        query_parser.set_field_fuzzy(self.f_content, true, 1, true);
+
         let text_query = query_parser.parse_query(query_str)?;
 
         let query: Box<dyn tantivy::query::Query> = if let Some(uid) = user_id {
@@ -280,5 +287,35 @@ mod tests {
 
         let results = idx.search("Rust", None, 10).unwrap();
         assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn fuzzy_search_matches_partial_tokens() {
+        let idx = SearchIndex::in_memory().unwrap();
+        let uid = test_user_id();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        idx.upsert(id1, uid, "n8n workflow automation", "Automate tasks with n8n", "https://n8n.io", "n8n.io").await.unwrap();
+        idx.upsert(id2, uid, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
+        idx.commit().await.unwrap();
+
+        idx.reader.reload().unwrap();
+
+        // "n" should match "n8n" via fuzzy matching (edit distance 1)
+        let results = idx.search("n", Some(uid), 10).unwrap();
+        assert!(results.contains(&id1), "'n' should match 'n8n' entry, got {:?}", results);
+
+        // "n8" should also match "n8n"
+        let results = idx.search("n8", Some(uid), 10).unwrap();
+        assert!(results.contains(&id1), "'n8' should match 'n8n' entry, got {:?}", results);
+
+        // Full term still works
+        let results = idx.search("n8n", Some(uid), 10).unwrap();
+        assert!(results.contains(&id1), "'n8n' should match 'n8n' entry, got {:?}", results);
+
+        // "Rus" should match "Rust" via fuzzy
+        let results = idx.search("Rus", Some(uid), 10).unwrap();
+        assert!(results.contains(&id2), "'Rus' should match 'Rust' entry, got {:?}", results);
     }
 }

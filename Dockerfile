@@ -42,6 +42,22 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
       cargo build --release --no-default-features --bin lettura && cp target/release/lettura /lettura; \
     fi
 
+# Stage 2b: Unit test
+# Usage:
+#   docker build --target test -t lettura-test .
+#   docker build --target test --build-arg TEST_ARGS="--lib search" -t lettura-test .
+# The build fails if any test fails, which is intentional for CI.
+# For local dev, use TEST_ARGS to filter: --build-arg TEST_ARGS="--lib search"
+FROM backend-builder AS test
+ARG TEST_ARGS=""
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    if [ "$RENDERING" = "1" ]; then \
+      cargo test ${TEST_ARGS} -- --nocapture; \
+    else \
+      cargo test --no-default-features ${TEST_ARGS} -- --nocapture; \
+    fi
+
 # Stage 3: Runtime
 FROM debian:bookworm-slim
 ARG RENDERING

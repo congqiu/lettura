@@ -51,6 +51,19 @@ pub async fn import_wallabag(
                         Some(content),
                         None, None, None, None, None, 0, "manual",
                     ).await.ok();
+
+                    // Index imported content so it's immediately searchable
+                    let domain = entry::extract_domain(&new_entry.url).unwrap_or_default();
+                    if let Err(e) = state.search_index.upsert(
+                        new_entry.id,
+                        auth.user_id,
+                        wb_entry.title.as_deref().unwrap_or(""),
+                        content,
+                        &new_entry.url,
+                        &domain,
+                    ).await {
+                        tracing::warn!(entry_id = %new_entry.id, "failed to index imported entry: {e}");
+                    }
                 } else {
                     // Queue for fetching
                     let _ = state.fetch_queue.send(FetchJob {
@@ -150,6 +163,20 @@ pub async fn import_browser(
                         &state.pool, new_entry.id,
                         Some(title), None, None, None, None, None, None, 0, "pending",
                     ).await.ok();
+
+                    // Index the title so the entry is at least partially searchable
+                    // before the fetch job completes
+                    let domain = entry::extract_domain(&new_entry.url).unwrap_or_default();
+                    if let Err(e) = state.search_index.upsert(
+                        new_entry.id,
+                        auth.user_id,
+                        title,
+                        "",
+                        &new_entry.url,
+                        &domain,
+                    ).await {
+                        tracing::warn!(entry_id = %new_entry.id, "failed to index imported entry: {e}");
+                    }
                 }
                 let _ = state.fetch_queue.send(FetchJob {
                     entry_id: new_entry.id,
