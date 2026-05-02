@@ -34,9 +34,7 @@ pub fn create_storage(config: &crate::config::Config) -> Box<dyn ImageStorage> {
     }
 }
 
-const MAX_IMAGE_SIZE: usize = 10 * 1024 * 1024;
-
-pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError> {
+pub async fn download_image(url: &str, max_size: usize) -> Result<(Vec<u8>, String), StorageError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .user_agent("Lettura/0.1")
@@ -50,7 +48,7 @@ pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError
         .map_err(|e| StorageError::Io(e.to_string()))?;
 
     if let Some(len) = resp.content_length() {
-        if len as usize > MAX_IMAGE_SIZE {
+        if len as usize > max_size {
             return Err(StorageError::Io(format!("image too large: {len} bytes")));
         }
     }
@@ -67,7 +65,7 @@ pub async fn download_image(url: &str) -> Result<(Vec<u8>, String), StorageError
         .await
         .map_err(|e| StorageError::Io(e.to_string()))?;
 
-    if data.len() > MAX_IMAGE_SIZE {
+    if data.len() > max_size {
         return Err(StorageError::Io(format!("image too large: {} bytes", data.len())));
     }
 
@@ -121,6 +119,7 @@ fn url_extension(url: &str) -> Option<&'static str> {
 pub async fn process_images(
     html: &str,
     storage: std::sync::Arc<dyn ImageStorage>,
+    max_image_size: usize,
 ) -> String {
     // Collect image URLs in a sync block to avoid holding non-Send scraper types across await
     let img_urls: Vec<String> = {
@@ -148,7 +147,7 @@ pub async fn process_images(
         let sem = semaphore.clone();
         handles.push(tokio::spawn(async move {
             let _permit = sem.acquire_owned().await.ok()?;
-            match download_image(&url).await {
+            match download_image(&url, max_image_size).await {
                 Ok((data, content_type)) => {
                     let key = image_key_from_url(&url, Some(&content_type));
                     match s.store(&key, &data, &content_type).await {

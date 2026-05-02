@@ -83,9 +83,9 @@ pub async fn upload_files(
         let filename = field.file_name().unwrap_or("unknown").to_string();
         let data = field.bytes().await.map_err(|e: MultipartError| ApiError::BadRequest(e.to_string()))?;
         total_size += data.len();
-        if total_size > 10 * 1024 * 1024 {
+        if total_size > state.config.pages_max_upload_bytes {
             tokio::fs::remove_dir_all(&temp_base).await.ok();
-            return Err(ApiError::BadRequest("upload too large (max 10MB)".to_string()));
+            return Err(ApiError::BadRequest("upload too large".to_string()));
         }
 
         if filename.ends_with(".zip") {

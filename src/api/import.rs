@@ -28,8 +28,8 @@ pub async fn import_wallabag(
     auth: AuthUser,
     body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let bytes = axum::body::to_bytes(body, 500 * 1024 * 1024).await
-        .map_err(|_| ApiError::BadRequest("request body too large (max 500MB)".to_string()))?;
+    let bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes).await
+        .map_err(|_| ApiError::BadRequest("request body too large".to_string()))?;
     let entries: Vec<WallabagEntry> = serde_json::from_slice(&bytes)
         .map_err(|e| ApiError::BadRequest(format!("invalid JSON: {e}")))?;
     let mut imported = 0;
@@ -135,8 +135,8 @@ pub async fn import_browser(
     auth: AuthUser,
     body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let body_bytes = axum::body::to_bytes(body, 500 * 1024 * 1024).await
-        .map_err(|_| ApiError::BadRequest("request body too large (max 500MB)".to_string()))?;
+    let body_bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes).await
+        .map_err(|_| ApiError::BadRequest("request body too large".to_string()))?;
     let body_str = std::str::from_utf8(&body_bytes)
         .map_err(|e| ApiError::BadRequest(format!("invalid UTF-8: {e}")))?;
 

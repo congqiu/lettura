@@ -14,6 +14,15 @@ use crate::rate_limit::{rate_limit_middleware, GlobalRateLimit};
 use crate::search::SearchIndex;
 use crate::tasks::fetcher;
 
+/// Derive the auth source string from the authenticated user.
+/// Centralized here to avoid duplication across handler files.
+pub fn auth_source_str(auth: &crate::auth::middleware::AuthUser) -> String {
+    match auth.source {
+        crate::auth::middleware::AuthSource::Jwt => "jwt".to_string(),
+        crate::auth::middleware::AuthSource::Pat { .. } => "pat".to_string(),
+    }
+}
+
 pub mod admin;
 pub mod annotations;
 pub mod audit_logs;
@@ -87,7 +96,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/auth/login", post(auth::login))
         .with_state(state.clone())
         .layer(axum::middleware::from_fn_with_state(
-            GlobalRateLimit::new(10),
+            GlobalRateLimit::new(config.auth_rate_limit),
             rate_limit_middleware,
         ));
 
@@ -264,7 +273,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // Applied as the outermost layer so rate-limited requests are rejected
         // early without consuming downstream resources.
         .layer(axum::middleware::from_fn_with_state(
-            GlobalRateLimit::new(100),
+            GlobalRateLimit::new(config.global_rate_limit),
             rate_limit_middleware,
         ));
 

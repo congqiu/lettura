@@ -38,6 +38,15 @@ pub struct Config {
     pub render_timeout_ms: u64,
     // Public base URL for skill endpoint and other public resources
     pub public_base_url: Option<String>,
+    // Operational tuning
+    pub import_max_body_bytes: usize,
+    pub pages_max_upload_bytes: usize,
+    pub max_image_size: usize,
+    pub auth_rate_limit: u32,
+    pub global_rate_limit: u32,
+    pub search_commit_interval_secs: u64,
+    pub token_cleanup_interval_secs: u64,
+    pub metrics_interval_secs: u64,
 }
 
 impl Config {
@@ -89,6 +98,14 @@ impl Config {
             render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
             render_timeout_ms: env::var("LETTURA_RENDER_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(15000),
             public_base_url: env::var("LETTURA_PUBLIC_BASE_URL").ok(),
+            import_max_body_bytes: env::var("LETTURA_IMPORT_MAX_BODY_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(500 * 1024 * 1024),
+            pages_max_upload_bytes: env::var("LETTURA_PAGES_MAX_UPLOAD_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
+            max_image_size: env::var("LETTURA_MAX_IMAGE_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
+            auth_rate_limit: env::var("LETTURA_AUTH_RATE_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
+            global_rate_limit: env::var("LETTURA_GLOBAL_RATE_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(100),
+            search_commit_interval_secs: env::var("LETTURA_SEARCH_COMMIT_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
+            token_cleanup_interval_secs: env::var("LETTURA_TOKEN_CLEANUP_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(3600),
+            metrics_interval_secs: env::var("LETTURA_METRICS_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(15),
         })
     }
 

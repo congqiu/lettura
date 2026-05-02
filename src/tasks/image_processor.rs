@@ -23,14 +23,16 @@ pub struct ImageProcessor {
     pool: sqlx::PgPool,
     storage: Arc<dyn ImageStorage>,
     semaphore: Arc<Semaphore>,
+    max_image_size: usize,
 }
 
 impl ImageProcessor {
-    pub fn new(pool: sqlx::PgPool, storage: Arc<dyn ImageStorage>) -> Self {
+    pub fn new(pool: sqlx::PgPool, storage: Arc<dyn ImageStorage>, max_image_size: usize) -> Self {
         Self {
             pool,
             storage,
             semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_JOBS)),
+            max_image_size,
         }
     }
 
@@ -67,7 +69,7 @@ impl ImageProcessor {
             "processing image job"
         );
 
-        let processed_html = crate::storage::process_images(&job.original_html, self.storage.clone()).await;
+        let processed_html = crate::storage::process_images(&job.original_html, self.storage.clone(), self.max_image_size).await;
 
         // Update entry content with processed HTML
         match entry::update_content_only(&self.pool, job.entry_id, &processed_html).await {
@@ -102,8 +104,9 @@ impl ImageProcessor {
 pub fn start_image_processor(
     pool: sqlx::PgPool,
     storage: Arc<dyn ImageStorage>,
+    max_image_size: usize,
 ) -> Arc<ImageProcessor> {
-    let processor = Arc::new(ImageProcessor::new(pool, storage));
+    let processor = Arc::new(ImageProcessor::new(pool, storage, max_image_size));
     let processor_clone = processor.clone();
 
     tokio::spawn(async move {

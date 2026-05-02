@@ -36,7 +36,7 @@ async fn main() {
         lettura::api::router_with_handles(pool.clone(), config.clone());
 
     // Start image processor
-    lettura::tasks::start_image_processor(pool.clone(), storage.clone());
+    lettura::tasks::start_image_processor(pool.clone(), storage.clone(), config.max_image_size);
 
     // Background task: flush search index every 3 seconds. Documents become
     // searchable within this window after a write. Critical paths (e.g.
@@ -44,7 +44,7 @@ async fn main() {
     {
         let idx = search_index.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.search_commit_interval_secs));
             let mut consecutive_failures: u64 = 0;
             loop {
                 interval.tick().await;
@@ -70,7 +70,7 @@ async fn main() {
     {
         let cleanup_pool = pool.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.token_cleanup_interval_secs));
             loop {
                 interval.tick().await;
                 match lettura::models::user::cleanup_expired_refresh_tokens(&cleanup_pool).await {
@@ -97,7 +97,7 @@ async fn main() {
         let search_idx = search_index.clone();
         let pool_for_metrics = pool.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.metrics_interval_secs));
             loop {
                 interval.tick().await;
                 let depth = fetch_depth.load(Ordering::Relaxed) as f64;
