@@ -101,10 +101,60 @@ pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bo
     if result.rows_affected() > 0 {
         // Invalidate cache since we deleted a tag
         crate::cache::TAG_CACHE.invalidate(user_id).await;
+        crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
         Ok(true)
     } else {
         Ok(false)
     }
+}
+
+#[derive(Debug)]
+pub enum RenameError {
+    Conflict,
+    Database(String),
+}
+
+pub async fn rename_tag(
+    pool: &PgPool,
+    tag_id: Uuid,
+    user_id: Uuid,
+    new_label: &str,
+) -> Result<Tag, RenameError> {
+    let new_slug = slugify(new_label);
+
+    // Check slug conflict excluding self
+    let conflict: bool = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tags WHERE user_id = $1 AND slug = $2 AND id != $3",
+    )
+    .bind(user_id)
+    .bind(&new_slug)
+    .bind(tag_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| RenameError::Database(e.to_string()))?
+        > 0;
+
+    if conflict {
+        return Err(RenameError::Conflict);
+    }
+
+    let tag = sqlx::query_as::<_, Tag>(
+        "UPDATE tags SET label = $1, slug = $2 WHERE id = $3 AND user_id = $4 RETURNING *",
+    )
+    .bind(new_label)
+    .bind(&new_slug)
+    .bind(tag_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| RenameError::Database(e.to_string()))?
+    .ok_or_else(|| RenameError::Database("tag not found".to_string()))?;
+
+    // Invalidate caches
+    crate::cache::TAG_CACHE.invalidate(user_id).await;
+    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+
+    Ok(tag)
 }
 
 pub async fn list_tags_for_entry(pool: &PgPool, entry_id: Uuid) -> Result<Vec<Tag>, ModelError> {
