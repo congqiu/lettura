@@ -1,8 +1,9 @@
 use axum::extract::State;
 use axum::Json;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 
@@ -26,25 +27,14 @@ pub async fn export_all(
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::ExportAll,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"entries": entries.len(), "tags": tags.len()}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::ExportAll,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"entries": entries.len(), "tags": tags.len()}),
     ).await;
 
     Ok(Json(serde_json::json!({

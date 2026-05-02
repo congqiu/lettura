@@ -2,21 +2,15 @@ use axum::extract::{Path, State};
 use axum::Json;
 use uuid::Uuid;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry, memo};
 use crate::tasks::fetcher::FetchJob;
 
 use super::validate::ValidatedJson;
-
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
-}
 
 pub async fn list_memos(
     State(state): State<AppState>,
@@ -32,21 +26,14 @@ pub async fn create_memo(
     ValidatedJson(params): ValidatedJson<memo::CreateMemo>,
 ) -> Result<Json<memo::Memo>, ApiError> {
     let m = memo::create_memo(&state.pool, auth.user_id, &params).await?;
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::CreateMemo,
-            resource_type: Some(AuditResourceType::Memo),
-            resource_id: Some(m.id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::CreateMemo,
+        Some(AuditResourceType::Memo),
+        Some(m.id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(m))
 }
@@ -60,21 +47,14 @@ pub async fn delete_memo(
     if !deleted {
         return Err(ApiError::NotFound("memo not found".to_string()));
     }
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::DeleteMemo,
-            resource_type: Some(AuditResourceType::Memo),
-            resource_id: Some(memo_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::DeleteMemo,
+        Some(AuditResourceType::Memo),
+        Some(memo_id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
@@ -105,21 +85,14 @@ pub async fn promote_memo(
                 url: new_entry.url.clone(),
             })
             .await;
-        let _ = audit_log::insert(
+        audit_log::log_success(
             &state.pool,
-            audit_log::InsertAuditLog {
-                user_id: Some(auth.user_id),
-                auth_source: auth_source_str(&auth),
-                action: AuditAction::PromoteMemo,
-                resource_type: Some(AuditResourceType::Memo),
-                resource_id: Some(memo_id),
-                status: "success".to_string(),
-                details: serde_json::json!({"entry_id": new_entry.id}),
-                error_message: None,
-                ip_address: None,
-                user_agent: None,
-                request_id: None,
-            },
+            Some(auth.user_id),
+            auth_source_str(&auth),
+            AuditAction::PromoteMemo,
+            Some(AuditResourceType::Memo),
+            Some(memo_id),
+            serde_json::json!({"entry_id": new_entry.id}),
         ).await;
         Ok(Json(serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id})))
     } else {
@@ -135,21 +108,14 @@ pub async fn promote_memo(
         )
         .await?;
         memo::set_promoted_entry(&state.pool, memo_id, new_entry.id).await?;
-        let _ = audit_log::insert(
+        audit_log::log_success(
             &state.pool,
-            audit_log::InsertAuditLog {
-                user_id: Some(auth.user_id),
-                auth_source: auth_source_str(&auth),
-                action: AuditAction::PromoteMemo,
-                resource_type: Some(AuditResourceType::Memo),
-                resource_id: Some(memo_id),
-                status: "success".to_string(),
-                details: serde_json::json!({"entry_id": new_entry.id}),
-                error_message: None,
-                ip_address: None,
-                user_agent: None,
-                request_id: None,
-            },
+            Some(auth.user_id),
+            auth_source_str(&auth),
+            AuditAction::PromoteMemo,
+            Some(AuditResourceType::Memo),
+            Some(memo_id),
+            serde_json::json!({"entry_id": new_entry.id}),
         ).await;
         Ok(Json(serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id})))
     }

@@ -75,21 +75,26 @@ pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Re
 
     // Invalidate cache since we added a new tag
     crate::cache::TAG_CACHE.invalidate(user_id).await;
+    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
 
     Ok(tag)
 }
 
-pub async fn add_tag_to_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<(), ModelError> {
+pub async fn add_tag_to_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, tag_id: Uuid) -> Result<(), ModelError> {
     sqlx::query("INSERT INTO entry_tags (entry_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
         .bind(entry_id).bind(tag_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
+    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
     Ok(())
 }
 
-pub async fn remove_tag_from_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
+pub async fn remove_tag_from_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM entry_tags WHERE entry_id = $1 AND tag_id = $2")
         .bind(entry_id).bind(tag_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
+    if result.rows_affected() > 0 {
+        crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+    }
     Ok(result.rows_affected() > 0)
 }
 
@@ -244,6 +249,7 @@ pub async fn ensure_and_link(
 
     // Invalidate cache since we may have created new tags
     crate::cache::TAG_CACHE.invalidate(user_id).await;
+    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
 
     Ok(())
 }

@@ -2,20 +2,14 @@ use axum::extract::{Path, State};
 use axum::Json;
 use uuid::Uuid;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::tagging_rule::{self, CreateTaggingRule, UpdateTaggingRule};
 
 use super::validate::ValidatedJson;
-
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
-}
 
 pub async fn list_rules(
     State(state): State<AppState>,
@@ -31,21 +25,14 @@ pub async fn create_rule(
     ValidatedJson(params): ValidatedJson<CreateTaggingRule>,
 ) -> Result<Json<tagging_rule::TaggingRule>, ApiError> {
     let rule = tagging_rule::create_rule(&state.pool, auth.user_id, &params).await?;
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::CreateTaggingRule,
-            resource_type: Some(AuditResourceType::TaggingRule),
-            resource_id: Some(rule.id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::CreateTaggingRule,
+        Some(AuditResourceType::TaggingRule),
+        Some(rule.id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(rule))
 }
@@ -57,21 +44,14 @@ pub async fn update_rule(
     Json(params): Json<UpdateTaggingRule>,
 ) -> Result<Json<tagging_rule::TaggingRule>, ApiError> {
     let updated = tagging_rule::update_rule(&state.pool, auth.user_id, rule_id, &params).await?;
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::UpdateTaggingRule,
-            resource_type: Some(AuditResourceType::TaggingRule),
-            resource_id: Some(rule_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::UpdateTaggingRule,
+        Some(AuditResourceType::TaggingRule),
+        Some(rule_id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(updated))
 }
@@ -85,21 +65,14 @@ pub async fn delete_rule(
     if !deleted {
         return Err(ApiError::NotFound("rule not found".to_string()));
     }
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::DeleteTaggingRule,
-            resource_type: Some(AuditResourceType::TaggingRule),
-            resource_id: Some(rule_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::DeleteTaggingRule,
+        Some(AuditResourceType::TaggingRule),
+        Some(rule_id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }

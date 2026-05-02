@@ -121,6 +121,48 @@ pub struct InsertAuditLog {
     pub request_id: Option<Uuid>,
 }
 
+/// Create an `InsertAuditLog` with common fields pre-filled.
+/// Eliminates boilerplate: `status`, `error_message`, `ip_address`,
+/// `user_agent`, `request_id` are set to defaults.
+pub fn new_entry(
+    user_id: Option<Uuid>,
+    auth_source: String,
+    action: AuditAction,
+    resource_type: Option<AuditResourceType>,
+    resource_id: Option<Uuid>,
+    details: serde_json::Value,
+) -> InsertAuditLog {
+    InsertAuditLog {
+        user_id,
+        auth_source,
+        action,
+        resource_type,
+        resource_id,
+        status: "success".to_string(),
+        details,
+        error_message: None,
+        ip_address: None,
+        user_agent: None,
+        request_id: None,
+    }
+}
+
+/// Insert an audit log entry. On failure, logs a warning instead of propagating the error.
+/// Use this for fire-and-forget audit logging where the main operation should not be blocked.
+pub async fn log_success(
+    pool: &PgPool,
+    user_id: Option<Uuid>,
+    auth_source: String,
+    action: AuditAction,
+    resource_type: Option<AuditResourceType>,
+    resource_id: Option<Uuid>,
+    details: serde_json::Value,
+) {
+    if let Err(e) = insert(pool, new_entry(user_id, auth_source, action, resource_type, resource_id, details)).await {
+        tracing::warn!("audit log insert failed: {e}");
+    }
+}
+
 /// Fire-and-forget helper for logging an action without blocking the request.
 pub fn fire_and_forget(
     pool: PgPool,
@@ -133,7 +175,7 @@ pub fn fire_and_forget(
     details: serde_json::Value,
 ) {
     tokio::spawn(async move {
-        let _ = insert(
+        if let Err(e) = insert(
             &pool,
             InsertAuditLog {
                 user_id,
@@ -149,7 +191,10 @@ pub fn fire_and_forget(
                 request_id: None,
             },
         )
-        .await;
+        .await
+        {
+            tracing::warn!("audit log insert failed: {e}");
+        }
     });
 }
 

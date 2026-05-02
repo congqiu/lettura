@@ -2,8 +2,9 @@ use axum::extract::{Path, State};
 use axum::Json;
 use uuid::Uuid;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::site_rule::{self, CreateSiteRule, UpdateSiteRule};
@@ -18,34 +19,20 @@ pub async fn list_rules(
     Ok(Json(rules))
 }
 
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
-}
-
 pub async fn create_rule(
     State(state): State<AppState>,
     auth: AuthUser,
     ValidatedJson(params): ValidatedJson<CreateSiteRule>,
 ) -> Result<Json<site_rule::SiteRule>, ApiError> {
     let rule = site_rule::create_rule(&state.pool, auth.user_id, &params).await?;
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::CreateSiteRule,
-            resource_type: Some(AuditResourceType::SiteRule),
-            resource_id: Some(rule.id),
-            status: "success".to_string(),
-            details: serde_json::json!({"domain": rule.domain}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::CreateSiteRule,
+        Some(AuditResourceType::SiteRule),
+        Some(rule.id),
+        serde_json::json!({"domain": rule.domain}),
     ).await;
     Ok(Json(rule))
 }
@@ -57,21 +44,14 @@ pub async fn update_rule(
     Json(params): Json<UpdateSiteRule>,
 ) -> Result<Json<site_rule::SiteRule>, ApiError> {
     let updated = site_rule::update_rule(&state.pool, auth.user_id, rule_id, &params).await?;
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::UpdateSiteRule,
-            resource_type: Some(AuditResourceType::SiteRule),
-            resource_id: Some(rule_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::UpdateSiteRule,
+        Some(AuditResourceType::SiteRule),
+        Some(rule_id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(updated))
 }
@@ -85,21 +65,14 @@ pub async fn delete_rule(
     if !deleted {
         return Err(ApiError::NotFound("site rule not found".to_string()));
     }
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::DeleteSiteRule,
-            resource_type: Some(AuditResourceType::SiteRule),
-            resource_id: Some(rule_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::DeleteSiteRule,
+        Some(AuditResourceType::SiteRule),
+        Some(rule_id),
+        serde_json::json!({}),
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }

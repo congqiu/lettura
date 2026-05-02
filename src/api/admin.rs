@@ -1,18 +1,12 @@
 use axum::extract::State;
 use axum::Json;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::user::User;
-
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
-}
 
 pub async fn list_users(
     State(state): State<AppState>,
@@ -38,21 +32,14 @@ pub async fn list_users(
         })
         .collect();
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::AdminListUsers,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"count": summaries.len()}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::AdminListUsers,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"count": summaries.len()}),
     ).await;
 
     Ok(Json(summaries))
@@ -98,7 +85,7 @@ pub async fn reindex(
 
     let count = entries.len();
     for (id, user_id, title, text_content, url, domain) in entries {
-        state
+        if let Err(e) = state
             .search_index
             .upsert(
                 id,
@@ -109,27 +96,22 @@ pub async fn reindex(
                 domain.as_deref().unwrap_or(""),
             )
             .await
-            .ok();
+        {
+            tracing::warn!("reindex: failed to upsert entry {id}: {e}");
+        }
     }
 
     // Flush the bulk changes immediately so they are searchable.
     state.search_index.commit().await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::AdminReindex,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"indexed": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::AdminReindex,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"indexed": count}),
     ).await;
 
     Ok(Json(serde_json::json!({

@@ -1,7 +1,8 @@
 use axum::{Json, extract::State};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::api::auth_source_str;
+use crate::auth::middleware::AuthUser;
 use crate::api::error::ApiError;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry::{self, ListParams}, tag};
@@ -43,13 +44,6 @@ pub struct BulkResult {
     pub ids: Vec<uuid::Uuid>,
 }
 
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
-}
-
 fn check_max(ids: &[uuid::Uuid], max: Option<i64>) -> Result<(), ApiError> {
     if let Some(m) = max {
         if ids.len() as i64 > m {
@@ -77,21 +71,14 @@ pub async fn bulk_tag_add(
     tag::ensure_and_link(&state.pool, auth.user_id, &ids, &req.add).await?;
     let count = ids.len();
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkTagAdd,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"tags": req.add, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkTagAdd,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"tags": req.add, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
@@ -118,28 +105,21 @@ pub async fn bulk_untag(
             .bind(auth.user_id).bind(label)
             .fetch_optional(&state.pool).await
             .map_err(|e| ApiError::Internal(e.to_string()))? {
-                tag::remove_tag_from_entry(&state.pool, *id, t.0).await
+                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0).await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
         }
     }
     let count = ids.len();
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkUntag,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"tags": req.remove, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkUntag,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"tags": req.remove, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
@@ -168,21 +148,14 @@ pub async fn bulk_archive(
     }
     let count = ids.len();
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkArchive,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"value": req.value, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkArchive,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"value": req.value, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
@@ -211,21 +184,14 @@ pub async fn bulk_star(
     }
     let count = ids.len();
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkStar,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"value": req.value, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkStar,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"value": req.value, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
@@ -272,21 +238,14 @@ pub async fn bulk_tag_by_ids(
     // Invalidate tag stats cache since tag counts may have changed
     crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkTagAdd,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"tags": req.tags, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkTagAdd,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"tags": req.tags, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
@@ -311,7 +270,7 @@ pub async fn bulk_untag_by_ids(
             .bind(auth.user_id).bind(label)
             .fetch_optional(&state.pool).await
             .map_err(|e| ApiError::Internal(e.to_string()))? {
-                tag::remove_tag_from_entry(&state.pool, *id, t.0).await
+                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0).await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
         }
@@ -321,21 +280,14 @@ pub async fn bulk_untag_by_ids(
     // Invalidate tag stats cache since tag counts may have changed
     crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkUntag,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"tags": req.tags, "count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkUntag,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"tags": req.tags, "count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
@@ -360,21 +312,14 @@ pub async fn bulk_delete_by_ids(
 
     let count = result.rows_affected() as usize;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkSoftDelete,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkSoftDelete,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
@@ -399,21 +344,14 @@ pub async fn bulk_archive_by_ids(
 
     let count = result.rows_affected() as usize;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::BulkArchive,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"count": count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::BulkArchive,
+        Some(AuditResourceType::Entry),
+        None,
+        serde_json::json!({"count": count}),
     ).await;
 
     Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
