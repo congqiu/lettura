@@ -32,6 +32,7 @@ export interface EntrySummary {
   is_archived: boolean;
   is_starred: boolean;
   created_at: string;
+  tags: { id: string; label: string }[];
 }
 
 export interface ListParams {
@@ -42,7 +43,9 @@ export interface ListParams {
   is_starred?: boolean;
   search?: string;
   domain?: string;
-  tags?: string[];
+  tag?: string;
+  exclude_tag?: string;
+  untagged?: boolean;
 }
 
 export interface ListResponse {
