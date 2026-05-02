@@ -58,6 +58,8 @@ pub enum AuditAction {
     BulkUntag,
     BulkArchive,
     BulkStar,
+    BulkSoftDelete,
+    RenameTag,
     UploadPageFiles,
 }
 
