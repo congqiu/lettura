@@ -84,6 +84,17 @@ pub async fn import_wallabag(
                     entry::update_entry(&state.pool, auth.user_id, new_entry.id, &params).await.ok();
                 }
 
+                // Import tags from Wallabag
+                if let Some(ref tag_labels) = wb_entry.tags {
+                    if !tag_labels.is_empty() {
+                        if let Err(e) = crate::models::tag::ensure_and_link(
+                            &state.pool, auth.user_id, &[new_entry.id], tag_labels,
+                        ).await {
+                            tracing::warn!(entry_id = %new_entry.id, "failed to import tags: {e}");
+                        }
+                    }
+                }
+
                 imported += 1;
             }
             Err(e) => {
