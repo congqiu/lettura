@@ -1,8 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor } from 'lucide-react';
+import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/auth';
 import { useThemeStore } from '../../store/theme';
 import { logout as apiLogout } from '../../api/auth';
+import { fetchTagStats } from '../../api/tags';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -28,6 +30,17 @@ export function AppSidebar() {
   const { logout } = useAuthStore();
   const navigate = useNavigate();
   const { theme, setTheme } = useThemeStore();
+
+  const { data: tagStats = [] } = useQuery({
+    queryKey: ['tags', 'stats'],
+    queryFn: fetchTagStats,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const topTags = tagStats
+    .filter((t) => t.entry_count > 0)
+    .sort((a, b) => b.entry_count - a.entry_count)
+    .slice(0, 10);
 
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refresh_token');
@@ -70,6 +83,44 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {topTags.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {topTags.map((tag) => (
+                  <SidebarMenuItem key={tag.id}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={`/?tag=${encodeURIComponent(tag.label)}`}
+                        className={({ isActive }) =>
+                          isActive ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
+                        }
+                      >
+                        <TagIcon size={18} />
+                        <span className="truncate">{tag.label}</span>
+                        <span className="ml-auto text-xs text-muted-foreground">{tag.entry_count}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                {tagStats.filter((t) => t.entry_count > 0).length > 10 && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/tags"
+                        className="text-muted-foreground"
+                      >
+                        <TagIcon size={18} />
+                        <span>查看全部</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <Separator className="mx-0 w-full" />
 
