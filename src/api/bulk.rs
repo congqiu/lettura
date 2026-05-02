@@ -230,3 +230,191 @@ pub async fn bulk_star(
 
     Ok(Json(BulkResult { matched: count, updated: count, ids }))
 }
+
+// --- Bulk-by-IDs endpoints ---
+
+#[derive(Deserialize)]
+pub struct BulkTagByIdsRequest {
+    pub entry_ids: Vec<uuid::Uuid>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct BulkUntagByIdsRequest {
+    pub entry_ids: Vec<uuid::Uuid>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct BulkDeleteByIdsRequest {
+    pub entry_ids: Vec<uuid::Uuid>,
+}
+
+#[derive(Deserialize)]
+pub struct BulkArchiveByIdsRequest {
+    pub entry_ids: Vec<uuid::Uuid>,
+}
+
+pub async fn bulk_tag_by_ids(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<BulkTagByIdsRequest>,
+) -> Result<Json<BulkResult>, ApiError> {
+    if req.entry_ids.is_empty() {
+        return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
+    }
+    if req.tags.is_empty() {
+        return Err(ApiError::BadRequest("tags cannot be empty".into()));
+    }
+    tag::ensure_and_link(&state.pool, auth.user_id, &req.entry_ids, &req.tags).await?;
+    let count = req.entry_ids.len();
+
+    // Invalidate tag stats cache since tag counts may have changed
+    crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::BulkTagAdd,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"tags": req.tags, "count": count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
+    Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
+}
+
+pub async fn bulk_untag_by_ids(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<BulkUntagByIdsRequest>,
+) -> Result<Json<BulkResult>, ApiError> {
+    if req.entry_ids.is_empty() {
+        return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
+    }
+    if req.tags.is_empty() {
+        return Err(ApiError::BadRequest("tags cannot be empty".into()));
+    }
+    for id in &req.entry_ids {
+        for label in &req.tags {
+            if let Some(t) = sqlx::query_as::<_, (uuid::Uuid,)>(
+                "SELECT id FROM tags WHERE user_id = $1 AND label = $2"
+            )
+            .bind(auth.user_id).bind(label)
+            .fetch_optional(&state.pool).await
+            .map_err(|e| ApiError::Internal(e.to_string()))? {
+                tag::remove_tag_from_entry(&state.pool, *id, t.0).await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
+            }
+        }
+    }
+    let count = req.entry_ids.len();
+
+    // Invalidate tag stats cache since tag counts may have changed
+    crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::BulkUntag,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"tags": req.tags, "count": count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
+    Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
+}
+
+pub async fn bulk_delete_by_ids(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<BulkDeleteByIdsRequest>,
+) -> Result<Json<BulkResult>, ApiError> {
+    if req.entry_ids.is_empty() {
+        return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
+    }
+    let result = sqlx::query(
+        "UPDATE entries SET deleted_at = NOW() WHERE id = ANY($1) AND user_id = $2"
+    )
+    .bind(&req.entry_ids)
+    .bind(auth.user_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let count = result.rows_affected() as usize;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::BulkSoftDelete,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"count": count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
+    Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
+}
+
+pub async fn bulk_archive_by_ids(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<BulkArchiveByIdsRequest>,
+) -> Result<Json<BulkResult>, ApiError> {
+    if req.entry_ids.is_empty() {
+        return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
+    }
+    let result = sqlx::query(
+        "UPDATE entries SET is_archived = true, archived_at = NOW(), updated_at = NOW() WHERE id = ANY($1) AND user_id = $2"
+    )
+    .bind(&req.entry_ids)
+    .bind(auth.user_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    let count = result.rows_affected() as usize;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::BulkArchive,
+            resource_type: Some(AuditResourceType::Entry),
+            resource_id: None,
+            status: "success".to_string(),
+            details: serde_json::json!({"count": count}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
+    Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
+}

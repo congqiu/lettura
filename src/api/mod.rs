@@ -128,6 +128,10 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/entries/bulk/untag", post(bulk::bulk_untag))
         .route("/api/v1/entries/bulk/archive", post(bulk::bulk_archive))
         .route("/api/v1/entries/bulk/star", post(bulk::bulk_star))
+        .route("/api/v1/entries/bulk/tag-by-ids", post(bulk::bulk_tag_by_ids))
+        .route("/api/v1/entries/bulk/untag-by-ids", post(bulk::bulk_untag_by_ids))
+        .route("/api/v1/entries/bulk/delete-by-ids", post(bulk::bulk_delete_by_ids))
+        .route("/api/v1/entries/bulk/archive-by-ids", post(bulk::bulk_archive_by_ids))
         // Tags
         .route("/api/v1/tags", get(tags::list_tags))
         .route("/api/v1/tags/stats", get(tags::tags_stats))
