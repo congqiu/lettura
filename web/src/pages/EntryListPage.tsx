@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
-import { Search, Loader2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Search, Loader2, CheckSquare, Square, Tag, TagOff, Archive, Trash2, X } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
+import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
 import AddEntryForm from '../components/AddEntryForm';
 import ErrorState from '../components/ErrorState';
@@ -10,6 +12,20 @@ import EmptyState from '../components/EmptyState';
 import TagBadge from '../components/TagBadge';
 import { useListKeyboardNav } from '../hooks/useKeyboardShortcuts';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 interface Props {
   filter?: 'unread' | 'archived' | 'starred';
@@ -52,6 +68,14 @@ export default function EntryListPage({ filter }: Props) {
   const [domain, setDomain] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTagInput, setBulkTagInput] = useState('');
+  const [showBulkTagSuggest, setShowBulkTagSuggest] = useState(false);
+  const [bulkUntagInput, setBulkUntagInput] = useState('');
+  const [showBulkUntagSuggest, setShowBulkUntagSuggest] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const qc = useQueryClient();
 
   const tagFilter = searchParams.get('tag') || '';
   const excludeTag = searchParams.get('exclude_tag') || '';
@@ -77,6 +101,13 @@ export default function EntryListPage({ filter }: Props) {
     isFetchingNextPage,
   } = useInfiniteEntries(params);
 
+  // Fetch tag stats for autocomplete
+  const { data: tagStats = [] } = useQuery({
+    queryKey: ['tags', 'stats'],
+    queryFn: fetchTagStats,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Flatten pages into a single array
   const entries: EntrySummary[] = data?.pages.flatMap((page) => page.entries) ?? [];
 
@@ -93,6 +124,90 @@ export default function EntryListPage({ filter }: Props) {
   useListKeyboardNav(entries, selectedIndex, setSelectedIndex);
 
   const title = TITLES[filter || 'unread'];
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const afterBulkOp = () => {
+    clearSelection();
+    qc.invalidateQueries({ queryKey: ['entries-infinite'] });
+    qc.invalidateQueries({ queryKey: ['tags', 'stats'] });
+  };
+
+  const bulkTagMutation = useMutation({
+    mutationFn: ({ ids, tags }: { ids: string[]; tags: string[] }) => bulkTagByIds(ids, tags),
+    onSuccess: () => {
+      toast.success(`已为 ${selectedIds.size} 篇文章添加标签`);
+      afterBulkOp();
+    },
+    onError: () => toast.error('批量打标签失败'),
+  });
+
+  const bulkUntagMutation = useMutation({
+    mutationFn: ({ ids, tags }: { ids: string[]; tags: string[] }) => bulkUntagByIds(ids, tags),
+    onSuccess: () => {
+      toast.success(`已从 ${selectedIds.size} 篇文章移除标签`);
+      afterBulkOp();
+    },
+    onError: () => toast.error('批量移除标签失败'),
+  });
+
+  const bulkArchiveMutation = useMutation({
+    mutationFn: (ids: string[]) => bulkArchiveByIds(ids),
+    onSuccess: () => {
+      toast.success(`已归档 ${selectedIds.size} 篇文章`);
+      afterBulkOp();
+    },
+    onError: () => toast.error('批量归档失败'),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteByIds(ids),
+    onSuccess: () => {
+      toast.success(`已删除 ${selectedIds.size} 篇文章`);
+      afterBulkOp();
+    },
+    onError: () => toast.error('批量删除失败'),
+  });
+
+  // Autocomplete suggestions for bulk tag
+  const tagSuggestions = tagStats
+    .filter((t) => t.label.toLowerCase().includes(bulkTagInput.toLowerCase()))
+    .slice(0, 10);
+
+  const untagSuggestions = tagStats
+    .filter((t) => t.label.toLowerCase().includes(bulkUntagInput.toLowerCase()))
+    .slice(0, 10);
+
+  const handleBulkTag = (label?: string) => {
+    const tag = label || bulkTagInput.trim();
+    if (!tag || selectedIds.size === 0) return;
+    bulkTagMutation.mutate({ ids: Array.from(selectedIds), tags: [tag] });
+    setBulkTagInput('');
+    setShowBulkTagSuggest(false);
+  };
+
+  const handleBulkUntag = (label?: string) => {
+    const tag = label || bulkUntagInput.trim();
+    if (!tag || selectedIds.size === 0) return;
+    bulkUntagMutation.mutate({ ids: Array.from(selectedIds), tags: [tag] });
+    setBulkUntagInput('');
+    setShowBulkUntagSuggest(false);
+  };
 
   return (
     <div>
@@ -136,6 +251,19 @@ export default function EntryListPage({ filter }: Props) {
               className="pl-9 bg-card"
             />
           </div>
+          <Button
+            variant={selectionMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (selectionMode) {
+                clearSelection();
+              } else {
+                setSelectionMode(true);
+              }
+            }}
+          >
+            {selectionMode ? '取消多选' : '多选'}
+          </Button>
         </div>
       </div>
 
@@ -152,12 +280,25 @@ export default function EntryListPage({ filter }: Props) {
       ) : (
         <div className="space-y-4">
           {entries.map((entry, i) => (
-            <EntryCard
-              key={entry.id}
-              entry={entry}
-              selected={i === selectedIndex}
-              onDomainClick={(d) => setDomain(d)}
-            />
+            <div key={entry.id} className="relative">
+              {selectionMode && (
+                <button
+                  onClick={() => toggleSelect(entry.id)}
+                  className="absolute left-0 top-5 z-10 -ml-8 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {selectedIds.has(entry.id) ? (
+                    <CheckSquare size={18} className="text-primary" />
+                  ) : (
+                    <Square size={18} />
+                  )}
+                </button>
+              )}
+              <EntryCard
+                entry={entry}
+                selected={i === selectedIndex || selectedIds.has(entry.id)}
+                onDomainClick={(d) => setDomain(d)}
+              />
+            </div>
           ))}
 
           {/* Sentinel for infinite scroll */}
@@ -178,6 +319,129 @@ export default function EntryListPage({ filter }: Props) {
           )}
         </div>
       )}
+
+      {/* Bulk action bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium">已选 {selectedIds.size} 篇</span>
+
+            {/* Tag input */}
+            <div className="relative flex items-center gap-1">
+              <div className="relative">
+                <Input
+                  value={bulkTagInput}
+                  onChange={(e) => {
+                    setBulkTagInput(e.target.value);
+                    setShowBulkTagSuggest(true);
+                  }}
+                  onFocus={() => setShowBulkTagSuggest(true)}
+                  placeholder="打标签..."
+                  className="h-8 w-28 text-sm"
+                />
+                {showBulkTagSuggest && bulkTagInput && tagSuggestions.length > 0 && (
+                  <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
+                    <Command className="border border-border shadow-md">
+                      <CommandList>
+                        <CommandEmpty>无匹配</CommandEmpty>
+                        <CommandGroup>
+                          {tagSuggestions.map((tag) => (
+                            <CommandItem
+                              key={tag.id}
+                              value={tag.label}
+                              onSelect={() => handleBulkTag(tag.label)}
+                            >
+                              {tag.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => handleBulkTag()} disabled={!bulkTagInput.trim()}>
+                <Tag size={14} />
+              </Button>
+            </div>
+
+            {/* Untag input */}
+            <div className="relative flex items-center gap-1">
+              <div className="relative">
+                <Input
+                  value={bulkUntagInput}
+                  onChange={(e) => {
+                    setBulkUntagInput(e.target.value);
+                    setShowBulkUntagSuggest(true);
+                  }}
+                  onFocus={() => setShowBulkUntagSuggest(true)}
+                  placeholder="取消标签..."
+                  className="h-8 w-28 text-sm"
+                />
+                {showBulkUntagSuggest && bulkUntagInput && untagSuggestions.length > 0 && (
+                  <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
+                    <Command className="border border-border shadow-md">
+                      <CommandList>
+                        <CommandEmpty>无匹配</CommandEmpty>
+                        <CommandGroup>
+                          {untagSuggestions.map((tag) => (
+                            <CommandItem
+                              key={tag.id}
+                              value={tag.label}
+                              onSelect={() => handleBulkUntag(tag.label)}
+                            >
+                              {tag.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </div>
+                )}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()}>
+                <TagOff size={14} />
+              </Button>
+            </div>
+
+            <Button size="sm" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))}>
+              <Archive size={14} className="mr-1" /> 归档
+            </Button>
+
+            <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 size={14} className="mr-1" /> 删除
+            </Button>
+
+            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto">
+              <X size={14} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除选中的 {selectedIds.size} 篇文章吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                bulkDeleteMutation.mutate(Array.from(selectedIds));
+                setDeleteConfirmOpen(false);
+              }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
