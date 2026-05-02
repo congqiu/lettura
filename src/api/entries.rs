@@ -4,8 +4,9 @@ use axum::Json;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceType};
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
@@ -83,10 +84,6 @@ pub async fn create_entry(
 
     tracing::info!(entry_id = %r.entry.id, already_existed = r.already_existed, "entry save");
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
     let details = serde_json::to_value(AuditDetails {
         after: Some(serde_json::json!({
             "url": r.entry.url,
@@ -96,25 +93,15 @@ pub async fn create_entry(
         ..Default::default()
     }).unwrap_or_default();
 
-    if let Err(e) = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::CreateEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(r.entry.id),
-            status: "success".to_string(),
-            details,
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
-    ).await
-    {
-        tracing::error!("failed to insert audit log: {}", e);
-    }
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::CreateEntry,
+        Some(AuditResourceType::Entry),
+        Some(r.entry.id),
+        details,
+    ).await;
 
     Ok(Json(CreateEntryResponse {
         entry: r.entry,
@@ -212,42 +199,24 @@ pub async fn update_entry(
 ) -> Result<Json<entry::Entry>, ApiError> {
     let updated = entry::update_entry(&state.pool, auth.user_id, entry_id, &params).await?;
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::UpdateEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(entry_id),
-            status: "success".to_string(),
-            details: serde_json::to_value(AuditDetails {
-                after: Some(serde_json::json!({
-                    "title": updated.title,
-                    "is_archived": updated.is_archived,
-                    "is_starred": updated.is_starred,
-                })),
-                ..Default::default()
-            }).unwrap_or_default(),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::UpdateEntry,
+        Some(AuditResourceType::Entry),
+        Some(entry_id),
+        serde_json::to_value(AuditDetails {
+            after: Some(serde_json::json!({
+                "title": updated.title,
+                "is_archived": updated.is_archived,
+                "is_starred": updated.is_starred,
+            })),
+            ..Default::default()
+        }).unwrap_or_default(),
     ).await;
 
     Ok(Json(updated))
-}
-
-fn auth_source_str(auth: &AuthUser) -> String {
-    match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    }
 }
 
 pub async fn delete_entry(
@@ -260,24 +229,19 @@ pub async fn delete_entry(
         return Err(ApiError::NotFound("entry not found".to_string()));
     }
     // Remove from search index on soft delete
-    let _ = state.search_index.delete(entry_id).await;
+    if let Err(e) = state.search_index.delete(entry_id).await {
+        tracing::warn!("search index delete failed for entry {entry_id}: {e}");
+    }
     tracing::info!(entry_id = %entry_id, "entry soft-deleted");
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::SoftDeleteEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(entry_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::SoftDeleteEntry,
+        Some(AuditResourceType::Entry),
+        Some(entry_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(serde_json::json!({"message": "deleted"})))
@@ -291,32 +255,27 @@ pub async fn restore_entry(
     entry::restore_entry(&state.pool, entry_id, auth.user_id).await?;
     // Re-index restored entry
     if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await {
-        let _ = state.search_index.upsert(
+        if let Err(e) = state.search_index.upsert(
             restored.id,
             auth.user_id,
             restored.title.as_deref().unwrap_or(""),
             restored.text_content.as_deref().unwrap_or(""),
             &restored.url,
             restored.domain_name.as_deref().unwrap_or(""),
-        ).await;
+        ).await {
+            tracing::warn!("search index upsert failed for entry {entry_id}: {e}");
+        }
     }
     tracing::info!(entry_id = %entry_id, "entry restored");
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::RestoreEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(entry_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::RestoreEntry,
+        Some(AuditResourceType::Entry),
+        Some(entry_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(serde_json::json!({"message": "restored"})))
@@ -330,25 +289,22 @@ pub async fn permanently_delete_entry(
     entry::permanently_delete_entry(&state.pool, entry_id, auth.user_id).await?;
     // Ensure removed from search index. Commit immediately so a stale doc
     // pointing at a deleted entry can never surface (data-privacy guarantee).
-    let _ = state.search_index.delete(entry_id).await;
-    let _ = state.search_index.commit().await;
+    if let Err(e) = state.search_index.delete(entry_id).await {
+        tracing::warn!("search index delete failed for entry {entry_id}: {e}");
+    }
+    if let Err(e) = state.search_index.commit().await {
+        tracing::warn!("search index commit failed: {e}");
+    }
     tracing::info!(entry_id = %entry_id, "entry permanently deleted");
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::PermanentDeleteEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(entry_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::PermanentDeleteEntry,
+        Some(AuditResourceType::Entry),
+        Some(entry_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(serde_json::json!({"message": "permanently deleted"})))
@@ -367,21 +323,14 @@ pub async fn refetch_entry(
     }
     let _ = state.fetch_queue.send(FetchJob { entry_id: found.id, user_id: auth.user_id, url: found.url.clone() }).await;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: auth_source_str(&auth),
-            action: AuditAction::RefetchEntry,
-            resource_type: Some(AuditResourceType::Entry),
-            resource_id: Some(entry_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::RefetchEntry,
+        Some(AuditResourceType::Entry),
+        Some(entry_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(serde_json::json!({"message": "refetch queued"})))

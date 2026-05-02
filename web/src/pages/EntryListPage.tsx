@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, CheckSquare, Square, Tag, TagOff, Archive, Trash2, X } from 'lucide-react';
+import { Search, Loader2, CheckSquare, Square, Tag, Tags, Archive, Trash2, X } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -400,7 +400,7 @@ export default function EntryListPage({ filter }: Props) {
                 )}
               </div>
               <Button size="sm" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()}>
-                <TagOff size={14} />
+                <Tags size={14} />
               </Button>
             </div>
 

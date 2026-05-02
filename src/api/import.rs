@@ -3,8 +3,9 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::entry;
@@ -44,13 +45,15 @@ pub async fn import_wallabag(
             Ok(new_entry) => {
                 // If wallabag provided content, use it directly
                 if let Some(ref content) = wb_entry.content {
-                    entry::update_entry_content(
+                    if let Err(e) = entry::update_entry_content(
                         &state.pool,
                         new_entry.id,
                         wb_entry.title.as_deref(),
                         Some(content),
                         None, None, None, None, None, 0, "manual",
-                    ).await.ok();
+                    ).await {
+                        tracing::warn!("import: failed to update content for entry {}: {e}", new_entry.id);
+                    }
 
                     // Index imported content so it's immediately searchable
                     let domain = entry::extract_domain(&new_entry.url).unwrap_or_default();
@@ -81,7 +84,9 @@ pub async fn import_wallabag(
                         is_archived: if wb_entry.is_archived == Some(1) { Some(true) } else { None },
                         is_starred: if wb_entry.is_starred == Some(1) { Some(true) } else { None },
                     };
-                    entry::update_entry(&state.pool, auth.user_id, new_entry.id, &params).await.ok();
+                    if let Err(e) = entry::update_entry(&state.pool, auth.user_id, new_entry.id, &params).await {
+                        tracing::warn!("import: failed to update status for entry {}: {e}", new_entry.id);
+                    }
                 }
 
                 // Import tags from Wallabag
@@ -106,25 +111,14 @@ pub async fn import_wallabag(
 
     tracing::info!(imported = imported, skipped = skipped, total = entries.len(), "wallabag import completed");
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::ImportWallabag,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"imported": imported, "skipped": skipped, "total": entries.len()}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::ImportWallabag,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"imported": imported, "skipped": skipped, "total": entries.len()}),
     ).await;
 
     Ok(Json(serde_json::json!({
@@ -170,10 +164,12 @@ pub async fn import_browser(
         match entry::create_entry(&state.pool, auth.user_id, href).await {
             Ok(new_entry) => {
                 if !title.is_empty() {
-                    entry::update_entry_content(
+                    if let Err(e) = entry::update_entry_content(
                         &state.pool, new_entry.id,
                         Some(title), None, None, None, None, None, None, 0, "pending",
-                    ).await.ok();
+                    ).await {
+                        tracing::warn!("import: failed to update content for entry {}: {e}", new_entry.id);
+                    }
 
                     // Index the title so the entry is at least partially searchable
                     // before the fetch job completes
@@ -202,25 +198,14 @@ pub async fn import_browser(
 
     tracing::info!(imported = imported, skipped = skipped, "browser import completed");
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::ImportBrowser,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"imported": imported, "skipped": skipped}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::ImportBrowser,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"imported": imported, "skipped": skipped}),
     ).await;
 
     Ok(Json(serde_json::json!({

@@ -83,21 +83,14 @@ pub async fn create_token(
     .await
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: "jwt".to_string(),
-            action: AuditAction::CreatePat,
-            resource_type: Some(AuditResourceType::Pat),
-            resource_id: Some(id),
-            status: "success".to_string(),
-            details: serde_json::json!({"name": req.name, "scope": scope_str}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        "jwt".to_string(),
+        AuditAction::CreatePat,
+        Some(AuditResourceType::Pat),
+        Some(id),
+        serde_json::json!({"name": req.name, "scope": scope_str}),
     ).await;
 
     Ok((
@@ -135,21 +128,14 @@ pub async fn delete_token(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
     {
-        let _ = audit_log::insert(
+        audit_log::log_success(
             &state.pool,
-            audit_log::InsertAuditLog {
-                user_id: Some(auth.user_id),
-                auth_source: "jwt".to_string(),
-                action: AuditAction::DeletePat,
-                resource_type: Some(AuditResourceType::Pat),
-                resource_id: Some(id),
-                status: "success".to_string(),
-                details: serde_json::json!({}),
-                error_message: None,
-                ip_address: None,
-                user_agent: None,
-                request_id: None,
-            },
+            Some(auth.user_id),
+            "jwt".to_string(),
+            AuditAction::DeletePat,
+            Some(AuditResourceType::Pat),
+            Some(id),
+            serde_json::json!({}),
         ).await;
         Ok(StatusCode::NO_CONTENT)
     } else {

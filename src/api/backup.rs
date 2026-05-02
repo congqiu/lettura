@@ -5,8 +5,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 
@@ -218,25 +219,14 @@ pub async fn backup(
 
     tracing::info!("admin backup created");
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::AdminBackup,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"users": user_count, "entries": entry_count}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::AdminBackup,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"users": user_count, "entries": entry_count}),
     ).await;
 
     let filename = format!(
@@ -492,7 +482,9 @@ pub async fn restore(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Rebuild search index
-    state.search_index.clear().await.ok();
+    if let Err(e) = state.search_index.clear().await {
+        tracing::warn!("failed to clear search index after restore: {e}");
+    }
 
     let entries_for_index: Vec<(Uuid, Uuid, Option<String>, Option<String>, String, Option<String>)> =
         sqlx::query_as(
@@ -503,41 +495,32 @@ pub async fn restore(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     for (id, user_id, title, text_content, url, domain) in &entries_for_index {
-        state
-            .search_index
-            .upsert(
-                *id,
-                *user_id,
-                title.as_deref().unwrap_or(""),
-                text_content.as_deref().unwrap_or(""),
-                url,
-                domain.as_deref().unwrap_or(""),
-            )
-            .await
-            .ok();
+            if let Err(e) = state
+                .search_index
+                .upsert(
+                    *id,
+                    *user_id,
+                    title.as_deref().unwrap_or(""),
+                    text_content.as_deref().unwrap_or(""),
+                    url,
+                    domain.as_deref().unwrap_or(""),
+                )
+                .await
+            {
+                tracing::warn!(entry_id = %id, "failed to re-index entry after restore: {e}");
+            }
     }
 
     tracing::info!("admin restore completed");
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::AdminRestore,
-            resource_type: Some(AuditResourceType::System),
-            resource_id: None,
-            status: "success".to_string(),
-            details: serde_json::json!({"users": data.users.len(), "entries": data.entries.len()}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::AdminRestore,
+        Some(AuditResourceType::System),
+        None,
+        serde_json::json!({"users": data.users.len(), "entries": data.entries.len()}),
     ).await;
 
     Ok(axum::Json(serde_json::json!({

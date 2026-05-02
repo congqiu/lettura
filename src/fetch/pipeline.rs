@@ -250,7 +250,7 @@ async fn save(
     method: &str,
 ) {
     // Save original content first, then queue async image processing
-    entry::update_entry_content(
+    if let Err(e) = entry::update_entry_content(
         &ctx.pool,
         job.entry_id,
         result.title.as_deref(),
@@ -264,7 +264,9 @@ async fn save(
         method,
     )
     .await
-    .ok();
+    {
+        tracing::warn!(entry_id = %job.entry_id, "failed to update entry content: {e}");
+    }
 
     // Queue async image processing job
     if let Err(e) = crate::models::image_process_job::create(
@@ -281,11 +283,14 @@ async fn save(
         );
     }
 
-    let domain = entry::find_entry_by_id(&ctx.pool, job.user_id, job.entry_id)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|e| e.domain_name);
+    let domain = match entry::find_entry_by_id(&ctx.pool, job.user_id, job.entry_id).await {
+        Ok(Some(e)) => e.domain_name,
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(entry_id = %job.entry_id, "failed to fetch entry for domain: {e}");
+            None
+        }
+    };
 
     if let Err(e) = ctx
         .search_index
@@ -339,9 +344,9 @@ async fn apply_tagging_rules(
                 if let Ok(tag) =
                     crate::models::tag::find_or_create_tag(pool, user_id, tag_label).await
                 {
-                    crate::models::tag::add_tag_to_entry(pool, entry_id, tag.id)
-                        .await
-                        .ok();
+                    if let Err(e) = crate::models::tag::add_tag_to_entry(pool, user_id, entry_id, tag.id).await {
+                        tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
+                    }
                 }
             }
         }
@@ -349,11 +354,13 @@ async fn apply_tagging_rules(
 }
 
 async fn mark_failed(pool: &PgPool, entry_id: Uuid, status: i16) {
-    entry::update_entry_content(
+    if let Err(e) = entry::update_entry_content(
         pool, entry_id, None, None, None, None, None, None, None, status, "failed",
     )
     .await
-    .ok();
+    {
+        tracing::warn!(entry_id = %entry_id, "failed to mark entry as failed: {e}");
+    }
 }
 
 /// Entry point for falling back to rendering when static fetch fails or content

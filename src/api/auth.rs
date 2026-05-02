@@ -4,9 +4,10 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::jwt;
-use crate::auth::middleware::{AuthSource, AuthUser};
+use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::auth::password;
 use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceType};
@@ -62,24 +63,17 @@ pub async fn register(
 
     tracing::info!(user_id = %new_user.id, "user registered");
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(new_user.id),
-            auth_source: "jwt".to_string(),
-            action: AuditAction::Register,
-            resource_type: Some(AuditResourceType::User),
-            resource_id: Some(new_user.id),
-            status: "success".to_string(),
-            details: serde_json::to_value(AuditDetails {
-                after: Some(serde_json::json!({"username": new_user.username, "email": new_user.email})),
-                ..Default::default()
-            }).unwrap_or_default(),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(new_user.id),
+        "jwt".to_string(),
+        AuditAction::Register,
+        Some(AuditResourceType::User),
+        Some(new_user.id),
+        serde_json::to_value(AuditDetails {
+            after: Some(serde_json::json!({"username": new_user.username, "email": new_user.email})),
+            ..Default::default()
+        }).unwrap_or_default(),
     ).await;
 
     issue_tokens(&state, new_user.id, new_user.is_admin).await
@@ -99,21 +93,14 @@ pub async fn login(
 
     tracing::info!(user_id = %found.id, "user logged in");
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(found.id),
-            auth_source: "jwt".to_string(),
-            action: AuditAction::Login,
-            resource_type: Some(AuditResourceType::User),
-            resource_id: Some(found.id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(found.id),
+        "jwt".to_string(),
+        AuditAction::Login,
+        Some(AuditResourceType::User),
+        Some(found.id),
+        serde_json::json!({}),
     ).await;
 
     issue_tokens(&state, found.id, found.is_admin).await
@@ -148,25 +135,14 @@ pub async fn logout(
     let token_hash = jwt::hash_refresh_token(&req.refresh_token);
     user::delete_refresh_token(&state.pool, &token_hash).await?;
 
-    let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
-    };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::Logout,
-            resource_type: Some(AuditResourceType::User),
-            resource_id: Some(auth.user_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source_str(&auth),
+        AuditAction::Logout,
+        Some(AuditResourceType::User),
+        Some(auth.user_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(MessageResponse {
@@ -207,21 +183,14 @@ pub async fn regenerate_feed_token(
 ) -> Result<Json<FeedTokenResponse>, ApiError> {
     let new_token = user::regenerate_feed_token(&state.pool, auth.user_id).await?;
 
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source: "jwt".to_string(),
-            action: AuditAction::RegenerateFeedToken,
-            resource_type: Some(AuditResourceType::User),
-            resource_id: Some(auth.user_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        "jwt".to_string(),
+        AuditAction::RegenerateFeedToken,
+        Some(AuditResourceType::User),
+        Some(auth.user_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(FeedTokenResponse { feed_token: new_token }))
@@ -249,8 +218,8 @@ pub async fn me(
     .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt",
-        AuthSource::Pat { .. } => "pat",
+        crate::auth::middleware::AuthSource::Jwt => "jwt",
+        crate::auth::middleware::AuthSource::Pat { .. } => "pat",
     };
 
     Ok(Json(MeResponse {
@@ -288,24 +257,17 @@ pub async fn change_password(
     user::update_password(&state.pool, auth.user_id, &new_hash).await?;
 
     let auth_source = match auth.source {
-        AuthSource::Jwt => "jwt".to_string(),
-        AuthSource::Pat { .. } => "pat".to_string(),
+        crate::auth::middleware::AuthSource::Jwt => "jwt".to_string(),
+        crate::auth::middleware::AuthSource::Pat { .. } => "pat".to_string(),
     };
-    let _ = audit_log::insert(
+    audit_log::log_success(
         &state.pool,
-        audit_log::InsertAuditLog {
-            user_id: Some(auth.user_id),
-            auth_source,
-            action: AuditAction::ChangePassword,
-            resource_type: Some(AuditResourceType::User),
-            resource_id: Some(auth.user_id),
-            status: "success".to_string(),
-            details: serde_json::json!({}),
-            error_message: None,
-            ip_address: None,
-            user_agent: None,
-            request_id: None,
-        },
+        Some(auth.user_id),
+        auth_source,
+        AuditAction::ChangePassword,
+        Some(AuditResourceType::User),
+        Some(auth.user_id),
+        serde_json::json!({}),
     ).await;
 
     Ok(Json(MessageResponse {
