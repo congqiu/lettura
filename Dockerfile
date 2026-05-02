@@ -74,12 +74,18 @@ RUN apt-get update && apt-get install -y \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for running the application
+RUN groupadd -r lettura && useradd -r -g lettura -d /data -s /sbin/nologin lettura
+
 WORKDIR /app
 
 COPY --from=backend-builder /lettura ./lettura
 COPY --from=backend-builder /app/migrations ./migrations
 
-RUN mkdir -p /data/tantivy /data/site-configs
+RUN mkdir -p /data/tantivy /data/site-configs /data/pages /data/storage \
+    && chown -R lettura:lettura /data
+
+USER lettura
 
 EXPOSE 3330
 

@@ -1,70 +1,45 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lettura}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lettura}
+      POSTGRES_DB: ${POSTGRES_DB:-lettura}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5436}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lettura}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   lettura:
     build:
       context: .
+      dockerfile: Dockerfile
       args:
-        # Set RENDERING=0 to build a slim image without chromiumoxide + chromium.
-        RENDERING: ${RENDERING:-1}
+        - RENDERING=${RENDERING:-1}
     ports:
-      - "3330:3330"
+      - "${APP_PORT:-3330}:3330"
     environment:
-      DATABASE_URL: postgres://lettura:lettura@postgres:5436/lettura
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
-      LISTEN_ADDR: 0.0.0.0:3330
-      INDEX_PATH: /data/tantivy
-      RUST_LOG: info
-      METRICS_ENABLED: ${METRICS_ENABLED:-false}
-      # Fetch configuration (optional)
-      LETTURA_USER_AGENT: ${LETTURA_USER_AGENT:-}
-      LETTURA_FETCH_TIMEOUT: ${LETTURA_FETCH_TIMEOUT:-30}
-      LETTURA_FETCH_MAX_RETRIES: ${LETTURA_FETCH_MAX_RETRIES:-3}
-      LETTURA_PROXY: ${LETTURA_PROXY:-}
-      # Site rules: YAML files mounted at /data/site-configs
-      LETTURA_SITE_CONFIGS_PATH: ${LETTURA_SITE_CONFIGS_PATH:-/data/site-configs}
-      # Render fallback (honored when RENDERING=1 was used at build time)
+      DATABASE_URL: postgres://${POSTGRES_USER:-lettura}:${POSTGRES_PASSWORD:-lettura}@postgres:5432/${POSTGRES_DB:-lettura}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      LETTURA_SITE_CONFIGS_PATH: /data/site-configs
       LETTURA_RENDERING_ENABLED: ${LETTURA_RENDERING_ENABLED:-auto}
       LETTURA_CHROMIUM_PATH: ${LETTURA_CHROMIUM_PATH:-}
       LETTURA_RENDER_CONCURRENCY: ${LETTURA_RENDER_CONCURRENCY:-2}
       LETTURA_RENDER_TIMEOUT_MS: ${LETTURA_RENDER_TIMEOUT_MS:-15000}
     volumes:
-      - lettura_data:/data/tantivy
-      - lettura_pages:/data/pages
-      - lettura_storage:/data/storage
-      - ./site-configs-local:/data/site-configs
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3330/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - ./site-configs-local:/data/site-configs:ro
+      - appdata:/data
     depends_on:
       postgres:
         condition: service_healthy
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: lettura
-      POSTGRES_PASSWORD: lettura
-      POSTGRES_DB: lettura
-      PGPORT: 5436
-    ports:
-      - "5436:5436"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lettura"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    restart: unless-stopped
 
 volumes:
-  lettura_data:
-  lettura_pages:
-  lettura_storage:
-  postgres_data:
+  pgdata:
+  appdata:

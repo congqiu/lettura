@@ -2,5 +2,9 @@ target/
 web/node_modules/
 web/dist/
 .git/
+.claude/
 *.md
 docs/
+.env
+.env.*
+site-configs-local/
