@@ -87,7 +87,7 @@ impl Config {
             cors_origins: env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string()),
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
             user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36".to_string()
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
             }),
             fetch_timeout_secs: env::var("LETTURA_FETCH_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
             fetch_max_retries: env::var("LETTURA_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
