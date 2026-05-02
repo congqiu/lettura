@@ -6,7 +6,7 @@ ARG RENDERING=1
 # Stage 1: Build frontend
 FROM node:24 AS frontend-builder
 
-RUN corepack enable && corepack prepare pnpm@10- --activate
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 WORKDIR /app/web
 COPY web/package.json web/pnpm-lock.yaml ./
