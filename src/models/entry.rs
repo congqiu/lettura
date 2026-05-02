@@ -74,6 +74,8 @@ pub struct EntrySummary {
     pub domain_name: Option<String>, pub published_by: Option<String>,
     pub is_archived: bool, pub is_starred: bool, pub created_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
+    #[sqlx(skip)]
+    pub tags: Vec<crate::models::tag::TagLabel>,
 }
 
 pub fn hash_url(url: &str) -> String {
@@ -219,10 +221,13 @@ pub async fn list_entries(
         qb.push_bind(offset);
     }
 
-    qb.build_query_as::<EntrySummary>()
+    let mut entries = qb.build_query_as::<EntrySummary>()
         .fetch_all(pool)
         .await
-        .map_err(|e| ModelError::Database(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    attach_tags(pool, &mut entries).await?;
+    Ok(entries)
 }
 
 /// Compute the next cursor from a freshly-fetched result page. Returns Some
@@ -341,14 +346,16 @@ pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> 
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    sqlx::query_as::<_, EntrySummary>(
+    let mut entries = sqlx::query_as::<_, EntrySummary>(
         "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND id = ANY($2) AND deleted_at IS NULL ORDER BY created_at DESC"
     )
     .bind(user_id)
     .bind(ids)
     .fetch_all(pool)
     .await
-    .map_err(|e| ModelError::Database(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+    attach_tags(pool, &mut entries).await?;
+    Ok(entries)
 }
 
 pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<bool, ModelError> {
@@ -359,13 +366,15 @@ pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Resul
 }
 
 pub async fn list_deleted_entries(pool: &PgPool, user_id: Uuid) -> Result<Vec<EntrySummary>, ModelError> {
-    sqlx::query_as::<_, EntrySummary>(
+    let mut entries = sqlx::query_as::<_, EntrySummary>(
         "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC"
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| ModelError::Database(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+    attach_tags(pool, &mut entries).await?;
+    Ok(entries)
 }
 
 pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ModelError> {
@@ -433,5 +442,42 @@ pub async fn update_content_only(
     .execute(pool)
     .await
     .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Attach tag labels to a list of entry summaries in-place.
+/// Issues a single batch query for all entry IDs.
+async fn attach_tags(pool: &PgPool, entries: &mut [EntrySummary]) -> Result<(), ModelError> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let entry_ids: Vec<Uuid> = entries.iter().map(|e| e.id).collect();
+
+    let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
+        "SELECT et.entry_id, t.id AS tag_id, t.label \
+         FROM entry_tags et \
+         JOIN tags t ON t.id = et.tag_id \
+         WHERE et.entry_id = ANY($1) \
+         ORDER BY t.label",
+    )
+    .bind(&entry_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    let mut tag_map: std::collections::HashMap<Uuid, Vec<crate::models::tag::TagLabel>> =
+        std::collections::HashMap::new();
+    for (entry_id, tag_id, label) in rows {
+        tag_map
+            .entry(entry_id)
+            .or_default()
+            .push(crate::models::tag::TagLabel { id: tag_id, label });
+    }
+
+    for entry in entries.iter_mut() {
+        entry.tags = tag_map.remove(&entry.id).unwrap_or_default();
+    }
+
     Ok(())
 }
