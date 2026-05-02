@@ -130,6 +130,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/entries/bulk/star", post(bulk::bulk_star))
         // Tags
         .route("/api/v1/tags", get(tags::list_tags))
+        .route("/api/v1/tags/stats", get(tags::tags_stats))
         .route("/api/v1/entries/{id}/tags", get(tags::list_tags_for_entry))
         .route("/api/v1/entries/{id}/tags", post(tags::add_tag_to_entry))
         .route(
@@ -140,7 +141,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             "/api/v1/entries/{entry_id}/tags/by-label/{label}",
             delete(tags::remove_tag_from_entry_by_label),
         )
-        .route("/api/v1/tags/{id}", delete(tags::delete_tag))
+        .route("/api/v1/tags/{id}", delete(tags::delete_tag).patch(tags::rename_tag_handler))
         // Annotations
         .route(
             "/api/v1/entries/{id}/annotations",

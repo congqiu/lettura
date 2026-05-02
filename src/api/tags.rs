@@ -26,6 +26,55 @@ pub async fn list_tags(
     Ok(Json(tags))
 }
 
+pub async fn tags_stats(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<tag::TagStats>>, ApiError> {
+    let stats = tag::TagStats::list_cached(&state.pool, auth.user_id).await?;
+    Ok(Json(stats))
+}
+
+#[derive(Deserialize)]
+pub struct RenameTagRequest {
+    pub label: String,
+}
+
+pub async fn rename_tag_handler(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(tag_id): Path<Uuid>,
+    Json(req): Json<RenameTagRequest>,
+) -> Result<Json<tag::Tag>, ApiError> {
+    let updated = tag::rename_tag(&state.pool, tag_id, auth.user_id, &req.label)
+        .await
+        .map_err(|e| match e {
+            tag::RenameError::Conflict => ApiError::Conflict("a tag with this name already exists".to_string()),
+            tag::RenameError::Database(msg) => {
+                tracing::error!("rename_tag database error: {msg}");
+                ApiError::Internal("internal server error".to_string())
+            }
+        })?;
+
+    let _ = audit_log::insert(
+        &state.pool,
+        audit_log::InsertAuditLog {
+            user_id: Some(auth.user_id),
+            auth_source: auth_source_str(&auth),
+            action: AuditAction::RenameTag,
+            resource_type: Some(AuditResourceType::Tag),
+            resource_id: Some(tag_id),
+            status: "success".to_string(),
+            details: serde_json::json!({"new_label": req.label}),
+            error_message: None,
+            ip_address: None,
+            user_agent: None,
+            request_id: None,
+        },
+    ).await;
+
+    Ok(Json(updated))
+}
+
 pub async fn list_tags_for_entry(
     State(state): State<AppState>,
     auth: AuthUser,
