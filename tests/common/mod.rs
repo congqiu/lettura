@@ -64,7 +64,7 @@ impl TestApp {
             public_base_url: None,
         };
 
-        let (app, _, _) = lettura::api::router_with_search(
+        let (app, _, _, _) = lettura::api::router_with_search(
             pool.clone(),
             config.clone(),
             Some(search_index.clone()),

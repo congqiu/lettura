@@ -44,6 +44,22 @@ pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<SiteRule>, M
     .map_err(|e| ModelError::Database(e.to_string()))
 }
 
+/// List rules with caching. Note: site rules include both user-specific and global rules.
+pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<SiteRule>, ModelError> {
+    // Try cache first
+    if let Some(cached) = crate::cache::SITE_RULE_CACHE.get(user_id).await {
+        return Ok(cached);
+    }
+
+    // Query database
+    let rules = list_rules(pool, user_id).await?;
+
+    // Update cache
+    crate::cache::SITE_RULE_CACHE.insert(user_id, rules.clone()).await;
+
+    Ok(rules)
+}
+
 pub async fn find_by_domain(pool: &PgPool, user_id: Uuid, domain: &str) -> Result<Option<SiteRule>, ModelError> {
     sqlx::query_as::<_, SiteRule>(
         "SELECT * FROM site_rules WHERE domain = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id DESC NULLS LAST LIMIT 1",
@@ -56,7 +72,7 @@ pub async fn find_by_domain(pool: &PgPool, user_id: Uuid, domain: &str) -> Resul
 }
 
 pub async fn create_rule(pool: &PgPool, user_id: Uuid, params: &CreateSiteRule) -> Result<SiteRule, ModelError> {
-    sqlx::query_as::<_, SiteRule>(
+    let rule = sqlx::query_as::<_, SiteRule>(
         "INSERT INTO site_rules (user_id, domain, content_selector, title_selector, strip_selectors) VALUES ($1, $2, $3, $4, $5) RETURNING *",
     )
     .bind(user_id)
@@ -66,7 +82,12 @@ pub async fn create_rule(pool: &PgPool, user_id: Uuid, params: &CreateSiteRule) 
     .bind(&params.strip_selectors)
     .fetch_one(pool)
     .await
-    .map_err(|e| ModelError::Database(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache
+    crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+
+    Ok(rule)
 }
 
 pub async fn update_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid, params: &UpdateSiteRule) -> Result<SiteRule, ModelError> {
@@ -79,16 +100,28 @@ pub async fn update_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid, params: &U
     let title_selector = params.title_selector.as_deref().or(existing.title_selector.as_deref());
     let strip_selectors = params.strip_selectors.as_ref().or(existing.strip_selectors.as_ref());
 
-    sqlx::query_as::<_, SiteRule>(
+    let updated = sqlx::query_as::<_, SiteRule>(
         "UPDATE site_rules SET content_selector = $3, title_selector = $4, strip_selectors = $5 WHERE id = $1 AND user_id = $2 RETURNING *",
     )
     .bind(rule_id).bind(user_id).bind(content_selector).bind(title_selector).bind(strip_selectors)
-    .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+    .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache
+    crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+
+    Ok(updated)
 }
 
 pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM site_rules WHERE id = $1 AND user_id = $2")
         .bind(rule_id).bind(user_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
-    Ok(result.rows_affected() > 0)
+
+    if result.rows_affected() > 0 {
+        // Invalidate cache
+        crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }

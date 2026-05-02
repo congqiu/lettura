@@ -3,8 +3,18 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
+    // Initialize structured JSON logging
+    // Set RUST_LOG=lettura=info,audit=info to control log levels
+    let env_filter = EnvFilter::from_default_env()
+        .add_directive("lettura=info".parse().unwrap())
+        .add_directive("audit=info".parse().unwrap());
+
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
+        .json()
+        .with_target(false)
+        .with_file(false)
+        .with_line_number(false)
         .init();
 
     dotenvy::dotenv().ok();
@@ -22,8 +32,11 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let (app, search_index, fetch_queue) =
+    let (app, search_index, fetch_queue, storage) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
+
+    // Start image processor
+    lettura::tasks::start_image_processor(pool.clone(), storage.clone());
 
     // Background task: flush search index every 3 seconds. Documents become
     // searchable within this window after a write. Critical paths (e.g.
@@ -98,7 +111,8 @@ async fn main() {
         });
 
         tracing::info!("Prometheus metrics enabled at /metrics");
-        app.merge(metrics_route)
+        metrics_route
+            .merge(app)
             .layer(axum::middleware::from_fn(
                 lettura::metrics::track_metrics,
             ))

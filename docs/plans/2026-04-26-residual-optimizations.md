@@ -1,12 +1,22 @@
 # Residual Optimizations Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status note (2026-05-01):** 下文大量 checkbox 保留为原始执行脚本，不再逐项回填；当前真实完成度以本文件的 `Progress Update` 和 `CLAUDE.md` 路线图为准。
 
 **Goal:** 收尾 Plan 4b 阶段剩余的小颗粒优化：消除批量打标签 N+1、把 CPU 密集的内容提取放到 `spawn_blocking`、补齐前端缓存默认、加守门式分页保护、补三个核心模块的单元测试、补两个观测指标、加 Docker BuildKit cache mount。
 
-**Architecture:** 每个 task 都是独立、可单独 commit 的颗粒改动，覆盖 server `src/`、前端 `web/src/` 和 `Dockerfile`。所有 server 改动遵循 TDD：先红→实现→绿→提交。每个 task 结束都跑一次最小相关 `cargo test` 子集，最后再过一次 `cargo test --workspace`。
+**Architecture:** 每个 task 都是独立、可单独 commit 的颗粒改动，覆盖 server `src/`、前端 `web/src/` 和 `Dockerfile`。所有 server 改动遵循 TDD：先红→实现→绿→提交。后端编译/测试统一在 Docker 容器中执行；每个 task 结束都跑一次最小相关 `docker compose exec lettura cargo test ...` 子集，最后再过一次 `docker compose exec lettura cargo test --workspace`。
 
 **Tech Stack:** Rust 2024 (Axum, SQLx, tokio, metrics 0.24)、TypeScript + React 19 + TanStack Query v5、Docker BuildKit。
+
+**Progress Update (2026-05-01):**
+- 已完成并通过验证：Task 1–10（`ensure_and_link`、bulk/save 去 N+1、`spawn_blocking`、QueryClient 默认缓存、分页守门、3 组单测补齐、新增 metrics）。
+- 已完成并通过验证：Task 11（Dockerfile BuildKit cache mount 已落地，`DOCKER_BUILDKIT=1 docker compose build lettura` 构建成功）。
+- 收尾修复：补齐 `tests/common/mod.rs` 对 `router_with_search()` 新返回值的适配；修复 `x-request-id` header 大小写 panic；修复 runtime 镜像缺少 `curl` 导致 healthcheck 恒失败；补齐 `docker-compose.yml` 对 `METRICS_ENABLED` 的透传；修复 `/metrics` 被 SPA fallback 覆盖的问题。
+- 已验证命令：
+  - `docker run ... cargo test --workspace` → PASS
+  - `docker run ... pnpm test -- --run` → PASS
+  - `docker run ... pnpm build` → PASS
 
 **Out of scope（建议另立 plan）：**
 - 抓取队列重试 / 死信队列（涉及迁移 + 数据模型 + worker 重排，单独 plan）
@@ -1233,10 +1243,13 @@ EOF
 
 在所有 task 跑完之后：
 
-- [ ] `docker compose exec lettura cargo test --workspace 2>&1 | tail -30` —— 全 PASS
-- [ ] `cd web && pnpm build` —— 前端构建成功
-- [ ] `DOCKER_BUILDKIT=1 docker compose build lettura` + `docker compose up -d` + 浏览器跑一次 happy path（登录、保存条目、打标签、列表、搜索）
-- [ ] `curl http://localhost:3330/metrics | grep -c "^[a-z]"` —— 指标数比之前增加至少 3 条
+- [x] `docker run --rm --network=host -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5437/lettura -v "$PWD":/app -v /tmp/lettura-cargo-registry:/usr/local/cargo/registry -v /tmp/lettura-cargo-target:/app/target -w /app rust:bookworm cargo test --workspace` —— 2026-05-01 全 PASS
+- [x] `docker run --rm -e CI=true -v "$PWD":/app -v /tmp/lettura-pnpm-store:/root/.local/share/pnpm/store -w /app/web node:24 bash -lc 'corepack enable && corepack prepare pnpm@latest --activate && pnpm install --frozen-lockfile && pnpm build'` —— 2026-05-01 前端构建成功
+- [x] `docker run --rm -e CI=true -v "$PWD":/app -v /tmp/lettura-pnpm-store:/root/.local/share/pnpm/store -w /app/web node:24 bash -lc 'corepack enable && corepack prepare pnpm@latest --activate && pnpm install --frozen-lockfile && pnpm test -- --run'` —— 2026-05-01 前端测试通过
+- [x] `DOCKER_BUILDKIT=1 docker compose build lettura` —— 2026-05-01 构建成功
+- [x] `docker compose up -d lettura` + `curl --noproxy '*' -s http://127.0.0.1:3330/api/health` —— 2026-05-01 健康检查通过
+- [x] `METRICS_ENABLED=true docker compose up -d lettura` + `curl --noproxy '*' -s http://127.0.0.1:3330/metrics | head -40` —— 2026-05-01 指标端点返回 `http_requests_total` / `db_pool_*` / `fetch_queue_depth`
+- [ ] 浏览器 happy path（登录、保存条目、打标签、列表、搜索）—— 仍需人工 UI 验收
 
 ---
 

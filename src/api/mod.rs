@@ -6,6 +6,7 @@ use axum::{
 use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
 use crate::state::AppState;
 use crate::config::Config;
@@ -40,9 +41,9 @@ pub fn router(pool: PgPool, config: Config) -> Router {
 }
 
 /// Build router and return handles to internal components for metrics/monitoring.
-pub fn router_with_handles(pool: PgPool, config: Config) -> (Router, SearchIndex, fetcher::FetchQueue) {
-    let (router, search, fq) = router_with_search(pool, config, None);
-    (router, search, fq)
+pub fn router_with_handles(pool: PgPool, config: Config) -> (Router, SearchIndex, fetcher::FetchQueue, std::sync::Arc<dyn crate::storage::ImageStorage>) {
+    let (router, search, fq, storage) = router_with_search(pool, config, None);
+    (router, search, fq, storage)
 }
 
 /// Redirect handler for legacy `/api/{path}` routes.
@@ -59,7 +60,7 @@ async fn api_redirect(
     )
 }
 
-pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> (Router, SearchIndex, fetcher::FetchQueue) {
+pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> (Router, SearchIndex, fetcher::FetchQueue, std::sync::Arc<dyn crate::storage::ImageStorage>) {
     let search_index = search.unwrap_or_else(|| {
         SearchIndex::open(std::path::Path::new(&config.index_path))
             .expect("failed to open search index")
@@ -70,6 +71,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
 
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();
+    let storage_clone = storage.clone();
 
     let state = AppState {
         pool,
@@ -242,6 +244,16 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             axum::http::header::HeaderName::from_static("referrer-policy"),
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
+        // Request tracing: adds request_id to spans and logs
+        .layer(TraceLayer::new_for_http().make_span_with(
+            DefaultMakeSpan::new()
+                .level(tracing::Level::INFO)
+                .include_headers(true),
+        ))
+        // Request ID middleware: propagates or generates X-Request-Id
+        .layer(axum::middleware::from_fn(
+            crate::middleware::request_id_layer,
+        ))
         // Global rate limiting: 100 requests per minute.
         // Applied as the outermost layer so rate-limited requests are rejected
         // early without consuming downstream resources.
@@ -250,7 +262,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             rate_limit_middleware,
         ));
 
-    (router, search_clone, fq_clone)
+    (router, search_clone, fq_clone, storage_clone)
 }
 
 async fn serve_storage(

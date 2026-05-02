@@ -13,6 +13,7 @@ services:
       LISTEN_ADDR: 0.0.0.0:3330
       INDEX_PATH: /data/tantivy
       RUST_LOG: info
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
       # Fetch configuration (optional)
       LETTURA_USER_AGENT: ${LETTURA_USER_AGENT:-}
       LETTURA_FETCH_TIMEOUT: ${LETTURA_FETCH_TIMEOUT:-30}

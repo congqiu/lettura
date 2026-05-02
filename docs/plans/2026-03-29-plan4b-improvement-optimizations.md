@@ -138,7 +138,7 @@ async fn health_endpoint_not_versioned() {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test api_v1_routes_work old_api_routes_redirect health_endpoint_not_versioned`
+Run: `docker compose exec lettura cargo test api_v1_routes_work old_api_routes_redirect health_endpoint_not_versioned`
 Expected: FAIL -- `/api/v1/*` routes don't exist yet
 
 - [ ] **Step 3: 修改 src/api/mod.rs 将路由迁移到 /api/v1/ 并添加 301 重定向**
@@ -333,7 +333,7 @@ Run: `grep -rn '"/api/' tests/ --include='*.rs' | grep -v '/api/health' | grep -
 
 - [ ] **Step 9: 运行测试确认通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 Run: `cd web && npm run build`
@@ -457,7 +457,7 @@ async fn create_entry_rejects_invalid_url() {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test register_rejects_invalid_email register_rejects_short_password create_entry_rejects_invalid_url`
+Run: `docker compose exec lettura cargo test register_rejects_invalid_email register_rejects_short_password create_entry_rejects_invalid_url`
 Expected: FAIL -- no validation error format, just BadRequest or success
 
 - [ ] **Step 3: 添加 validator 依赖**
@@ -724,7 +724,7 @@ pub async fn create_memo(
 
 - [ ] **Step 11: 运行测试确认通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 12: Commit**
@@ -782,7 +782,7 @@ async fn auth_rate_limit_triggers_after_10_requests() {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test auth_rate_limit_triggers`
+Run: `docker compose exec lettura cargo test auth_rate_limit_triggers`
 Expected: FAIL -- 没有限流，全部返回 401（invalid credentials）而不是 429
 
 - [ ] **Step 3: 添加 tower-governor 依赖**
@@ -911,10 +911,10 @@ use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 
 - [ ] **Step 5: 运行测试确认通过**
 
-Run: `cargo test auth_rate_limit_triggers`
+Run: `docker compose exec lettura cargo test auth_rate_limit_triggers`
 Expected: PASS
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 6: Commit**
@@ -971,7 +971,7 @@ git commit -m "feat: add per-IP rate limiting with tower-governor (10/min auth, 
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test config::tests -- --test-threads=1`
+Run: `docker compose exec lettura cargo test config::tests -- --test-threads=1`
 Expected: FAIL -- `db_max_connections` field does not exist
 
 - [ ] **Step 3: 给 Config 添加 DB pool 字段**
@@ -1054,10 +1054,10 @@ pub async fn run_migrations(pool: &PgPool) {
 
 - [ ] **Step 7: 运行测试确认通过**
 
-Run: `cargo test config::tests -- --test-threads=1`
+Run: `docker compose exec lettura cargo test config::tests -- --test-threads=1`
 Expected: PASS
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 8: Commit**
@@ -1171,7 +1171,7 @@ async fn duplicate_email_returns_conflict() {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test duplicate_entry_returns_conflict_from_unified duplicate_email_returns_conflict`
+Run: `docker compose exec lettura cargo test duplicate_entry_returns_conflict_from_unified duplicate_email_returns_conflict`
 Expected: FAIL (partial) -- duplicate entry already returns 409 from local handler, but duplicate email returns 409 with message "username or email already exists". The test for unified error handling pattern will validate the new `From<sqlx::Error>` works.
 
 - [ ] **Step 3: 增强 From<sqlx::Error> 实现**
@@ -1299,7 +1299,7 @@ pub async fn login(
 
 - [ ] **Step 7: 运行测试确认通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 8: Commit**
@@ -2016,7 +2016,7 @@ async fn list_deleted_entries_shows_trash() {
 
 - [ ] **Step 3: 运行测试确认失败**
 
-Run: `cargo test soft_delete_hides restore_entry permanent_delete list_deleted_entries`
+Run: `docker compose exec lettura cargo test soft_delete_hides restore_entry permanent_delete list_deleted_entries`
 Expected: FAIL
 
 - [ ] **Step 4: 修改 models/entry.rs**
@@ -2262,7 +2262,7 @@ pub async fn permanently_delete_entry(
 
 - [ ] **Step 10: 运行测试确认通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 11: Commit**
@@ -2291,7 +2291,7 @@ CREATE INDEX idx_tagging_rules_rule ON tagging_rules USING GIN (rule);
 
 - [ ] **Step 2: 运行测试确认 migration 通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS（migration 在测试中自动执行）
 
 - [ ] **Step 3: Commit**
@@ -2336,7 +2336,7 @@ CREATE INDEX idx_entries_user_starred_v2 ON entries (user_id, starred_at DESC)
 
 - [ ] **Step 2: 运行测试确认 migration 通过**
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS
 
 - [ ] **Step 3: Commit**
@@ -2387,7 +2387,7 @@ git commit -m "feat: replace old indexes with partial composite indexes (include
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cargo test config::tests -- --test-threads=1`
+Run: `docker compose exec lettura cargo test config::tests -- --test-threads=1`
 Expected: FAIL -- `metrics_enabled` field does not exist
 
 - [ ] **Step 3: 添加 metrics 依赖**
@@ -2677,10 +2677,10 @@ fn normalize_metrics_path(path: &str) -> String {
 
 - [ ] **Step 8: 运行测试确认通过**
 
-Run: `cargo test config::tests -- --test-threads=1`
+Run: `docker compose exec lettura cargo test config::tests -- --test-threads=1`
 Expected: PASS
 
-Run: `cargo test`
+Run: `docker compose exec lettura cargo test`
 Expected: 全部 PASS（metrics 在测试中默认关闭，不影响现有测试）
 
 - [ ] **Step 9: Commit**
@@ -2694,22 +2694,22 @@ git commit -m "feat: add optional Prometheus metrics endpoint with request count
 
 ## Final Verification
 
-- [ ] **Step 1: 全量后端测试**
+- [x] **Step 1: 全量后端测试**
 
-Run: `cargo test`
+Run: `docker run --rm --network=host -e DATABASE_URL=postgres://lettura:lettura@127.0.0.1:5437/lettura -v "$PWD":/app -v /tmp/lettura-cargo-registry:/usr/local/cargo/registry -v /tmp/lettura-cargo-target:/app/target -w /app rust:bookworm cargo test --workspace`
 Expected: 全部 PASS
 
-- [ ] **Step 2: 前端编译**
+- [x] **Step 2: 前端编译**
 
-Run: `cd web && npm run build`
+Run: `docker run --rm -e CI=true -v "$PWD":/app -v /tmp/lettura-pnpm-store:/root/.local/share/pnpm/store -w /app/web node:24 bash -lc 'corepack enable && corepack prepare pnpm@latest --activate && pnpm install --frozen-lockfile && pnpm build'`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 3: 前端测试**
+- [x] **Step 3: 前端测试**
 
-Run: `cd web && npm test`
+Run: `docker run --rm -e CI=true -v "$PWD":/app -v /tmp/lettura-pnpm-store:/root/.local/share/pnpm/store -w /app/web node:24 bash -lc 'corepack enable && corepack prepare pnpm@latest --activate && pnpm install --frozen-lockfile && pnpm test -- --run'`
 Expected: 全部 PASS
 
-- [ ] **Step 4: Docker build 验证**
+- [x] **Step 4: Docker build 验证**
 
-Run: `docker build -t lettura:test .`
+Run: `DOCKER_BUILDKIT=1 docker compose build lettura`
 Expected: BUILD SUCCESS（可选，取决于环境）

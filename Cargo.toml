@@ -69,7 +69,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Observability
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.18", default-features = false }
 
@@ -88,6 +88,9 @@ zip = "2"
 
 # Config
 dotenvy = "0.15"
+
+# Caching
+moka = { version = "0.12", features = ["future"] }
 
 # Rendering fallback (optional, enabled by the `rendering` feature)
 chromiumoxide = { version = "0.7", features = ["tokio-runtime"], default-features = false, optional = true }

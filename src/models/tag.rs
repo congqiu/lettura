@@ -32,15 +32,36 @@ pub async fn list_tags(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ModelEr
         .map_err(|e| ModelError::Database(e.to_string()))
 }
 
+/// List tags with caching. Use this for read-heavy paths like the tag list API.
+pub async fn list_tags_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ModelError> {
+    // Try cache first
+    if let Some(cached) = crate::cache::TAG_CACHE.get(user_id).await {
+        return Ok(cached);
+    }
+
+    // Query database
+    let tags = list_tags(pool, user_id).await?;
+
+    // Update cache
+    crate::cache::TAG_CACHE.insert(user_id, tags.clone()).await;
+
+    Ok(tags)
+}
+
 pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Result<Tag, ModelError> {
     let slug = slugify(label);
     if let Some(tag) = sqlx::query_as::<_, Tag>("SELECT * FROM tags WHERE user_id = $1 AND slug = $2")
         .bind(user_id).bind(&slug).fetch_optional(pool).await.map_err(|e| ModelError::Database(e.to_string()))? {
         return Ok(tag);
     }
-    sqlx::query_as::<_, Tag>("INSERT INTO tags (user_id, label, slug) VALUES ($1, $2, $3) RETURNING *")
+    let tag = sqlx::query_as::<_, Tag>("INSERT INTO tags (user_id, label, slug) VALUES ($1, $2, $3) RETURNING *")
         .bind(user_id).bind(label).bind(&slug).fetch_one(pool).await
-        .map_err(|e| ModelError::Database(e.to_string()))
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache since we added a new tag
+    crate::cache::TAG_CACHE.invalidate(user_id).await;
+
+    Ok(tag)
 }
 
 pub async fn add_tag_to_entry(pool: &PgPool, entry_id: Uuid, tag_id: Uuid) -> Result<(), ModelError> {
@@ -61,7 +82,14 @@ pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bo
     let result = sqlx::query("DELETE FROM tags WHERE id = $1 AND user_id = $2")
         .bind(tag_id).bind(user_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
-    Ok(result.rows_affected() > 0)
+
+    if result.rows_affected() > 0 {
+        // Invalidate cache since we deleted a tag
+        crate::cache::TAG_CACHE.invalidate(user_id).await;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 pub async fn list_tags_for_entry(pool: &PgPool, entry_id: Uuid) -> Result<Vec<Tag>, ModelError> {
@@ -148,5 +176,9 @@ pub async fn ensure_and_link(
     tx.commit()
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache since we may have created new tags
+    crate::cache::TAG_CACHE.invalidate(user_id).await;
+
     Ok(())
 }

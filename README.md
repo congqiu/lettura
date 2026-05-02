@@ -115,14 +115,16 @@ token = "lta_..."
 ## Development
 
 ```bash
-# 后端
-cargo test
+# 后端编译/测试（Docker）
+docker compose build lettura
+docker compose up -d postgres lettura
+docker compose exec lettura cargo test --workspace
 
 # 前端
 cd web && pnpm install && pnpm run dev
 
-# Docker 构建
-docker build -t lettura .
+# 生产镜像构建
+DOCKER_BUILDKIT=1 docker compose build lettura
 ```
 
 ## Tech Stack

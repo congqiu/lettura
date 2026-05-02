@@ -9,7 +9,7 @@ use crate::fetch::{http, json_extract, rewrite};
 use crate::models::entry;
 use crate::search::SearchIndex;
 use crate::site_config::{self, RenderMode, ResponseType, SiteConfig};
-use crate::storage::{self, ImageStorage};
+use crate::storage::ImageStorage;
 use crate::tasks::fetcher::FetchJob;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -249,13 +249,12 @@ async fn save(
     status: i16,
     method: &str,
 ) {
-    let content = storage::process_images(&result.content, ctx.image_storage.clone()).await;
-
+    // Save original content first, then queue async image processing
     entry::update_entry_content(
         &ctx.pool,
         job.entry_id,
         result.title.as_deref(),
-        Some(&content),
+        Some(&result.content), // Original HTML with external image URLs
         Some(&result.text_content),
         result.language.as_deref(),
         result.preview_image.as_deref(),
@@ -266,6 +265,21 @@ async fn save(
     )
     .await
     .ok();
+
+    // Queue async image processing job
+    if let Err(e) = crate::models::image_process_job::create(
+        &ctx.pool,
+        job.entry_id,
+        &result.content,
+    )
+    .await
+    {
+        tracing::warn!(
+            entry_id = %job.entry_id,
+            error = %e,
+            "failed to create image process job"
+        );
+    }
 
     let domain = entry::find_entry_by_id(&ctx.pool, job.user_id, job.entry_id)
         .await
@@ -302,7 +316,8 @@ async fn apply_tagging_rules(
     url: &str,
     result: &ExtractResult,
 ) {
-    let rules = match crate::models::tagging_rule::list_rules(pool, user_id).await {
+    // Use cached version - this is called on every fetch
+    let rules = match crate::models::tagging_rule::list_rules_cached(pool, user_id).await {
         Ok(r) => r,
         Err(_) => return,
     };

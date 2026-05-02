@@ -1,0 +1,17 @@
+{
+  "name": "lettura-extension",
+  "version": "1.1.0",
+  "description": "Save articles to your Lettura instance",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vite build && npm run postbuild",
+    "postbuild": "node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

@@ -21,7 +21,8 @@ pub async fn list_tags(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<tag::Tag>>, ApiError> {
-    let tags = tag::list_tags(&state.pool, auth.user_id).await?;
+    // Use cached version for list endpoint
+    let tags = tag::list_tags_cached(&state.pool, auth.user_id).await?;
     Ok(Json(tags))
 }
 

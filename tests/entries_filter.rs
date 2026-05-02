@@ -329,9 +329,11 @@ async fn list_with_cursor_returns_next_page_via_header() {
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(res.status(), 200);
-    let _next_header_first = res.headers().get("x-next-cursor").map(|v| v.to_str().unwrap().to_string());
+    let next_header_first = res.headers().get("x-next-cursor").map(|v| v.to_str().unwrap().to_string());
     let first: Vec<serde_json::Value> = res.json().await.unwrap();
     assert_eq!(first.len(), 2);
+    // First page should have next_cursor since there are more entries
+    assert!(next_header_first.is_some(), "X-Next-Cursor must be present on first page when there are more entries");
 
     // Now request with cursor=<last entry's encoded cursor>. Construct one
     // from the last item's created_at + id (manual %3A to avoid a dep).

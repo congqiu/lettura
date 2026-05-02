@@ -1,10 +1,13 @@
 pub mod api;
+pub mod audit;
 pub mod auth;
+pub mod cache;
 pub mod config;
 pub mod db;
 pub mod extract;
 pub mod fetch;
 pub mod metrics;
+pub mod middleware;
 pub mod models;
 pub mod rate_limit;
 pub mod search;

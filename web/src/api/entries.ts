@@ -35,17 +35,31 @@ export interface EntrySummary {
 }
 
 export interface ListParams {
+  cursor?: string;
   page?: number;
   per_page?: number;
   is_archived?: boolean;
   is_starred?: boolean;
   search?: string;
   domain?: string;
+  tags?: string[];
 }
 
-export async function listEntries(params: ListParams = {}): Promise<EntrySummary[]> {
+export interface ListResponse {
+  entries: EntrySummary[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export async function listEntries(params: ListParams = {}): Promise<ListResponse> {
   const res = await api.get('/entries', { params });
-  return res.data;
+  // Extract cursor from response header
+  const nextCursor = res.headers['x-next-cursor'] || null;
+  return {
+    entries: res.data,
+    next_cursor: nextCursor,
+    has_more: nextCursor !== null,
+  };
 }
 
 export async function getEntry(id: string): Promise<Entry> {

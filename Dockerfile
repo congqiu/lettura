@@ -48,6 +48,7 @@ ARG RENDERING
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     libssl3 \
     && if [ "$RENDERING" = "1" ]; then \
          apt-get install -y --no-install-recommends \

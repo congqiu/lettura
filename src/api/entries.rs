@@ -185,13 +185,9 @@ pub async fn list_entries(
     let per_page = params.inner.per_page.unwrap_or(20).min(100);
     let entries = entry::list_entries(&state.pool, auth.user_id, &params.inner).await?;
 
-    // X-Next-Cursor header is only meaningful when the caller is using cursor
-    // mode. Page-mode callers simply don't read this header.
-    let next = if params.inner.cursor.is_some() {
-        entry::next_cursor_from(&entries, per_page)
-    } else {
-        None
-    };
+    // Always compute next_cursor for infinite scroll to work correctly.
+    // Page-mode callers simply don't read this header.
+    let next = entry::next_cursor_from(&entries, per_page);
 
     let mut response = Json(entries).into_response();
     if let Some(c) = next {

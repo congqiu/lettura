@@ -418,3 +418,20 @@ pub async fn update_entry_content(
     .execute(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }
+
+/// Update only the content field (used by async image processor).
+pub async fn update_content_only(
+    pool: &PgPool,
+    entry_id: Uuid,
+    content: &str,
+) -> Result<(), ModelError> {
+    sqlx::query(
+        "UPDATE entries SET content = $2, updated_at = NOW() WHERE id = $1 AND is_content_edited = false"
+    )
+    .bind(entry_id)
+    .bind(content)
+    .execute(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
+}

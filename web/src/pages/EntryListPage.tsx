@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
-import { listEntries, type ListParams } from '../api/entries';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
+import { Search, Loader2 } from 'lucide-react';
+import type { EntrySummary, ListParams } from '../api/entries';
 import EntryCard from '../components/EntryCard';
 import AddEntryForm from '../components/AddEntryForm';
 import ErrorState from '../components/ErrorState';
@@ -16,22 +16,70 @@ interface Props {
 
 const TITLES = { unread: '未读', archived: '归档', starred: '收藏' };
 
+// Intersection Observer hook for infinite scroll
+function useIntersectionObserver(
+  callback: () => void,
+  options: { threshold?: number; rootMargin?: string } = {}
+) {
+  const targetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const target = targetRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          callback();
+        }
+      },
+      {
+        threshold: options.threshold ?? 0,
+        rootMargin: options.rootMargin ?? '200px',
+      }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [callback, options.threshold, options.rootMargin]);
+
+  return targetRef;
+}
+
 export default function EntryListPage({ filter }: Props) {
   const [search, setSearch] = useState('');
   const [domain, setDomain] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const params: ListParams = {};
+  const params: Omit<ListParams, 'cursor'> = {};
   if (filter === 'archived') params.is_archived = true;
   if (filter === 'starred') params.is_starred = true;
   if (filter === 'unread') params.is_archived = false;
   if (search) params.search = search;
   if (domain) params.domain = domain;
 
-  const { data: entries = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['entries', filter, search, domain],
-    queryFn: () => listEntries(params),
-  });
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteEntries(params);
+
+  // Flatten pages into a single array
+  const entries: EntrySummary[] = data?.pages.flatMap((page) => page.entries) ?? [];
+
+  // Callback for intersection observer
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Sentinel element for infinite scroll
+  const sentinelRef = useIntersectionObserver(loadMore);
 
   useListKeyboardNav(entries, selectedIndex, setSelectedIndex);
 
@@ -83,6 +131,23 @@ export default function EntryListPage({ filter }: Props) {
               onDomainClick={(d) => setDomain(d)}
             />
           ))}
+
+          {/* Sentinel for infinite scroll */}
+          <div ref={sentinelRef} className="h-4" />
+
+          {/* Loading indicator */}
+          {isFetchingNextPage && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* End of list indicator */}
+          {!hasNextPage && entries.length > 0 && (
+            <div className="text-center text-muted-foreground text-sm py-4">
+              已加载全部文章
+            </div>
+          )}
         </div>
       )}
     </div>

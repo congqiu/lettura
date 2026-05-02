@@ -41,12 +41,29 @@ pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>
     .map_err(|e| ModelError::Database(e.to_string()))
 }
 
+/// List rules with caching. This is the highest priority cache as it's queried
+/// on every fetch operation.
+pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>, ModelError> {
+    // Try cache first
+    if let Some(cached) = crate::cache::TAGGING_RULE_CACHE.get(user_id).await {
+        return Ok(cached);
+    }
+
+    // Query database
+    let rules = list_rules(pool, user_id).await?;
+
+    // Update cache
+    crate::cache::TAGGING_RULE_CACHE.insert(user_id, rules.clone()).await;
+
+    Ok(rules)
+}
+
 pub async fn create_rule(
     pool: &PgPool,
     user_id: Uuid,
     params: &CreateTaggingRule,
 ) -> Result<TaggingRule, ModelError> {
-    sqlx::query_as::<_, TaggingRule>(
+    let rule = sqlx::query_as::<_, TaggingRule>(
         "INSERT INTO tagging_rules (user_id, rule, tags, priority) VALUES ($1, $2, $3, $4) RETURNING *",
     )
     .bind(user_id)
@@ -55,7 +72,12 @@ pub async fn create_rule(
     .bind(params.priority.unwrap_or(0))
     .fetch_one(pool)
     .await
-    .map_err(|e| ModelError::Database(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache
+    crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+
+    Ok(rule)
 }
 
 pub async fn update_rule(
@@ -78,7 +100,7 @@ pub async fn update_rule(
     let tags = params.tags.as_ref().unwrap_or(&existing.tags);
     let priority = params.priority.unwrap_or(existing.priority);
 
-    sqlx::query_as::<_, TaggingRule>(
+    let updated = sqlx::query_as::<_, TaggingRule>(
         "UPDATE tagging_rules SET rule = $3, tags = $4, priority = $5 WHERE id = $1 AND user_id = $2 RETURNING *",
     )
     .bind(rule_id)
@@ -88,7 +110,12 @@ pub async fn update_rule(
     .bind(priority)
     .fetch_one(pool)
     .await
-    .map_err(|e| ModelError::Database(e.to_string()))
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+
+    // Invalidate cache
+    crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+
+    Ok(updated)
 }
 
 pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ModelError> {
@@ -98,7 +125,14 @@ pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<
         .execute(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
-    Ok(result.rows_affected() > 0)
+
+    if result.rows_affected() > 0 {
+        // Invalidate cache
+        crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 /// Evaluate a rule against entry fields, return true if matches
