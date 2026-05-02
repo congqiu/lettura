@@ -170,15 +170,19 @@ pub async fn list_entries(
     // If search query provided, use tantivy to get matching IDs first
     if let Some(ref query) = params.inner.search {
         if !query.is_empty() {
-            let ids = state
-                .search_index
-                .search(query, Some(auth.user_id), 100)
-                .unwrap_or_default();
-            if ids.is_empty() {
-                return Ok(Json(Vec::<entry::EntrySummary>::new()).into_response());
+            let ids = match state.search_index.search(query, Some(auth.user_id), 100) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::warn!("Search query {:?} failed: {e}", query);
+                    Vec::new()
+                }
+            };
+            if !ids.is_empty() {
+                let entries = entry::list_entries_by_ids(&state.pool, auth.user_id, &ids).await?;
+                return Ok(Json(entries).into_response());
             }
-            let entries = entry::list_entries_by_ids(&state.pool, auth.user_id, &ids).await?;
-            return Ok(Json(entries).into_response());
+            // Tantivy returned 0 results — fall through to SQL ILIKE search
+            // which handles cases where the index is incomplete or stale.
         }
     }
 

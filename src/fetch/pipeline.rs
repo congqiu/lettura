@@ -287,7 +287,7 @@ async fn save(
         .flatten()
         .and_then(|e| e.domain_name);
 
-    let _ = ctx
+    if let Err(e) = ctx
         .search_index
         .upsert(
             job.entry_id,
@@ -297,7 +297,10 @@ async fn save(
             &job.url,
             domain.as_deref().unwrap_or(""),
         )
-        .await;
+        .await
+    {
+        tracing::error!("Failed to index entry {}: {e}", job.entry_id);
+    }
 
     apply_tagging_rules(&ctx.pool, job.user_id, job.entry_id, &job.url, result).await;
 
