@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEntry, updateEntry, deleteEntry, refetchEntry } from '../api/entries';
@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '../hooks/use-mobile';
+import { useSwipe } from '../hooks/useSwipe';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -22,6 +25,30 @@ export default function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
+  const location = useLocation();
+  const listContext = location.state as { entryIds?: string[]; currentIndex?: number } | null;
+
+  const navigateToEntry = (direction: 'prev' | 'next') => {
+    if (!listContext?.entryIds || listContext.currentIndex === undefined) return;
+    const newIndex = direction === 'prev' ? listContext.currentIndex - 1 : listContext.currentIndex + 1;
+    if (newIndex < 0 || newIndex >= listContext.entryIds.length) return;
+    const newId = listContext.entryIds[newIndex];
+    navigate(`/entry/${newId}`, {
+      state: { entryIds: listContext.entryIds, currentIndex: newIndex },
+      replace: true,
+    });
+  };
+
+  // Single swipe handler: edge swipe for back, content swipe for article switching
+  const { swipeOffset, isSwiping: isGestureActive, ref: gestureRef } = useSwipe(
+    {
+      onSwipeRight: () => navigateToEntry('prev'),
+      onSwipeLeft: () => navigateToEntry('next'),
+      onEdgeSwipeRight: () => navigate(-1),
+    },
+    { threshold: 100, direction: 'horizontal', edgeStart: 30 },
+  );
   const [editing, setEditing] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -71,8 +98,15 @@ export default function EntryDetailPage() {
   if (!entry) return <div className="py-8"><ErrorState message="文章未找到" /></div>;
 
   return (
-    <div className="flex gap-0 lg:-mx-4">
-      <div className={`flex-1 px-4 w-full overflow-hidden lg:${showAnnotations ? 'max-w-3xl' : 'max-w-3xl'} ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
+    <div
+      ref={isMobile ? gestureRef : undefined}
+      className="flex gap-0 lg:-mx-4"
+      style={isMobile && isGestureActive ? {
+        transform: `translateX(${swipeOffset.x}px)`,
+        transition: swipeOffset.x === 0 ? 'transform 0.2s ease-out' : 'none',
+      } : undefined}
+    >
+      <div className={`flex-1 px-4 w-full overflow-hidden lg:max-w-3xl ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-4 -ml-2 text-muted-foreground">
           <ArrowLeft size={16} className="mr-1" /> 返回
         </Button>
@@ -194,7 +228,15 @@ export default function EntryDetailPage() {
         {id && <EntryTags entryId={id} />}
       </div>
 
-      {showAnnotations && id && <AnnotationsSidebar entryId={id} />}
+      {isMobile ? (
+        <Sheet open={showAnnotations} onOpenChange={setShowAnnotations}>
+          <SheetContent side="bottom" className="h-[60dvh] pb-[env(safe-area-inset-bottom)]">
+            {id && <AnnotationsSidebar entryId={id} compact />}
+          </SheetContent>
+        </Sheet>
+      ) : (
+        showAnnotations && id && <AnnotationsSidebar entryId={id} />
+      )}
     </div>
   );
 }

@@ -7,9 +7,9 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
-interface Props { entryId: string; }
+interface Props { entryId: string; compact?: boolean; }
 
-export default function AnnotationsSidebar({ entryId }: Props) {
+export default function AnnotationsSidebar({ entryId, compact }: Props) {
   const [newQuote, setNewQuote] = useState('');
   const [newText, setNewText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,13 +47,15 @@ export default function AnnotationsSidebar({ entryId }: Props) {
   };
 
   return (
-    <div className="w-80 border-l border-border bg-card p-4 overflow-y-auto">
+    <div className={compact ? 'bg-card p-4 overflow-y-auto' : 'w-80 border-l border-border bg-card p-4 overflow-y-auto'}>
       <h3 className="font-medium text-card-foreground mb-4">批注</h3>
 
       <div className="mb-4 p-3 bg-secondary rounded-lg border border-border">
-        <Button variant="ghost" size="sm" onClick={handleCaptureSelection} className="text-muted-foreground hover:text-foreground mb-2">
-          捕获选中文字
-        </Button>
+        {!compact && (
+          <Button variant="ghost" size="sm" onClick={handleCaptureSelection} className="text-muted-foreground hover:text-foreground mb-2">
+            捕获选中文字
+          </Button>
+        )}
         {newQuote && (
           <blockquote className="text-sm text-muted-foreground border-l-2 border-accent pl-2 mb-2 italic">
             {newQuote}

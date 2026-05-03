@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, CheckSquare, Square, Tag, Tags, Archive, Trash2, X } from 'lucide-react';
+import { Search, Loader2, Tag, Tags, Archive, Trash2, X } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -11,6 +11,8 @@ import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import TagBadge from '../components/TagBadge';
 import { useListKeyboardNav } from '../hooks/useKeyboardShortcuts';
+import { useSwipe } from '../hooks/useSwipe';
+import { useIsMobile } from '../hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -77,6 +79,34 @@ export default function EntryListPage({ filter }: Props) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const qc = useQueryClient();
 
+  const isMobile = useIsMobile();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await qc.invalidateQueries({ queryKey: ['entries-infinite'] });
+    setIsRefreshing(false);
+  };
+
+  const { isSwiping: isPulling, ref: refreshRef } = useSwipe(
+    { onSwipeDown: handleRefresh },
+    { threshold: 60, direction: 'vertical' },
+  );
+
+  // Only enable pull-to-refresh when scrolled to top
+  useEffect(() => {
+    if (!isMobile || !refreshRef.current) return;
+    const el = refreshRef.current;
+    const checkScrollTop = () => {
+      // Use 'manipulation' to allow vertical scroll while preventing double-tap zoom.
+      // The useSwipe hook handles vertical gesture detection via touch events.
+      el.style.touchAction = window.scrollY === 0 ? 'manipulation' : 'auto';
+    };
+    window.addEventListener('scroll', checkScrollTop, { passive: true });
+    checkScrollTop();
+    return () => window.removeEventListener('scroll', checkScrollTop);
+  }, [isMobile]);
+
   const tagFilter = searchParams.get('tag') || '';
   const excludeTag = searchParams.get('exclude_tag') || '';
   const untagged = searchParams.get('untagged') === 'true';
@@ -110,6 +140,7 @@ export default function EntryListPage({ filter }: Props) {
 
   // Flatten pages into a single array
   const entries: EntrySummary[] = data?.pages.flatMap((page) => page.entries) ?? [];
+  const entryIds = useMemo(() => entries.map(e => e.id), [entries]);
 
   // Callback for intersection observer
   const loadMore = useCallback(() => {
@@ -210,7 +241,13 @@ export default function EntryListPage({ filter }: Props) {
   };
 
   return (
-    <div>
+    <div ref={isMobile ? refreshRef : undefined}>
+      {(isPulling || isRefreshing) && (
+        <div className="flex items-center justify-center py-3 text-sm text-muted-foreground">
+          <Loader2 size={16} className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? '刷新中...' : '下拉刷新'}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
@@ -280,23 +317,16 @@ export default function EntryListPage({ filter }: Props) {
       ) : (
         <div className="space-y-4">
           {entries.map((entry, i) => (
-            <div key={entry.id} className="relative">
-              {selectionMode && (
-                <button
-                  onClick={() => toggleSelect(entry.id)}
-                  className="absolute left-0 top-5 z-10 -ml-8 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {selectedIds.has(entry.id) ? (
-                    <CheckSquare size={18} className="text-primary" />
-                  ) : (
-                    <Square size={18} />
-                  )}
-                </button>
-              )}
+            <div key={entry.id}>
               <EntryCard
                 entry={entry}
                 selected={i === selectedIndex || selectedIds.has(entry.id)}
                 onDomainClick={(d) => setDomain(d)}
+                selectionMode={selectionMode}
+                entrySelected={selectedIds.has(entry.id)}
+                onToggleSelect={() => toggleSelect(entry.id)}
+                entryIndex={i}
+                entryIds={entryIds}
               />
             </div>
           ))}
@@ -322,7 +352,7 @@ export default function EntryListPage({ filter }: Props) {
 
       {/* Bulk action bar */}
       {selectionMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-lg">
+        <div className="fixed left-0 right-0 z-50 bg-background border-t border-border shadow-lg pb-[env(safe-area-inset-bottom)]" style={{ bottom: 'var(--bottom-nav-height, 0px)' }}>
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
             <span className="text-sm font-medium">已选 {selectedIds.size} 篇</span>
 
