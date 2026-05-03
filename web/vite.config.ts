@@ -40,6 +40,15 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        share_target: {
+          action: '/share-target',
+          method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
+          params: {
+            url: 'url',
+            text: 'text',
+          },
+        },
       },
     }),
   ],

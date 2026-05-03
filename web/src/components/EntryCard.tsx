@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Star, Archive, ExternalLink, Clock } from 'lucide-react';
+import { Star, Archive, ExternalLink, Clock, CheckSquare, Square } from 'lucide-react';
 import { type EntrySummary } from '../api/entries';
 import { timeAgo } from '../utils/time';
 import { useEntryActions } from '../hooks/useEntryActions';
@@ -11,21 +11,48 @@ export default function EntryCard({
   entry,
   selected = false,
   onDomainClick,
+  selectionMode,
+  entrySelected,
+  onToggleSelect,
+  entryIndex,
+  entryIds,
 }: {
   entry: EntrySummary;
   selected?: boolean;
   onDomainClick?: (domain: string) => void;
+  selectionMode?: boolean;
+  entrySelected?: boolean;
+  onToggleSelect?: () => void;
+  entryIndex?: number;
+  entryIds?: string[];
 }) {
   const { toggleStar, toggleArchive } = useEntryActions(entry.id, entry);
 
   return (
     <div className={cn(
       'group bg-card border border-border rounded-xl p-5',
-      selected ? 'ring-2 ring-primary shadow-md shadow-primary/10' : ''
+      selected ? 'ring-2 ring-primary shadow-md shadow-primary/10' : '',
+      selectionMode ? 'flex flex-row items-start' : ''
     )}>
+      {selectionMode && (
+        <button
+          onClick={(e) => { e.preventDefault(); onToggleSelect?.(); }}
+          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mr-3"
+        >
+          {entrySelected ? (
+            <CheckSquare size={18} className="text-primary" />
+          ) : (
+            <Square size={18} />
+          )}
+        </button>
+      )}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div className="flex-1 min-w-0 flex flex-col gap-2">
-          <Link to={`/entry/${entry.id}`} className="block">
+          <Link
+            to={`/entry/${entry.id}`}
+            state={entryIds ? { entryIds, currentIndex: entryIndex } : undefined}
+            className="block"
+          >
             <h3 className="text-lg font-semibold text-card-foreground leading-snug line-clamp-2 hover:text-primary transition-colors break-all">
               {entry.title || entry.url}
             </h3>

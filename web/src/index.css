@@ -109,3 +109,10 @@
     @apply overflow-x-auto max-w-full;
   }
 }
+
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { login } from '../api/auth';
 import { useAuthStore } from '../store/auth';
 import { Button } from '../components/ui/button';
@@ -11,6 +11,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawRedirect = searchParams.get('redirect') || '/';
+  const redirect = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
   const authLogin = useAuthStore((s) => s.login);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +23,7 @@ export default function LoginPage() {
     try {
       const res = await login(email, password);
       authLogin(res.access_token, res.refresh_token);
-      navigate('/');
+      navigate(redirect);
     } catch (err: any) {
       setError(err.response?.data?.message || '登录失败');
     } finally {

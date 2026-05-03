@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '../../store/auth';
 import { useNavigate } from 'react-router-dom';
 import { logout as apiLogout } from '../../api/auth';
-import { useState } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 
 const bottomNavItems = [
   { to: '/', label: '未读', icon: BookOpen, end: true },
@@ -18,6 +18,14 @@ export function MobileBottomNav() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const { logout } = useAuthStore();
   const navigate = useNavigate();
+  const navRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = navRef.current;
+    if (el) {
+      document.documentElement.style.setProperty('--bottom-nav-height', `${el.offsetHeight}px`);
+    }
+  }, []);
 
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refresh_token');
@@ -29,7 +37,7 @@ export function MobileBottomNav() {
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card lg:hidden">
+    <div ref={navRef} className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card lg:hidden">
       <div className="flex items-center justify-around px-1 py-1 pb-[env(safe-area-inset-bottom)] box-border">
         {bottomNavItems.map((item) => (
           <NavLink

@@ -236,7 +236,8 @@ export default function SettingsPage() {
         {tagStats.length === 0 ? (
           <p className="text-sm text-muted-foreground">暂无标签</p>
         ) : (
-          <div className="border border-border rounded-lg overflow-hidden">
+          <>
+          <div className="border border-border rounded-lg overflow-hidden hidden sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
@@ -291,6 +292,46 @@ export default function SettingsPage() {
               </tbody>
             </table>
           </div>
+          <div className="space-y-2 sm:hidden">
+            {tagStats.map((tag) => (
+              <div key={tag.id} className="border border-border rounded-lg p-3 bg-card">
+                <div className="flex items-center justify-between mb-2">
+                  {editingTagId === tag.id ? (
+                    <Input
+                      value={editingLabel}
+                      onChange={(e) => setEditingLabel(e.target.value)}
+                      onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
+                      onBlur={() => setEditingTagId(null)}
+                      className="h-7 text-sm flex-1 mr-2"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="font-medium text-card-foreground">{tag.label}</span>
+                  )}
+                  <span className="text-sm text-muted-foreground">{tag.entry_count} 篇</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => { setEditingTagId(tag.id); setEditingLabel(tag.label); }}
+                  >
+                    <Pencil size={14} className="mr-1" /> 编辑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 hover:text-destructive"
+                    onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
+                  >
+                    <Trash2 size={14} className="mr-1" /> 删除
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </section>
 

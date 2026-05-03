@@ -28,7 +28,7 @@ export default function PagesPage() {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto flex-nowrap scrollbar-hide">
           {TABS.map(t => (
             <button
               key={t.key}

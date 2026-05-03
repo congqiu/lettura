@@ -69,7 +69,10 @@ export function useListKeyboardNav(
         case 'Enter':
         case 'o':
           if (currentEntries[currentSelected]) {
-            navigate(`/entry/${currentEntries[currentSelected].id}`);
+            const entryIds = currentEntries.map(e => e.id);
+            navigate(`/entry/${currentEntries[currentSelected].id}`, {
+              state: { entryIds, currentIndex: currentSelected },
+            });
           }
           break;
       }

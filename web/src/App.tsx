@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ShareTargetPage from './pages/ShareTargetPage';
 import EntryListPage from './pages/EntryListPage';
 import EntryDetailPage from './pages/EntryDetailPage';
 
@@ -35,6 +36,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/share-target" element={<ShareTargetPage />} />
               <Route
                 path="/"
                 element={
