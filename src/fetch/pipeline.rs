@@ -79,6 +79,13 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
         _ => job.url.clone(),
     };
 
+    // SSRF protection: block requests to private/reserved IPs.
+    if let Err(e) = crate::fetch::ssrf::validate_url(&effective_url) {
+        tracing::warn!(entry_id = %job.entry_id, url = %effective_url, "SSRF blocked: {e}");
+        mark_failed(&ctx.pool, job.entry_id, 0).await;
+        return;
+    }
+
     // Build the request with per-site overrides.
     let mut builder = ctx.client.get(&effective_url);
     if let Some(ref sc) = site_config {

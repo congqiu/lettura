@@ -14,3 +14,4 @@ pub mod pipeline;
 #[cfg(feature = "rendering")]
 pub mod render;
 pub mod rewrite;
+pub mod ssrf;

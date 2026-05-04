@@ -35,6 +35,11 @@ pub fn create_storage(config: &crate::config::Config) -> Box<dyn ImageStorage> {
 }
 
 pub async fn download_image(url: &str, max_size: usize) -> Result<(Vec<u8>, String), StorageError> {
+    // SSRF protection: block requests to private/reserved IPs.
+    if let Err(e) = crate::fetch::ssrf::validate_url(url) {
+        return Err(StorageError::Io(format!("SSRF blocked: {e}")));
+    }
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .user_agent("Lettura/0.1")
