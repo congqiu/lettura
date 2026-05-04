@@ -23,6 +23,8 @@ pub struct Config {
     pub db_acquire_timeout_secs: u64,
     // CORS
     pub cors_origins: String,
+    // Production mode
+    pub production: bool,
     // Metrics
     pub metrics_enabled: bool,
     // Fetch
@@ -67,6 +69,18 @@ impl Config {
             ));
         }
 
+        let cors_origins = env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string());
+
+        let production = env::var("LETTURA_PRODUCTION")
+            .ok()
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+
+        // Reject wildcard CORS in production for security
+        if production && cors_origins == "*" {
+            return Err("CORS_ORIGINS must not be '*' in production mode. Set CORS_ORIGINS to specific allowed origins.".to_string());
+        }
+
         Ok(Self {
             database_url: env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?,
             jwt_secret,
@@ -84,7 +98,8 @@ impl Config {
             db_max_connections: env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
             db_min_connections: env::var("DB_MIN_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
             db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
-            cors_origins: env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string()),
+            cors_origins,
+            production,
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
             user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
@@ -160,6 +175,7 @@ mod tests {
             env::remove_var("DB_MIN_CONNECTIONS");
             env::remove_var("DB_ACQUIRE_TIMEOUT");
             env::remove_var("CORS_ORIGINS");
+            env::remove_var("LETTURA_PRODUCTION");
             env::remove_var("METRICS_ENABLED");
             env::remove_var("PAGES_STORAGE_PATH");
             env::remove_var("LETTURA_USER_AGENT");
@@ -222,5 +238,17 @@ mod tests {
         let cfg = Config::from_env().unwrap();
         assert!(!cfg.rendering_runtime_enabled());
         cleanup_env();
+    }
+
+    #[test]
+    fn rejects_wildcard_cors_in_production_mode() {
+        set_env("a-very-secure-secret-that-is-at-least-32-chars!");
+        unsafe { env::set_var("LETTURA_PRODUCTION", "true"); }
+        unsafe { env::set_var("CORS_ORIGINS", "*"); }
+        let result = Config::from_env();
+        unsafe { env::remove_var("LETTURA_PRODUCTION"); }
+        cleanup_env();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("CORS_ORIGINS"));
     }
 }
