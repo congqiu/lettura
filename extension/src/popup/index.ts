@@ -51,6 +51,10 @@ async function doLogin(): Promise<void> {
     showMessage(loginError, 'Please enter the server URL.', 'error');
     return;
   }
+  if (!serverUrl.startsWith('https://') && !serverUrl.startsWith('http://localhost') && !serverUrl.startsWith('http://127.0.0.1')) {
+    showMessage(loginError, 'Server URL must use HTTPS (or http://localhost for development).', 'error');
+    return;
+  }
   if (!email) {
     showMessage(loginError, 'Please enter your email.', 'error');
     return;

@@ -37,6 +37,8 @@ jobs:
         run: cargo fmt --check
       - name: Clippy lints
         run: cargo clippy -- -D warnings
+      - name: Security audit
+        run: cargo install cargo-audit --locked && cargo audit
 
   frontend-test:
     name: Frontend Tests
@@ -58,6 +60,8 @@ jobs:
         run: npx vitest run
       - name: Build
         run: npm run build
+      - name: Security audit
+        run: npx npm-audit-report --output markdown || npm audit --audit-level=moderate
 
   docker-build:
     name: Docker Build

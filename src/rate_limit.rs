@@ -29,7 +29,7 @@ impl GlobalRateLimit {
     }
 }
 
-fn extract_client_ip(request: &Request, trust_proxy: bool) -> String {
+pub fn extract_client_ip(request: &Request, trust_proxy: bool) -> String {
     if trust_proxy {
         if let Some(xff) = request.headers().get("x-forwarded-for") {
             if let Ok(val) = xff.to_str() {

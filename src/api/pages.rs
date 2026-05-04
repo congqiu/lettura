@@ -161,6 +161,9 @@ pub async fn upload_files(
 }
 
 fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
+    const MAX_ENTRIES: usize = 500;
+    const MAX_NAME_LEN: usize = 255;
+
     let reader = std::io::Cursor::new(data);
     let mut archive = zip::ZipArchive::new(reader).map_err(|e| ApiError::BadRequest(format!("invalid zip: {e}")))?;
     let mut files = Vec::new();
@@ -175,6 +178,12 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
         }
         if name.contains("..") {
             continue;
+        }
+        if name.len() > MAX_NAME_LEN {
+            return Err(ApiError::BadRequest(format!("zip entry name too long (max {MAX_NAME_LEN} chars): {name}")));
+        }
+        if files.len() >= MAX_ENTRIES {
+            return Err(ApiError::BadRequest(format!("too many zip entries (max {MAX_ENTRIES})")));
         }
 
         let mut content = Vec::new();

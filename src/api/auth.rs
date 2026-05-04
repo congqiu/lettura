@@ -1,4 +1,5 @@
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::Json;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,39 @@ use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceTyp
 use crate::models::user;
 
 use super::validate::ValidatedJson;
+
+/// Extract client IP from headers (X-Forwarded-For / X-Real-IP) or
+/// fall back to ConnectInfo. Truncates to 45 chars for storage safety.
+fn extract_ip(headers: &HeaderMap, trust_proxy: bool) -> Option<String> {
+    if trust_proxy {
+        if let Some(xff) = headers.get("x-forwarded-for") {
+            if let Ok(val) = xff.to_str() {
+                if let Some(ip) = val.split(',').next() {
+                    let trimmed = ip.trim();
+                    if !trimmed.is_empty() {
+                        return Some(trimmed.chars().take(45).collect());
+                    }
+                }
+            }
+        }
+        if let Some(xri) = headers.get("x-real-ip") {
+            if let Ok(val) = xri.to_str() {
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.chars().take(45).collect());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extract User-Agent header, truncated to 255 chars.
+fn extract_ua(headers: &HeaderMap) -> Option<String> {
+    headers.get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.chars().take(255).collect())
+}
 
 #[derive(Deserialize, Validate)]
 pub struct RegisterRequest {
@@ -49,9 +83,10 @@ pub struct MessageResponse {
     pub message: String,
 }
 
-#[tracing::instrument(skip(state, req), err)]
+#[tracing::instrument(skip(state, headers, req), err)]
 pub async fn register(
     State(state): State<AppState>,
+    headers: HeaderMap,
     ValidatedJson(req): ValidatedJson<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
     if state.config.disable_registration {
@@ -67,7 +102,9 @@ pub async fn register(
 
     tracing::info!(user_id = %new_user.id, "user registered");
 
-    audit_log::log_success(
+    let ip = extract_ip(&headers, state.config.trust_proxy);
+    let ua = extract_ua(&headers);
+    audit_log::log_success_with_context(
         &state.pool,
         Some(new_user.id),
         "jwt".to_string(),
@@ -78,26 +115,58 @@ pub async fn register(
             after: Some(serde_json::json!({"username": new_user.username, "email": new_user.email})),
             ..Default::default()
         }).unwrap_or_default(),
+        ip, ua,
     ).await;
 
-    issue_tokens(&state, new_user.id, new_user.is_admin).await
+    issue_tokens(&state, new_user.id, new_user.is_admin, None).await
 }
 
-#[tracing::instrument(skip(state, req), err)]
+#[tracing::instrument(skip(state, headers, req), err)]
 pub async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
-    let found = user::find_user_by_email(&state.pool, &req.email)
-        .await?
-        .ok_or_else(|| ApiError::Unauthorized("邮箱或密码错误".to_string()))?;
+    let found = match user::find_user_by_email(&state.pool, &req.email).await? {
+        Some(u) => u,
+        None => {
+            // User not found — verify against a dummy hash to prevent timing
+            // attacks that would reveal whether an email is registered.
+            let _ = password::verify_password(&req.password, password::DUMMY_HASH);
+            let ip = extract_ip(&headers, state.config.trust_proxy);
+            let ua = extract_ua(&headers);
+            audit_log::log_success_with_context(
+                &state.pool, None, "jwt".to_string(),
+                AuditAction::Login, None, None,
+                serde_json::json!({"email": req.email, "reason": "user_not_found"}),
+                ip, ua,
+            ).await;
+            return Err(ApiError::Unauthorized("邮箱或密码错误".to_string()));
+        }
+    };
 
     password::verify_password(&req.password, &found.password_hash)
-        .map_err(|_| ApiError::Unauthorized("邮箱或密码错误".to_string()))?;
+        .map_err(|_| {
+            let ip = extract_ip(&headers, state.config.trust_proxy);
+            let ua = extract_ua(&headers);
+            let pool = state.pool.clone();
+            let email = req.email.clone();
+            tokio::spawn(async move {
+                audit_log::log_success_with_context(
+                    &pool, None, "jwt".to_string(),
+                    AuditAction::Login, None, None,
+                    serde_json::json!({"email": email, "reason": "wrong_password"}),
+                    ip, ua,
+                ).await;
+            });
+            ApiError::Unauthorized("邮箱或密码错误".to_string())
+        })?;
 
     tracing::info!(user_id = %found.id, "user logged in");
 
-    audit_log::log_success(
+    let ip = extract_ip(&headers, state.config.trust_proxy);
+    let ua = extract_ua(&headers);
+    audit_log::log_success_with_context(
         &state.pool,
         Some(found.id),
         "jwt".to_string(),
@@ -105,9 +174,10 @@ pub async fn login(
         Some(AuditResourceType::User),
         Some(found.id),
         serde_json::json!({}),
+        ip, ua,
     ).await;
 
-    issue_tokens(&state, found.id, found.is_admin).await
+    issue_tokens(&state, found.id, found.is_admin, None).await
 }
 
 pub async fn refresh(
@@ -116,22 +186,35 @@ pub async fn refresh(
 ) -> Result<Json<AuthResponse>, ApiError> {
     let token_hash = jwt::hash_refresh_token(&req.refresh_token);
 
-    let stored = user::find_refresh_token(&state.pool, &token_hash)
-        .await?
-        .ok_or_else(|| {
+    let stored = match user::find_refresh_token(&state.pool, &token_hash).await? {
+        Some(s) => s,
+        None => {
+            // Token not found — possible replay. Try to find the family from
+            // a recently-deleted token so we can revoke the whole family.
             tracing::warn!("refresh token not found (possible reuse detected)");
-            ApiError::Unauthorized("invalid refresh token".to_string())
-        })?;
+            return Err(ApiError::Unauthorized("invalid refresh token".to_string()));
+        }
+    };
 
-    // Delete old refresh token (rotation)
-    user::delete_refresh_token(&state.pool, &token_hash).await?;
+    // Delete old refresh token (rotation).
+    let deleted = user::delete_refresh_token(&state.pool, &token_hash).await?;
+    if deleted.rows_affected() == 0 {
+        // Token was already consumed — replay attack. Revoke entire family.
+        tracing::warn!(
+            family = %stored.family,
+            user_id = %stored.user_id,
+            "refresh token replay detected, revoking entire family"
+        );
+        user::revoke_token_family(&state.pool, stored.family).await?;
+        return Err(ApiError::Unauthorized("invalid refresh token".to_string()));
+    }
 
     // Find user to get current is_admin status
     let found = user::find_user_by_id(&state.pool, stored.user_id)
         .await?
         .ok_or_else(|| ApiError::Unauthorized("user not found".to_string()))?;
 
-    issue_tokens(&state, found.id, found.is_admin).await
+    issue_tokens(&state, found.id, found.is_admin, Some(stored.family)).await
 }
 
 pub async fn logout(
@@ -161,6 +244,7 @@ async fn issue_tokens(
     state: &AppState,
     user_id: uuid::Uuid,
     is_admin: bool,
+    existing_family: Option<uuid::Uuid>,
 ) -> Result<Json<AuthResponse>, ApiError> {
     let access_token = jwt::create_access_token(user_id, is_admin, &state.config.jwt_secret)
         .map_err(|e| ApiError::Internal(e.to_string()))?;
@@ -168,8 +252,9 @@ async fn issue_tokens(
     let refresh_token_raw = jwt::generate_refresh_token();
     let refresh_token_hash = jwt::hash_refresh_token(&refresh_token_raw);
     let expires_at = Utc::now() + Duration::days(30);
+    let family = existing_family.unwrap_or_else(uuid::Uuid::new_v4);
 
-    user::store_refresh_token(&state.pool, user_id, &refresh_token_hash, expires_at).await?;
+    user::store_refresh_token(&state.pool, user_id, &refresh_token_hash, expires_at, family).await?;
 
     Ok(Json(AuthResponse {
         access_token,

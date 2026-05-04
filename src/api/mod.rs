@@ -218,17 +218,19 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
                 .route("/{slug}/{*file}", get(pages_public::serve_page_file))
                 .route("/{slug}/auth", post(pages_public::auth_page))
                 .with_state(state.clone());
+            // Allow same-origin framing for shared pages (overrides global frame-ancestors 'none')
+            // CSP for shared pages: no scripts allowed (prevents stored XSS from user HTML),
+            // inline styles allowed for readability, images from self/data/https/blob.
             page_router.layer(
                 SetResponseHeaderLayer::overriding(
                     axum::http::header::HeaderName::from_static("x-frame-options"),
                     HeaderValue::from_static("SAMEORIGIN"),
                 )
             )
-            // Allow same-origin framing for shared pages (overrides global frame-ancestors 'none')
             .layer(SetResponseHeaderLayer::overriding(
                 axum::http::header::HeaderName::from_static("content-security-policy"),
                 HeaderValue::from_static(
-                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+                    "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
                 ),
             ))
         })
@@ -247,6 +249,9 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
                     .split(',')
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
+                if origins.is_empty() {
+                    panic!("CORS_ORIGINS is set but no valid origins could be parsed. Check for typos — each entry must be a valid URL (e.g. https://example.com)");
+                }
                 cors.allow_origin(origins)
             }
         })
@@ -290,11 +295,12 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
     };
 
     let router = router
-        // Request tracing: adds request_id to spans and logs
+        // Request tracing: adds request_id to spans and logs.
+        // Headers are intentionally excluded to avoid logging sensitive
+        // values (Authorization, Cookie, etc.).
         .layer(TraceLayer::new_for_http().make_span_with(
             DefaultMakeSpan::new()
-                .level(tracing::Level::INFO)
-                .include_headers(true),
+                .level(tracing::Level::INFO),
         ))
         // Request ID middleware: propagates or generates X-Request-Id
         .layer(axum::middleware::from_fn(
@@ -331,10 +337,23 @@ async fn serve_storage(
     match tokio::fs::read(&file_path).await {
         Ok(data) => {
             let mime = mime_guess::from_path(&path).first_or_octet_stream();
+            let mime_str = mime.as_ref();
+            // Force dangerous content types to download instead of render inline.
+            // Prevents stored XSS via user-uploaded HTML/JS files.
+            let is_dangerous = mime_str.starts_with("text/html")
+                || mime_str.starts_with("application/javascript")
+                || mime_str.starts_with("application/xhtml")
+                || mime_str.starts_with("text/javascript");
+            let content_disposition = if is_dangerous {
+                "attachment"
+            } else {
+                "inline"
+            };
             (
                 axum::http::StatusCode::OK,
-                [(axum::http::header::CONTENT_TYPE, mime.as_ref().to_string()),
-                 (axum::http::header::CACHE_CONTROL, "public, max-age=31536000".to_string())],
+                [(axum::http::header::CONTENT_TYPE, mime_str.to_string()),
+                 (axum::http::header::CACHE_CONTROL, "public, max-age=31536000".to_string()),
+                 (axum::http::header::CONTENT_DISPOSITION, content_disposition.to_string())],
                 data,
             ).into_response()
         }

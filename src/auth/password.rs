@@ -12,6 +12,11 @@ pub enum PasswordError {
     VerifyError,
 }
 
+/// A pre-computed argon2 hash used as a dummy when the user is not found.
+/// Running verify_password against this eliminates timing differences between
+/// "user not found" and "wrong password" paths.
+pub const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$YXNkZmFzZGZhc2RmYXNk$N0K0ZWWJF4L5KLpKbGBqMbsV8pQ0YtMa5M8+Lm4Fk3I";
+
 pub fn hash_password(password: &str) -> Result<String, PasswordError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();

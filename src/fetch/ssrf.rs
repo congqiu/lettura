@@ -47,8 +47,13 @@ fn is_private_ip(ip: &IpAddr) -> bool {
 }
 
 /// Validate that a URL does not point to a private/reserved IP.
+/// Rejects non-HTTP schemes (file://, gopher://, etc.) and private/reserved hosts.
 pub fn validate_url(raw_url: &str) -> Result<(), String> {
     let parsed = Url::parse(raw_url).map_err(|e| format!("invalid URL: {e}"))?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(format!("blocked non-HTTP scheme: {scheme}://"));
+    }
     let host = parsed.host_str().ok_or_else(|| "URL has no host".to_string())?;
     if is_private_host(host) {
         return Err(format!("blocked private/reserved host: {host}"));
@@ -170,6 +175,26 @@ mod tests {
     fn allows_public_domains() {
         assert!(!is_private_host("example.com"));
         assert!(!is_private_host("github.com"));
+    }
+
+    #[test]
+    fn validate_url_blocks_file_scheme() {
+        assert!(validate_url("file:///etc/passwd").is_err());
+    }
+
+    #[test]
+    fn validate_url_blocks_gopher_scheme() {
+        assert!(validate_url("gopher://internal/").is_err());
+    }
+
+    #[test]
+    fn validate_url_allows_http_scheme() {
+        assert!(validate_url("http://example.com/page").is_ok());
+    }
+
+    #[test]
+    fn validate_url_allows_https_scheme() {
+        assert!(validate_url("https://example.com/page").is_ok());
     }
 
     #[test]

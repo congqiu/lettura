@@ -23,6 +23,7 @@ pub struct RefreshToken {
     pub user_id: Uuid,
     pub token_hash: String,
     pub expires_at: DateTime<Utc>,
+    pub family: Uuid,
     pub created_at: DateTime<Utc>,
 }
 
@@ -80,13 +81,15 @@ pub async fn store_refresh_token(
     user_id: Uuid,
     token_hash: &str,
     expires_at: DateTime<Utc>,
+    family: Uuid,
 ) -> Result<(), ModelError> {
     sqlx::query(
-        "INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+        "INSERT INTO refresh_tokens (user_id, token_hash, expires_at, family) VALUES ($1, $2, $3, $4)",
     )
     .bind(user_id)
     .bind(token_hash)
     .bind(expires_at)
+    .bind(family)
     .execute(pool)
     .await
     .map_err(|e| ModelError::Database(e.to_string()))?;
@@ -106,19 +109,28 @@ pub async fn find_refresh_token(
     .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn delete_refresh_token(pool: &PgPool, token_hash: &str) -> Result<(), ModelError> {
+pub async fn delete_refresh_token(pool: &PgPool, token_hash: &str) -> Result<sqlx::postgres::PgQueryResult, ModelError> {
     sqlx::query("DELETE FROM refresh_tokens WHERE token_hash = $1")
         .bind(token_hash)
         .execute(pool)
         .await
-        .map_err(|e| ModelError::Database(e.to_string()))?;
-    Ok(())
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 /// Revoke all refresh tokens for a user (e.g. on password change).
 pub async fn revoke_all_refresh_tokens(pool: &PgPool, user_id: Uuid) -> Result<(), ModelError> {
     sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
         .bind(user_id)
+        .execute(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Revoke all refresh tokens in a family (on replay detection).
+pub async fn revoke_token_family(pool: &PgPool, family: Uuid) -> Result<(), ModelError> {
+    sqlx::query("DELETE FROM refresh_tokens WHERE family = $1")
+        .bind(family)
         .execute(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;

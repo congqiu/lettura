@@ -14,6 +14,45 @@ use crate::site_config::RequestConfig;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+/// Maximum number of HTTP redirects to follow manually.
+const MAX_REDIRECTS: usize = 10;
+
+/// Error type for fetch operations, wrapping reqwest errors and SSRF violations.
+#[derive(Debug)]
+pub enum FetchError {
+    /// A reqwest-level error (timeout, connect, etc.).
+    Reqwest(reqwest::Error),
+    /// SSRF policy violation (private IP, bad scheme, DNS rebinding).
+    Ssrf(String),
+    /// Too many redirects.
+    TooManyRedirects,
+}
+
+impl std::fmt::Display for FetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchError::Reqwest(e) => write!(f, "{e}"),
+            FetchError::Ssrf(msg) => write!(f, "SSRF blocked: {msg}"),
+            FetchError::TooManyRedirects => write!(f, "too many redirects"),
+        }
+    }
+}
+
+impl std::error::Error for FetchError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FetchError::Reqwest(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<reqwest::Error> for FetchError {
+    fn from(e: reqwest::Error) -> Self {
+        FetchError::Reqwest(e)
+    }
+}
+
 /// Build the global reqwest client used by all fetch workers.
 /// Mirrors the pre-refactor defaults (cookie jar, optional proxy, default
 /// accept/language headers, configurable UA and timeout).
@@ -37,8 +76,11 @@ pub fn build_client(config: &Config) -> reqwest::Client {
 
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(config.fetch_timeout_secs))
+        .connect_timeout(Duration::from_secs(10))
+        .pool_max_idle_per_host(2)
         .user_agent(&config.user_agent)
         .cookie_store(true)
+        .redirect(reqwest::redirect::Policy::none())
         .default_headers(headers);
 
     if let Some(ref proxy_url) = config.proxy {
@@ -96,18 +138,98 @@ pub fn apply_request_config(
     builder
 }
 
-/// Send a request built from `request_builder`, retrying on transient failures.
+/// Send a request with site-config overrides, retrying on transient failures.
 /// On 429 the server's `Retry-After` is honored when present. All retries use
-/// capped exponential backoff with ±25% jitter. Per-attempt requests are
-/// cloned from `request_builder` so site-config headers/cookies/UA survive all
-/// retries; if the builder can't be cloned (e.g., stream body) each attempt
-/// falls back to a plain GET.
+/// capped exponential backoff with ±25% jitter.
+///
+/// Redirects are followed manually (the client has auto-redirect disabled) so
+/// that each hop is validated against SSRF rules (scheme + private-IP check)
+/// and DNS-rebinding protection (resolved IPs are checked after resolution).
+/// Site-config request overrides (headers, cookies, user-agent) are applied
+/// to every request including redirect hops.
 pub async fn fetch_with_retry(
-    request_builder: reqwest::RequestBuilder,
     url: &str,
     client: &reqwest::Client,
     max_retries: u32,
-) -> Result<reqwest::Response, reqwest::Error> {
+    request_config: Option<&RequestConfig>,
+) -> Result<reqwest::Response, FetchError> {
+    let mut current_url = url.to_string();
+    let mut redirects = 0usize;
+
+    loop {
+        // Pre-flight: resolve DNS and check that no resolved IP is private.
+        dns_check(&current_url).await?;
+
+        let response = send_with_retry_inner(&current_url, client, max_retries, request_config).await?;
+
+        let status = response.status();
+        if status.is_redirection() {
+            if redirects >= MAX_REDIRECTS {
+                tracing::warn!(url = %current_url, redirects, "too many redirects");
+                return Err(FetchError::TooManyRedirects);
+            }
+            if let Some(location) = response.headers().get(reqwest::header::LOCATION) {
+                let loc_str = location.to_str().unwrap_or("");
+                let next_url = resolve_redirect_url(&current_url, loc_str);
+                // Validate the redirect target against SSRF rules.
+                if let Err(e) = crate::fetch::ssrf::validate_url(&next_url) {
+                    tracing::warn!(from = %current_url, to = %next_url, "redirect SSRF blocked: {e}");
+                    return Err(FetchError::Ssrf(e));
+                }
+                tracing::debug!(from = %current_url, to = %next_url, "following redirect");
+                current_url = next_url;
+                redirects += 1;
+                continue;
+            }
+            // Redirect without Location header — return as-is.
+            return Ok(response);
+        }
+
+        return Ok(response);
+    }
+}
+
+/// Resolve a potentially-relative redirect Location against the current URL.
+fn resolve_redirect_url(current_url: &str, location: &str) -> String {
+    if location.starts_with("http://") || location.starts_with("https://") {
+        return location.to_string();
+    }
+    // Relative URL: resolve against the current URL's origin.
+    if let Ok(base) = url::Url::parse(current_url) {
+        if let Ok(joined) = base.join(location) {
+            return joined.to_string();
+        }
+    }
+    // Fallback: treat as-is.
+    location.to_string()
+}
+
+/// Pre-flight DNS check: resolve the host and reject private/reserved IPs.
+async fn dns_check(url_str: &str) -> Result<(), FetchError> {
+    let parsed = url::Url::parse(url_str).map_err(|e| FetchError::Ssrf(format!("invalid URL: {e}")))?;
+    let host = parsed.host_str().ok_or_else(|| FetchError::Ssrf("URL has no host".to_string()))?;
+    // Skip if already a raw IP — validate_url already handles that.
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        return Ok(());
+    }
+    // Resolve via system DNS and check all resulting IPs.
+    let addr = format!("{}:{}", host, parsed.port_or_known_default().unwrap_or(80));
+    let ips: Vec<std::net::IpAddr> = tokio::net::lookup_host(&addr)
+        .await
+        .map_err(|e| FetchError::Ssrf(format!("DNS resolution failed for {host}: {e}")))?
+        .map(|sa| sa.ip())
+        .collect();
+    crate::fetch::ssrf::check_resolved_ips(&ips).map_err(FetchError::Ssrf)
+}
+
+/// Inner retry loop: send a single request (no redirect handling) with
+/// transient-error retries. Site-config overrides are applied per attempt.
+async fn send_with_retry_inner(
+    url: &str,
+    client: &reqwest::Client,
+    max_retries: u32,
+    request_config: Option<&RequestConfig>,
+) -> Result<reqwest::Response, FetchError> {
     for attempt in 0..=max_retries {
         if attempt > 0 {
             let actual = backoff_delay(attempt, rand_simple());
@@ -115,18 +237,13 @@ pub async fn fetch_with_retry(
             tokio::time::sleep(actual).await;
         }
 
-        let attempt_builder = match request_builder.try_clone() {
-            Some(b) => b,
-            None => {
-                tracing::warn!(
-                    url = %url,
-                    "request builder not cloneable, retry will use plain GET (headers/cookies dropped)"
-                );
-                client.get(url)
-            }
-        };
+        let mut builder = client.get(url);
+        if let Some(rc) = request_config {
+            builder = apply_request_config(builder, rc);
+        }
+        let req = builder.build()?;
 
-        let response = match attempt_builder.send().await {
+        let response = match client.execute(req).await {
             Ok(r) => r,
             Err(e) => {
                 let is_retryable = e.is_timeout() || e.is_connect() || e.is_request();
@@ -141,12 +258,12 @@ pub async fn fetch_with_retry(
                 if is_retryable && attempt < max_retries {
                     continue;
                 }
-                return Err(e);
+                return Err(e.into());
             }
         };
 
         let status = response.status();
-        if status.is_success() {
+        if status.is_success() || status.is_redirection() {
             return Ok(response);
         }
         if status.as_u16() == 429 || status.is_server_error() {
@@ -156,7 +273,6 @@ pub async fn fetch_with_retry(
                     tokio::time::sleep(d).await;
                 }
             }
-            // Drop the response and retry; last attempt returns it to the caller.
             if attempt < max_retries {
                 continue;
             }
@@ -398,5 +514,29 @@ mod tests {
     fn parse_retry_after_trims_whitespace() {
         let v = reqwest::header::HeaderValue::from_static("  42  ");
         assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(42)));
+    }
+
+    #[test]
+    fn resolve_redirect_absolute_url() {
+        let result = resolve_redirect_url("https://example.com/page", "https://other.com/target");
+        assert_eq!(result, "https://other.com/target");
+    }
+
+    #[test]
+    fn resolve_redirect_relative_path() {
+        let result = resolve_redirect_url("https://example.com/page", "/other");
+        assert_eq!(result, "https://example.com/other");
+    }
+
+    #[test]
+    fn resolve_redirect_relative_path_with_query() {
+        let result = resolve_redirect_url("https://example.com/page?q=1", "/other?r=2");
+        assert_eq!(result, "https://example.com/other?r=2");
+    }
+
+    #[test]
+    fn resolve_redirect_relative_no_leading_slash() {
+        let result = resolve_redirect_url("https://example.com/dir/page", "other");
+        assert_eq!(result, "https://example.com/dir/other");
     }
 }

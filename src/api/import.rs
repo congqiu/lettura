@@ -150,7 +150,7 @@ pub async fn import_browser(
         doc.select(&a_selector)
             .filter_map(|element| {
                 let href = element.value().attr("href")?;
-                if href.starts_with("http") {
+                if href.starts_with("http://") || href.starts_with("https://") {
                     let title: String = element.text().collect();
                     Some((href.to_string(), title.trim().to_string()))
                 } else {

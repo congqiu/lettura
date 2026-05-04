@@ -47,10 +47,12 @@ pub fn create_access_token(
 }
 
 pub fn validate_token(token: &str, secret: &str) -> Result<Claims, JwtError> {
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.set_required_spec_claims(&["exp", "iat", "sub"]);
     let data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
+        &validation,
     )
     .map_err(|e| match e.kind() {
         jsonwebtoken::errors::ErrorKind::ExpiredSignature => JwtError::Expired,

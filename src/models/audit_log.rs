@@ -163,6 +163,26 @@ pub async fn log_success(
     }
 }
 
+/// Like `log_success` but includes IP address and User-Agent for security-relevant actions.
+pub async fn log_success_with_context(
+    pool: &PgPool,
+    user_id: Option<Uuid>,
+    auth_source: String,
+    action: AuditAction,
+    resource_type: Option<AuditResourceType>,
+    resource_id: Option<Uuid>,
+    details: serde_json::Value,
+    ip_address: Option<String>,
+    user_agent: Option<String>,
+) {
+    let mut entry = new_entry(user_id, auth_source, action, resource_type, resource_id, details);
+    entry.ip_address = ip_address;
+    entry.user_agent = user_agent;
+    if let Err(e) = insert(pool, entry).await {
+        tracing::warn!("audit log insert failed: {e}");
+    }
+}
+
 /// Fire-and-forget helper for logging an action without blocking the request.
 pub fn fire_and_forget(
     pool: PgPool,

@@ -57,6 +57,12 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
     // render.mode == force → skip the static path entirely.
     if let Some(ref sc) = site_config {
         if sc.render.mode == RenderMode::Force {
+            // SSRF protection must apply to the render path too.
+            if let Err(e) = crate::fetch::ssrf::validate_url(&job.url) {
+                tracing::warn!(entry_id = %job.entry_id, url = %job.url, "SSRF blocked (render): {e}");
+                mark_failed(&ctx.pool, job.entry_id, 0).await;
+                return;
+            }
             if try_render_then_extract(ctx, job, sc, 200).await {
                 return;
             }
@@ -86,14 +92,11 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
         return;
     }
 
-    // Build the request with per-site overrides.
-    let mut builder = ctx.client.get(&effective_url);
-    if let Some(ref sc) = site_config {
-        builder = http::apply_request_config(builder, &sc.request);
-    }
+    // Build request config from site config overrides.
+    let request_config = site_config.as_ref().map(|sc| &sc.request);
 
     let fetch_result =
-        http::fetch_with_retry(builder, &effective_url, &ctx.client, ctx.max_retries).await;
+        http::fetch_with_retry(&effective_url, &ctx.client, ctx.max_retries, request_config).await;
 
     match fetch_result {
         Ok(response) => {
@@ -111,12 +114,14 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
             }
         }
         Err(e) => {
+            let is_timeout = matches!(&e, http::FetchError::Reqwest(re) if re.is_timeout());
+            let is_connect = matches!(&e, http::FetchError::Reqwest(re) if re.is_connect());
             tracing::warn!(
                 entry_id = %job.entry_id,
                 url = %effective_url,
                 error = %e,
-                is_timeout = e.is_timeout(),
-                is_connect = e.is_connect(),
+                is_timeout,
+                is_connect,
                 "fetch HTTP error after retries"
             );
             if !fallback_render(ctx, job, site_config.as_ref(), 0).await {
