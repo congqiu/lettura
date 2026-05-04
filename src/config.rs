@@ -25,6 +25,13 @@ pub struct Config {
     pub cors_origins: String,
     // Production mode
     pub production: bool,
+
+    /// Trust X-Forwarded-For / X-Real-IP headers for rate limiting.
+    /// Only enable when running behind a trusted reverse proxy.
+    pub trust_proxy: bool,
+
+    /// Disable new user registration
+    pub disable_registration: bool,
     // Metrics
     pub metrics_enabled: bool,
     pub metrics_bearer_token: Option<String>,
@@ -82,6 +89,11 @@ impl Config {
             return Err("CORS_ORIGINS must not be '*' in production mode. Set CORS_ORIGINS to specific allowed origins.".to_string());
         }
 
+        // Reject obvious weak defaults
+        if jwt_secret == "change-me-to-a-random-secret-at-least-32-characters-long" {
+            return Err("JWT_SECRET must be changed from the default value".to_string());
+        }
+
         Ok(Self {
             database_url: env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?,
             jwt_secret,
@@ -101,6 +113,8 @@ impl Config {
             db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
             cors_origins,
             production,
+            trust_proxy: env::var("LETTURA_TRUST_PROXY").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
+            disable_registration: env::var("LETTURA_DISABLE_REGISTRATION").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
             metrics_bearer_token: env::var("LETTURA_METRICS_BEARER_TOKEN").ok(),
             user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {

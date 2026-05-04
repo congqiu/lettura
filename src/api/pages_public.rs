@@ -174,9 +174,10 @@ pub async fn auth_page(
                     }
                 }
                 let sig = sign_cookie(&state.config.jwt_secret, &slug);
+                let secure_flag = if state.config.production { "; Secure" } else { "" };
                 let cookie = format!(
-                    "page_auth_{}={}; Path=/p/{}; Max-Age=86400; HttpOnly; SameSite=Lax",
-                    slug, sig, slug
+                    "page_auth_{}={}; Path=/p/{}; Max-Age=86400; HttpOnly; SameSite=Lax{}",
+                    slug, sig, slug, secure_flag
                 );
                 (
                     StatusCode::FOUND,

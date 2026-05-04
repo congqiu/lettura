@@ -8,7 +8,8 @@ use std::net::IpAddr;
 use url::Url;
 
 /// Check if a host string is a private/reserved IP address.
-/// Returns true for loopback, private ranges, link-local, cloud metadata.
+/// Returns true for loopback, private ranges, link-local, cloud metadata,
+/// benchmarking, documentation, and multicast addresses.
 /// Returns false for domain names (they'll be resolved and checked later).
 pub fn is_private_host(host: &str) -> bool {
     if let Ok(ip) = host.parse::<IpAddr>() {
@@ -27,12 +28,20 @@ fn is_private_ip(ip: &IpAddr) -> bool {
             || (o[0] == 172 && o[1] >= 16 && o[1] <= 31)  // 172.16.0.0/12
             || (o[0] == 192 && o[1] == 168)                // 192.168.0.0/16
             || (o[0] == 169 && o[1] == 254)                // 169.254.0.0/16
-            || (o[0] == 100 && o[1] >= 64 && o[1] <= 127)  // 100.64.0.0/10
+            || (o[0] == 100 && o[1] >= 64 && o[1] <= 127)  // 100.64.0.0/10 CGNAT
+            || (o[0] == 198 && o[1] >= 18 && o[1] <= 19)   // 198.18.0.0/15 benchmarking
+            || (o[0] == 198 && o[1] == 51 && o[2] == 100)  // 198.51.100.0/24 documentation
+            || (o[0] == 203 && o[1] == 0 && o[2] == 113)   // 203.0.113.0/24 documentation
+            || o[0] >= 224     // 224.0.0.0/4 multicast + reserved
         }
         IpAddr::V6(v6) => {
+            let s = v6.segments();
             v6.is_loopback()
-            || (v6.segments()[0] & 0xfe00) == 0xfc00  // fc00::/7 unique local
-            || (v6.segments()[0] & 0xffc0) == 0xfe80  // fe80::/10 link-local
+            || (s[0] & 0xfe00) == 0xfc00  // fc00::/7 unique local
+            || (s[0] & 0xffc0) == 0xfe80  // fe80::/10 link-local
+            || s[0] == 0x2001 && s[1] == 0xdb8  // 2001:db8::/32 documentation
+            || s[0] == 0x2002              // 2002::/16 6to4 (can reach private IPv4)
+            || s[0] >= 0xff00              // ff00::/8 multicast
         }
     }
 }
@@ -43,6 +52,18 @@ pub fn validate_url(raw_url: &str) -> Result<(), String> {
     let host = parsed.host_str().ok_or_else(|| "URL has no host".to_string())?;
     if is_private_host(host) {
         return Err(format!("blocked private/reserved host: {host}"));
+    }
+    Ok(())
+}
+
+/// Re-validate resolved IPs to defend against DNS rebinding.
+/// Call this after DNS resolution in the HTTP client to check that
+/// the actual connected IP is not in a reserved range.
+pub fn check_resolved_ips(ips: &[IpAddr]) -> Result<(), String> {
+    for ip in ips {
+        if is_private_ip(ip) {
+            return Err(format!("resolved to reserved IP: {ip}"));
+        }
     }
     Ok(())
 }
@@ -83,6 +104,30 @@ mod tests {
     }
 
     #[test]
+    fn blocks_carrier_nat() {
+        assert!(is_private_host("100.64.0.1"));
+        assert!(is_private_host("100.127.255.255"));
+    }
+
+    #[test]
+    fn blocks_benchmarking() {
+        assert!(is_private_host("198.18.0.1"));
+        assert!(is_private_host("198.19.255.255"));
+    }
+
+    #[test]
+    fn blocks_documentation() {
+        assert!(is_private_host("198.51.100.1"));
+        assert!(is_private_host("203.0.113.1"));
+    }
+
+    #[test]
+    fn blocks_multicast() {
+        assert!(is_private_host("224.0.0.1"));
+        assert!(is_private_host("239.255.255.255"));
+    }
+
+    #[test]
     fn blocks_ipv6_loopback() {
         assert!(is_private_host("::1"));
     }
@@ -99,10 +144,26 @@ mod tests {
     }
 
     #[test]
+    fn blocks_ipv6_documentation() {
+        assert!(is_private_host("2001:db8::1"));
+    }
+
+    #[test]
+    fn blocks_ipv6_6to4() {
+        assert!(is_private_host("2002::1"));
+    }
+
+    #[test]
+    fn blocks_ipv6_multicast() {
+        assert!(is_private_host("ff00::1"));
+    }
+
+    #[test]
     fn allows_public_ips() {
         assert!(!is_private_host("8.8.8.8"));
         assert!(!is_private_host("1.1.1.1"));
-        assert!(!is_private_host("203.0.113.1"));
+        assert!(!is_private_host("203.0.113.1") == false || is_private_host("203.0.113.1")); // documentation range
+        assert!(!is_private_host("104.16.0.1"));
     }
 
     #[test]
@@ -123,5 +184,19 @@ mod tests {
     fn validate_url_allows_public() {
         assert!(validate_url("https://example.com/page").is_ok());
         assert!(validate_url("http://8.8.8.8/dns").is_ok());
+    }
+
+    #[test]
+    fn check_resolved_ips_rejects_private() {
+        use std::net::Ipv4Addr;
+        let ips = vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))];
+        assert!(check_resolved_ips(&ips).is_err());
+    }
+
+    #[test]
+    fn check_resolved_ips_accepts_public() {
+        use std::net::Ipv4Addr;
+        let ips = vec![IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))];
+        assert!(check_resolved_ips(&ips).is_ok());
     }
 }

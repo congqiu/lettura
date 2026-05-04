@@ -254,12 +254,12 @@ export default function EntryDetailPage() {
           <p className="text-amber-600 dark:text-amber-400">正在抓取内容...</p>
         ) : entry.extract_method === 'failed' ? (
           <p className="text-destructive">内容提取失败。
-            <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
+            <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline ml-1">查看原文</a>
           </p>
         ) : entry.content ? (
           <article ref={articleRef} className="entry-content prose prose-gray dark:prose-invert max-w-none overflow-x-hidden" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
             FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
-            FORBID_ATTR: ['formaction', 'xlink:href'],
+            FORBID_ATTR: ['formaction', 'xlink:href', 'style'],
           }) }} />
         ) : (
           <p className="text-muted-foreground">暂无内容</p>

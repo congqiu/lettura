@@ -54,6 +54,10 @@ pub async fn register(
     State(state): State<AppState>,
     ValidatedJson(req): ValidatedJson<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
+    if state.config.disable_registration {
+        return Err(ApiError::Forbidden("registration is disabled".to_string()));
+    }
+
     // First user becomes admin
     let user_count = user::count_users(&state.pool).await?;
     let is_admin = user_count == 0;

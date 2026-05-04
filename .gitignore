@@ -1,5 +1,15 @@
 /target
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+*.jks
+*.pfx
+docker-compose.override.yml
+docker-compose.local.yml
 .syncthing.*
 *.sync-conflict-*
 web/node_modules

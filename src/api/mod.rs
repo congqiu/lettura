@@ -96,7 +96,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .route("/api/v1/auth/login", post(auth::login))
         .with_state(state.clone())
         .layer(axum::middleware::from_fn_with_state(
-            GlobalRateLimit::new(config.auth_rate_limit),
+            GlobalRateLimit::new(config.auth_rate_limit).with_trust_proxy(config.trust_proxy),
             rate_limit_middleware,
         ));
 
@@ -224,6 +224,13 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
                     HeaderValue::from_static("SAMEORIGIN"),
                 )
             )
+            // Allow same-origin framing for shared pages (overrides global frame-ancestors 'none')
+            .layer(SetResponseHeaderLayer::overriding(
+                axum::http::header::HeaderName::from_static("content-security-policy"),
+                HeaderValue::from_static(
+                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+                ),
+            ))
         })
         .fallback(crate::spa::spa_handler)
         .with_state(state)
@@ -270,7 +277,19 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::HeaderName::from_static("permissions-policy"),
             HeaderValue::from_static("camera=(), microphone=(), geolocation=(), payment=()"),
+        ));
+
+    // HSTS (only in production — dev environments often use HTTP)
+    let router = if config.production {
+        router.layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("strict-transport-security"),
+            HeaderValue::from_static("max-age=63072000; includeSubDomains; preload"),
         ))
+    } else {
+        router
+    };
+
+    let router = router
         // Request tracing: adds request_id to spans and logs
         .layer(TraceLayer::new_for_http().make_span_with(
             DefaultMakeSpan::new()
@@ -285,7 +304,7 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // Applied as the outermost layer so rate-limited requests are rejected
         // early without consuming downstream resources.
         .layer(axum::middleware::from_fn_with_state(
-            GlobalRateLimit::new(config.global_rate_limit),
+            GlobalRateLimit::new(config.global_rate_limit).with_trust_proxy(config.trust_proxy),
             rate_limit_middleware,
         ));
 

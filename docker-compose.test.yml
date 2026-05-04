@@ -2,7 +2,7 @@ services:
   postgres-test:
     image: postgres:16-alpine
     ports:
-      - "5437:5432"
+      - "127.0.0.1:5437:5432"
     environment:
       POSTGRES_USER: lettura
       POSTGRES_PASSWORD: lettura
