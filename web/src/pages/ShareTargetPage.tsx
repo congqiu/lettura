@@ -25,7 +25,7 @@ export default function ShareTargetPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'duplicate' | 'error' | 'no-url'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [savedEntryId, setSavedEntryId] = useState('');
-  const timerRef = useRef<number>();
+  const timerRef = useRef<number>(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {

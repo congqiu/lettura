@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -53,12 +53,58 @@ export default function EntryDetailPage() {
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  const articleRef = useRef<HTMLElement>(null);
 
   const { data: entry, isLoading, error, refetch: refetchEntryQuery } = useQuery({
     queryKey: ['entry', id],
     queryFn: () => getEntry(id!),
     enabled: !!id,
   });
+
+  // Inject copy buttons into code blocks
+  useEffect(() => {
+    const article = articleRef.current;
+    if (!article) return;
+    const pres = article.querySelectorAll('pre');
+    const cleanups: (() => void)[] = [];
+
+    pres.forEach((pre) => {
+      if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'code-block-wrapper relative';
+      pre.parentNode?.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      const btn = document.createElement('button');
+      btn.className = 'absolute top-2 right-2 p-1.5 rounded-md bg-muted/80 text-muted-foreground hover:text-foreground opacity-0 transition-opacity cursor-pointer';
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+      btn.title = '复制代码';
+      wrapper.appendChild(btn);
+
+      const showBtn = () => { btn.style.opacity = '1'; };
+      const hideBtn = () => { btn.style.opacity = '0'; };
+      wrapper.addEventListener('mouseenter', showBtn);
+      wrapper.addEventListener('mouseleave', hideBtn);
+      cleanups.push(() => { wrapper.removeEventListener('mouseenter', showBtn); wrapper.removeEventListener('mouseleave', hideBtn); });
+
+      btn.addEventListener('click', async () => {
+        const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
+        try {
+          await navigator.clipboard.writeText(code);
+          btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+          btn.classList.add('text-green-500');
+          setTimeout(() => {
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
+            btn.classList.remove('text-green-500');
+          }, 2000);
+        } catch {
+          toast.error('复制失败');
+        }
+      });
+    });
+
+    return () => cleanups.forEach(fn => fn());
+  }, [entry?.content]);
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['entry', id] }); qc.invalidateQueries({ queryKey: ['entries'] }); };
 
@@ -211,7 +257,7 @@ export default function EntryDetailPage() {
             <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
           </p>
         ) : entry.content ? (
-          <article className="prose prose-gray dark:prose-invert max-w-none overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
+          <article ref={articleRef} className="entry-content prose prose-gray dark:prose-invert max-w-none overflow-x-hidden" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
         ) : (
           <p className="text-muted-foreground">暂无内容</p>
         )}
