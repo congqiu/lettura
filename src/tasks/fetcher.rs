@@ -112,3 +112,53 @@ pub fn start_fetch_worker(
 
     FetchQueue { tx, queue_depth }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    #[tokio::test]
+    async fn send_increments_queue_depth() {
+        let (tx, mut rx) = mpsc::channel::<FetchJob>(100);
+        let queue = FetchQueue {
+            tx,
+            queue_depth: Arc::new(AtomicUsize::new(0)),
+        };
+
+        let job = FetchJob {
+            entry_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            url: "https://example.com".to_string(),
+        };
+
+        queue.send(job).await.unwrap();
+        assert_eq!(queue.queue_depth.load(Ordering::Relaxed), 1);
+
+        // Drain the channel so the sender doesn't hang
+        let _ = rx.recv().await;
+    }
+
+    #[tokio::test]
+    async fn send_fails_when_channel_closed() {
+        let (tx, rx) = mpsc::channel::<FetchJob>(100);
+        let queue = FetchQueue {
+            tx,
+            queue_depth: Arc::new(AtomicUsize::new(0)),
+        };
+
+        // Close the receiver so send will fail
+        drop(rx);
+
+        let job = FetchJob {
+            entry_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            url: "https://example.com".to_string(),
+        };
+
+        let result = queue.send(job).await;
+        assert!(result.is_err());
+        // queue_depth should be rolled back to 0 on error
+        assert_eq!(queue.queue_depth.load(Ordering::Relaxed), 0);
+    }
+}

@@ -319,3 +319,74 @@ pub async fn count(pool: &PgPool, filter: &ListAuditLogsFilter) -> Result<i64, M
 
     Ok(row.try_get::<i64, _>(0).unwrap_or(0))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn new_entry_defaults() {
+        let user_id = Some(Uuid::new_v4());
+        let entry = new_entry(
+            user_id,
+            "jwt".to_string(),
+            AuditAction::Login,
+            None,
+            None,
+            json!({}),
+        );
+
+        assert_eq!(entry.status, "success");
+        assert!(entry.error_message.is_none());
+        assert!(entry.ip_address.is_none());
+        assert!(entry.user_agent.is_none());
+        assert!(entry.request_id.is_none());
+        assert_eq!(entry.user_id, user_id);
+        assert_eq!(entry.auth_source, "jwt");
+        assert_eq!(entry.action, AuditAction::Login);
+    }
+
+    #[test]
+    fn new_entry_preserves_resource_type() {
+        let resource_id = Uuid::new_v4();
+        let details = json!({"title": "test"});
+        let entry = new_entry(
+            Some(Uuid::new_v4()),
+            "pat".to_string(),
+            AuditAction::CreateEntry,
+            Some(AuditResourceType::Entry),
+            Some(resource_id),
+            details.clone(),
+        );
+
+        assert_eq!(entry.resource_type, Some(AuditResourceType::Entry));
+        assert_eq!(entry.resource_id, Some(resource_id));
+        assert_eq!(entry.details, details);
+    }
+
+    #[test]
+    fn new_entry_no_user() {
+        let entry = new_entry(
+            None,
+            "system".to_string(),
+            AuditAction::AdminReindex,
+            Some(AuditResourceType::System),
+            None,
+            json!({}),
+        );
+
+        assert!(entry.user_id.is_none());
+        assert_eq!(entry.action, AuditAction::AdminReindex);
+        assert_eq!(entry.auth_source, "system");
+    }
+
+    #[test]
+    fn audit_action_variants_exist() {
+        assert_ne!(AuditAction::CreateEntry, AuditAction::UpdateEntry);
+        assert_ne!(AuditAction::Login, AuditAction::Logout);
+        assert_ne!(AuditAction::StarEntry, AuditAction::UnstarEntry);
+        assert_ne!(AuditAction::ArchiveEntry, AuditAction::UnarchiveEntry);
+        assert_ne!(AuditAction::BulkArchive, AuditAction::BulkStar);
+    }
+}

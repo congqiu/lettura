@@ -481,3 +481,118 @@ async fn attach_tags(pool: &PgPool, entries: &mut [EntrySummary]) -> Result<(), 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    /// Helper to build an EntrySummary with minimal, deterministic fields.
+    fn mock_summary(id: Uuid, created_at: DateTime<Utc>) -> EntrySummary {
+        EntrySummary {
+            id,
+            user_id: Uuid::nil(),
+            url: "https://example.com".to_string(),
+            title: None,
+            content_type: "text/html".to_string(),
+            extract_method: "readability".to_string(),
+            language: None,
+            reading_time: None,
+            preview_picture: None,
+            domain_name: Some("example.com".to_string()),
+            published_by: None,
+            is_archived: false,
+            is_starred: false,
+            created_at,
+            deleted_at: None,
+            tags: vec![],
+        }
+    }
+
+    // --- hash_url ---
+
+    #[test]
+    fn hash_url_deterministic() {
+        let h1 = hash_url("https://example.com/article");
+        let h2 = hash_url("https://example.com/article");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn hash_url_different_urls() {
+        let h1 = hash_url("https://example.com/a");
+        let h2 = hash_url("https://example.com/b");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn hash_url_empty() {
+        let h = hash_url("");
+        assert!(!h.is_empty(), "empty input should still produce a non-empty hash");
+    }
+
+    // --- extract_domain ---
+
+    #[test]
+    fn extract_domain_common() {
+        assert_eq!(extract_domain("https://example.com/path"), Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_domain_with_port() {
+        // Url::host_str() does NOT include the port number
+        assert_eq!(extract_domain("http://localhost:3000/api"), Some("localhost".to_string()));
+    }
+
+    #[test]
+    fn extract_domain_subdomain() {
+        assert_eq!(extract_domain("https://blog.example.com/post"), Some("blog.example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_domain_invalid() {
+        assert_eq!(extract_domain("not-a-url"), None);
+    }
+
+    #[test]
+    fn extract_domain_ip() {
+        assert_eq!(extract_domain("http://192.168.1.1/path"), Some("192.168.1.1".to_string()));
+    }
+
+    // --- next_cursor_from ---
+
+    #[test]
+    fn next_cursor_full_page() {
+        let per_page: i64 = 3;
+        let items: Vec<EntrySummary> = (0..3).map(|i| {
+            let ts = Utc.timestamp_micros(1_700_000_000_000_000 + i as i64).unwrap();
+            mock_summary(Uuid::new_v4(), ts)
+        }).collect();
+
+        let cursor = next_cursor_from(&items, per_page);
+        assert!(cursor.is_some(), "full page should produce a cursor");
+
+        // Verify cursor is decodable and matches last item
+        let last = items.last().unwrap();
+        let (ts, id) = cursor::decode(&cursor.unwrap()).expect("cursor should decode");
+        assert_eq!(ts, last.created_at);
+        assert_eq!(id, last.id);
+    }
+
+    #[test]
+    fn next_cursor_partial_page() {
+        let per_page: i64 = 10;
+        let items: Vec<EntrySummary> = (0..3).map(|i| {
+            let ts = Utc.timestamp_micros(1_700_000_000_000_000 + i as i64).unwrap();
+            mock_summary(Uuid::new_v4(), ts)
+        }).collect();
+
+        assert!(next_cursor_from(&items, per_page).is_none(), "partial page should return None");
+    }
+
+    #[test]
+    fn next_cursor_empty() {
+        let items: Vec<EntrySummary> = vec![];
+        assert!(next_cursor_from(&items, 10).is_none(), "empty list should return None");
+    }
+}

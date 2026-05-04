@@ -254,6 +254,46 @@ pub async fn ensure_and_link(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::slugify;
+
+    #[test]
+    fn slugify_english() {
+        assert_eq!(slugify("Rust Programming"), "rust-programming");
+    }
+
+    #[test]
+    fn slugify_lowercase_input() {
+        assert_eq!(slugify("rust"), "rust");
+    }
+
+    #[test]
+    fn slugify_special_characters() {
+        assert_eq!(slugify("C++ & Rust"), "c-----rust");
+    }
+
+    #[test]
+    fn slugify_empty() {
+        assert_eq!(slugify(""), "");
+    }
+
+    #[test]
+    fn slugify_chinese() {
+        assert_eq!(slugify("技术博客"), "技术博客");
+    }
+
+    #[test]
+    fn slugify_leading_trailing_dashes() {
+        assert_eq!(slugify("--hello--"), "hello");
+    }
+
+    #[test]
+    fn slugify_already_slugified() {
+        assert_eq!(slugify("my-tag"), "my-tag");
+    }
+}
+
 impl TagStats {
     /// List tags with entry counts for a user, only counting non-deleted entries.
     pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<TagStats>, ModelError> {

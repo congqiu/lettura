@@ -90,3 +90,79 @@ where
 
     deserializer.deserialize_option(BoolOrString)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct WrapI64 {
+        #[serde(default, deserialize_with = "deserialize_i64_from_string")]
+        val: Option<i64>,
+    }
+
+    #[derive(Deserialize)]
+    struct WrapBool {
+        #[serde(default, deserialize_with = "deserialize_bool_from_string")]
+        val: Option<bool>,
+    }
+
+    // --- deserialize_i64_from_string ---
+
+    #[test]
+    fn i64_from_numeric_string() {
+        let w: WrapI64 = serde_qs::from_str("val=42").unwrap();
+        assert_eq!(w.val, Some(42));
+    }
+
+    #[test]
+    fn i64_from_negative_string() {
+        let w: WrapI64 = serde_qs::from_str("val=-7").unwrap();
+        assert_eq!(w.val, Some(-7));
+    }
+
+    #[test]
+    fn i64_from_non_numeric_string_is_error() {
+        let res = serde_qs::from_str::<WrapI64>("val=abc");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn i64_absent_is_none() {
+        let w: WrapI64 = serde_qs::from_str("").unwrap();
+        assert_eq!(w.val, None);
+    }
+
+    // --- deserialize_bool_from_string ---
+
+    #[test]
+    fn bool_from_true_string() {
+        let w: WrapBool = serde_qs::from_str("val=true").unwrap();
+        assert_eq!(w.val, Some(true));
+    }
+
+    #[test]
+    fn bool_from_false_string() {
+        let w: WrapBool = serde_qs::from_str("val=false").unwrap();
+        assert_eq!(w.val, Some(false));
+    }
+
+    #[test]
+    fn bool_from_invalid_string_is_error() {
+        let res = serde_qs::from_str::<WrapBool>("val=yes");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn bool_from_numeric_string_is_error() {
+        let res = serde_qs::from_str::<WrapBool>("val=1");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn bool_absent_is_none() {
+        let w: WrapBool = serde_qs::from_str("").unwrap();
+        assert_eq!(w.val, None);
+    }
+}

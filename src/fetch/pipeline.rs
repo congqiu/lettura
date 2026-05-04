@@ -20,6 +20,12 @@ use uuid::Uuid;
 /// short and attempt the render fallback (when available and mode != Never).
 const SHORT_CONTENT_THRESHOLD: usize = 100;
 
+/// Decide whether the extracted content is too short and rendering should be
+/// attempted. Pure function — no dependencies on DB, HTTP, or async runtime.
+pub(crate) fn should_try_render(text_len: usize, render_mode: RenderMode) -> bool {
+    text_len < SHORT_CONTENT_THRESHOLD && render_mode != RenderMode::Never
+}
+
 /// Resources shared by all fetch workers. Built once at startup.
 pub struct FetchContext {
     pub pool: PgPool,
@@ -182,11 +188,14 @@ async fn process_body(
                     metrics::histogram!("extract_duration_seconds", "method" => method)
                         .record(elapsed);
                     // Content too short → try rendering (if allowed by config + available).
-                    if result.inner.text_content.len() < SHORT_CONTENT_THRESHOLD {
+                    if should_try_render(
+                        result.inner.text_content.len(),
+                        site_config
+                            .map(|sc| sc.render.mode)
+                            .unwrap_or(RenderMode::Never),
+                    ) {
                         if let Some(sc) = site_config {
-                            if sc.render.mode != RenderMode::Never
-                                && try_render_then_extract(ctx, job, sc, status).await
-                            {
+                            if try_render_then_extract(ctx, job, sc, status).await {
                                 return;
                             }
                         }
@@ -447,4 +456,39 @@ async fn try_render_then_extract(
     _status: i16,
 ) -> bool {
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_content_auto_mode_triggers_render() {
+        assert!(should_try_render(50, RenderMode::Auto));
+    }
+
+    #[test]
+    fn short_content_never_mode_skips_render() {
+        assert!(!should_try_render(50, RenderMode::Never));
+    }
+
+    #[test]
+    fn long_content_skips_render() {
+        assert!(!should_try_render(500, RenderMode::Auto));
+    }
+
+    #[test]
+    fn threshold_boundary_below() {
+        assert!(should_try_render(99, RenderMode::Auto));
+    }
+
+    #[test]
+    fn threshold_boundary_at() {
+        assert!(!should_try_render(100, RenderMode::Auto));
+    }
+
+    #[test]
+    fn force_mode_with_short_content() {
+        assert!(should_try_render(50, RenderMode::Force));
+    }
 }
