@@ -101,13 +101,39 @@
 @layer base {
   * {
     @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted) / 0.5) transparent;
+  }
+  *::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted) / 0.5);
+    border-radius: 2px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
   }
   body {
     @apply bg-background text-foreground transition-colors duration-300;
   }
   pre {
-    @apply overflow-x-auto max-w-full;
+    @apply overflow-x-auto max-w-full min-w-0;
   }
+}
+
+.entry-content .highlight,
+.entry-content table.lntable,
+.entry-content .code-block-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.entry-content table.lntable {
+  display: block;
 }
 
 @utility scrollbar-hide {
