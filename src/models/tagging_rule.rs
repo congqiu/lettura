@@ -201,7 +201,9 @@ fn evaluate_condition(cond: &serde_json::Value, fields: &EntryFields) -> bool {
         "neq" => field_value != target,
         "contains" => field_value.contains(target),
         "not_contains" => !field_value.contains(target),
-        "matches" => regex::Regex::new(target)
+        "matches" => regex::RegexBuilder::new(target)
+            .size_limit(1 * 1024 * 1024) // 1 MB — prevents ReDoS from pathological patterns
+            .build()
             .map(|re| re.is_match(field_value))
             .unwrap_or(false),
         _ => false,

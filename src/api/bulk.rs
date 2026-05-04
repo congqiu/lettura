@@ -1,9 +1,11 @@
 use axum::{Json, extract::State};
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 use crate::api::auth_source_str;
 use crate::auth::middleware::AuthUser;
 use crate::api::error::ApiError;
+use crate::api::validate::ValidatedJson;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry::{self, ListParams}, tag};
 use crate::state::AppState;
@@ -199,32 +201,38 @@ pub async fn bulk_star(
 
 // --- Bulk-by-IDs endpoints ---
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct BulkTagByIdsRequest {
+    #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
+    #[validate(length(min = 1, max = 20, message = "tags must have 1-20 items"))]
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct BulkUntagByIdsRequest {
+    #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
+    #[validate(length(min = 1, max = 20, message = "tags must have 1-20 items"))]
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct BulkDeleteByIdsRequest {
+    #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct BulkArchiveByIdsRequest {
+    #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
 }
 
 pub async fn bulk_tag_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<BulkTagByIdsRequest>,
+    ValidatedJson(req): ValidatedJson<BulkTagByIdsRequest>,
 ) -> Result<Json<BulkResult>, ApiError> {
     if req.entry_ids.is_empty() {
         return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
@@ -254,7 +262,7 @@ pub async fn bulk_tag_by_ids(
 pub async fn bulk_untag_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<BulkUntagByIdsRequest>,
+    ValidatedJson(req): ValidatedJson<BulkUntagByIdsRequest>,
 ) -> Result<Json<BulkResult>, ApiError> {
     if req.entry_ids.is_empty() {
         return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
@@ -296,7 +304,7 @@ pub async fn bulk_untag_by_ids(
 pub async fn bulk_delete_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<BulkDeleteByIdsRequest>,
+    ValidatedJson(req): ValidatedJson<BulkDeleteByIdsRequest>,
 ) -> Result<Json<BulkResult>, ApiError> {
     if req.entry_ids.is_empty() {
         return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
@@ -328,7 +336,7 @@ pub async fn bulk_delete_by_ids(
 pub async fn bulk_archive_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<BulkArchiveByIdsRequest>,
+    ValidatedJson(req): ValidatedJson<BulkArchiveByIdsRequest>,
 ) -> Result<Json<BulkResult>, ApiError> {
     if req.entry_ids.is_empty() {
         return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));

@@ -3,9 +3,11 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
+use crate::api::validate::ValidatedJson;
 use crate::auth::middleware::AuthUser;
 use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
@@ -27,8 +29,9 @@ pub async fn tags_stats(
     Ok(Json(stats))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct RenameTagRequest {
+    #[validate(length(min = 1, max = 100, message = "label must be 1-100 characters"))]
     pub label: String,
 }
 
@@ -36,7 +39,7 @@ pub async fn rename_tag_handler(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(tag_id): Path<Uuid>,
-    Json(req): Json<RenameTagRequest>,
+    ValidatedJson(req): ValidatedJson<RenameTagRequest>,
 ) -> Result<Json<tag::Tag>, ApiError> {
     let updated = tag::rename_tag(&state.pool, tag_id, auth.user_id, &req.label)
         .await
@@ -73,8 +76,9 @@ pub async fn list_tags_for_entry(
     Ok(Json(tags))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct AddTagRequest {
+    #[validate(length(min = 1, max = 100, message = "label must be 1-100 characters"))]
     pub label: String,
 }
 
@@ -82,7 +86,7 @@ pub async fn add_tag_to_entry(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(entry_id): Path<Uuid>,
-    Json(req): Json<AddTagRequest>,
+    ValidatedJson(req): ValidatedJson<AddTagRequest>,
 ) -> Result<Json<tag::Tag>, ApiError> {
     entry::find_entry_by_id(&state.pool, auth.user_id, entry_id)
         .await?

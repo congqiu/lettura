@@ -27,8 +27,10 @@ pub struct ListQueryParams {
 pub struct CreateEntryRequest {
     #[validate(url(message = "invalid URL format"))]
     pub url: String,
+    #[validate(length(max = 500, message = "title must be at most 500 characters"))]
     pub title: Option<String>,
     #[serde(default)]
+    #[validate(length(max = 20, message = "at most 20 tags allowed"))]
     pub tag: Vec<String>,
 }
 

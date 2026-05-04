@@ -17,11 +17,11 @@ use super::validate::ValidatedJson;
 
 #[derive(Deserialize, Validate)]
 pub struct RegisterRequest {
-    #[validate(length(min = 1, message = "username is required"))]
+    #[validate(length(min = 1, max = 50, message = "username must be 1-50 characters"))]
     pub username: String,
     #[validate(email(message = "invalid email format"))]
     pub email: String,
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    #[validate(length(min = 8, max = 128, message = "password must be 8-128 characters"))]
     pub password: String,
 }
 
@@ -236,9 +236,9 @@ pub async fn me(
 
 #[derive(Deserialize, Validate)]
 pub struct ChangePasswordRequest {
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    #[validate(length(min = 8, max = 128, message = "password must be 8-128 characters"))]
     pub current_password: String,
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    #[validate(length(min = 8, max = 128, message = "password must be 8-128 characters"))]
     pub new_password: String,
 }
 
