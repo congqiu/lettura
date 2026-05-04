@@ -259,6 +259,18 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
             axum::http::header::HeaderName::from_static("referrer-policy"),
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
+        // Content-Security-Policy
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static(
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+            ),
+        ))
+        // Permissions-Policy
+        .layer(SetResponseHeaderLayer::overriding(
+            axum::http::header::HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=(), payment=()"),
+        ))
         // Request tracing: adds request_id to spans and logs
         .layer(TraceLayer::new_for_http().make_span_with(
             DefaultMakeSpan::new()

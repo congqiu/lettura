@@ -91,9 +91,12 @@ fn build_rss(channel_title: &str, entries: &[FeedEntry]) -> Response {
         let content = entry.content.as_deref().unwrap_or("");
         let date = entry.created_at.to_rfc2822();
         let escaped_url = xml_escape(&entry.url);
+        // Escape ]]> inside CDATA sections to prevent injection
+        let safe_title = title.replace("]]>", "]]&gt;");
+        let safe_content = content.replace("]]>", "]]&gt;");
         items.push_str(&format!(
             "<item><title><![CDATA[{}]]></title><link>{}</link><guid>{}</guid><pubDate>{}</pubDate><description><![CDATA[{}]]></description></item>",
-            title, escaped_url, entry.id, date, content
+            safe_title, escaped_url, entry.id, date, safe_content
         ));
     }
 
