@@ -146,7 +146,7 @@ async fn main() {
 
     tracing::info!("listening on {}", config.listen_addr);
     let shutdown_idx = search_index.clone();
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
             // Final flush so writes buffered since the last periodic commit

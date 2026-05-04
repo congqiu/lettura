@@ -160,6 +160,27 @@ pub async fn upload_files(
     }))
 }
 
+/// Validate that a zip entry path is a safe relative path.
+/// Only allows `Component::Normal` segments — rejects absolute paths,
+/// `..` traversal, drive letters, and other platform-specific components.
+fn is_safe_relative_path(name: &str) -> bool {
+    // Reject backslashes (Windows-style paths that could bypass checks).
+    if name.contains('\\') {
+        return false;
+    }
+    // Reject hidden files/dirs and __MACOSX metadata.
+    if name.starts_with('.') || name.contains("/.") || name.contains("__MACOSX") {
+        return false;
+    }
+    // Skip directory entries.
+    if name.ends_with('/') {
+        return false;
+    }
+    // Every component must be Normal (no Prefix, RootDir, ParentDir, CurDir).
+    use std::path::Component;
+    std::path::Path::new(name).components().all(|c| matches!(c, Component::Normal(_)))
+}
+
 fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
     const MAX_ENTRIES: usize = 500;
     const MAX_NAME_LEN: usize = 255;
@@ -173,10 +194,7 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
         let mut entry = archive.by_index(i).map_err(|e| ApiError::Internal(e.to_string()))?;
         let name = entry.name().to_string();
 
-        if name.ends_with('/') || name.starts_with('.') || name.contains("__MACOSX") || name.contains("/.") {
-            continue;
-        }
-        if name.contains("..") {
+        if name.is_empty() {
             continue;
         }
         if name.len() > MAX_NAME_LEN {
@@ -184,6 +202,13 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
         }
         if files.len() >= MAX_ENTRIES {
             return Err(ApiError::BadRequest(format!("too many zip entries (max {MAX_ENTRIES})")));
+        }
+        // Reject any path component that isn't a normal relative segment.
+        // This blocks absolute paths, ".." traversal, drive letters, and
+        // other platform-specific components.
+        if !is_safe_relative_path(&name) {
+            tracing::warn!(name = %name, "skipping unsafe zip entry");
+            continue;
         }
 
         let mut content = Vec::new();

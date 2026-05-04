@@ -1,8 +1,9 @@
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::HeaderMap;
 use axum::Json;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use validator::Validate;
 
 use crate::api::auth_source_str;
@@ -18,7 +19,7 @@ use super::validate::ValidatedJson;
 
 /// Extract client IP from headers (X-Forwarded-For / X-Real-IP) or
 /// fall back to ConnectInfo. Truncates to 45 chars for storage safety.
-fn extract_ip(headers: &HeaderMap, trust_proxy: bool) -> Option<String> {
+fn extract_ip(headers: &HeaderMap, trust_proxy: bool, peer_addr: Option<&SocketAddr>) -> Option<String> {
     if trust_proxy {
         if let Some(xff) = headers.get("x-forwarded-for") {
             if let Ok(val) = xff.to_str() {
@@ -39,7 +40,7 @@ fn extract_ip(headers: &HeaderMap, trust_proxy: bool) -> Option<String> {
             }
         }
     }
-    None
+    peer_addr.map(|a| a.ip().to_string())
 }
 
 /// Extract User-Agent header, truncated to 255 chars.
@@ -87,6 +88,7 @@ pub struct MessageResponse {
 pub async fn register(
     State(state): State<AppState>,
     headers: HeaderMap,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     ValidatedJson(req): ValidatedJson<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
     if state.config.disable_registration {
@@ -102,7 +104,7 @@ pub async fn register(
 
     tracing::info!(user_id = %new_user.id, "user registered");
 
-    let ip = extract_ip(&headers, state.config.trust_proxy);
+    let ip = extract_ip(&headers, state.config.trust_proxy, Some(&addr));
     let ua = extract_ua(&headers);
     audit_log::log_success_with_context(
         &state.pool,
@@ -125,6 +127,7 @@ pub async fn register(
 pub async fn login(
     State(state): State<AppState>,
     headers: HeaderMap,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, ApiError> {
     let found = match user::find_user_by_email(&state.pool, &req.email).await? {
@@ -133,7 +136,7 @@ pub async fn login(
             // User not found — verify against a dummy hash to prevent timing
             // attacks that would reveal whether an email is registered.
             let _ = password::verify_password(&req.password, password::DUMMY_HASH);
-            let ip = extract_ip(&headers, state.config.trust_proxy);
+            let ip = extract_ip(&headers, state.config.trust_proxy, Some(&addr));
             let ua = extract_ua(&headers);
             audit_log::log_success_with_context(
                 &state.pool, None, "jwt".to_string(),
@@ -145,9 +148,10 @@ pub async fn login(
         }
     };
 
+    let ci = Some(addr);
     password::verify_password(&req.password, &found.password_hash)
         .map_err(|_| {
-            let ip = extract_ip(&headers, state.config.trust_proxy);
+            let ip = extract_ip(&headers, state.config.trust_proxy, ci.as_ref());
             let ua = extract_ua(&headers);
             let pool = state.pool.clone();
             let email = req.email.clone();
@@ -164,7 +168,7 @@ pub async fn login(
 
     tracing::info!(user_id = %found.id, "user logged in");
 
-    let ip = extract_ip(&headers, state.config.trust_proxy);
+    let ip = extract_ip(&headers, state.config.trust_proxy, ci.as_ref());
     let ua = extract_ua(&headers);
     audit_log::log_success_with_context(
         &state.pool,

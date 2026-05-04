@@ -114,7 +114,7 @@ impl Config {
             cors_origins,
             production,
             trust_proxy: env::var("LETTURA_TRUST_PROXY").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
-            disable_registration: env::var("LETTURA_DISABLE_REGISTRATION").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
+            disable_registration: env::var("LETTURA_DISABLE_REGISTRATION").ok().map(|v| v == "true" || v == "1").unwrap_or(true),
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
             metrics_bearer_token: env::var("LETTURA_METRICS_BEARER_TOKEN").ok(),
             user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
