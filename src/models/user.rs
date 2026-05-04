@@ -115,6 +115,16 @@ pub async fn delete_refresh_token(pool: &PgPool, token_hash: &str) -> Result<(),
     Ok(())
 }
 
+/// Revoke all refresh tokens for a user (e.g. on password change).
+pub async fn revoke_all_refresh_tokens(pool: &PgPool, user_id: Uuid) -> Result<(), ModelError> {
+    sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
+}
+
 pub async fn regenerate_feed_token(pool: &PgPool, user_id: Uuid) -> Result<String, ModelError> {
     let new_token = generate_feed_token();
     let row: (String,) = sqlx::query_as(

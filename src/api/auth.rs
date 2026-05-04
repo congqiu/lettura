@@ -114,7 +114,10 @@ pub async fn refresh(
 
     let stored = user::find_refresh_token(&state.pool, &token_hash)
         .await?
-        .ok_or_else(|| ApiError::Unauthorized("invalid refresh token".to_string()))?;
+        .ok_or_else(|| {
+            tracing::warn!("refresh token not found (possible reuse detected)");
+            ApiError::Unauthorized("invalid refresh token".to_string())
+        })?;
 
     // Delete old refresh token (rotation)
     user::delete_refresh_token(&state.pool, &token_hash).await?;
@@ -255,6 +258,9 @@ pub async fn change_password(
         .map_err(|_| ApiError::Internal("failed to hash password".to_string()))?;
 
     user::update_password(&state.pool, auth.user_id, &new_hash).await?;
+
+    // Revoke all refresh tokens so other sessions are terminated
+    crate::models::user::revoke_all_refresh_tokens(&state.pool, auth.user_id).await?;
 
     let auth_source = match auth.source {
         crate::auth::middleware::AuthSource::Jwt => "jwt".to_string(),
