@@ -4,6 +4,7 @@ use axum::response::{IntoResponse, Response};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use serde::Deserialize;
+use sqlx;
 
 use crate::state::AppState;
 use crate::models::page;
@@ -78,15 +79,28 @@ async fn serve_page_file_inner(
     }
 
     if page_record.password.is_some() {
-        let authenticated = if let Some(pw) = query_password {
-            pw == page_record.password.as_ref().expect("password is Some when is_some() is true")
+        let (authenticated, needs_upgrade) = if let Some(pw) = query_password {
+            let stored = page_record.password.as_ref().expect("password is Some when is_some() is true");
+            let ok = crate::auth::password::verify_page_password(pw, stored).is_ok();
+            // Lazy upgrade: mark if stored password is plaintext and auth succeeded
+            (ok, ok && !stored.starts_with("$argon2"))
         } else {
-            get_cookie_value(headers, slug)
+            (get_cookie_value(headers, slug)
                 .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
-                .unwrap_or(false)
+                .unwrap_or(false), false)
         };
         if !authenticated {
             return render_password_page(slug, false);
+        }
+        // Lazy upgrade: hash plaintext passwords on successful authentication
+        if needs_upgrade {
+            if let Some(pw) = query_password {
+                if let Ok(hashed) = crate::auth::password::hash_page_password(pw) {
+                    let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
+                        .bind(&hashed).bind(page_record.id)
+                        .execute(&state.pool).await;
+                }
+            }
         }
     }
 
@@ -150,7 +164,15 @@ pub async fn auth_page(
 
     match &page_record.password {
         Some(stored_password) => {
-            if form.password == *stored_password {
+            if crate::auth::password::verify_page_password(&form.password, stored_password).is_ok() {
+                // Lazy upgrade: if the stored password is plaintext, hash it now
+                if !stored_password.starts_with("$argon2") {
+                    if let Ok(hashed) = crate::auth::password::hash_page_password(&form.password) {
+                        let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
+                            .bind(&hashed).bind(page_record.id)
+                            .execute(&state.pool).await;
+                    }
+                }
                 let sig = sign_cookie(&state.config.jwt_secret, &slug);
                 let cookie = format!(
                     "page_auth_{}={}; Path=/p/{}; Max-Age=86400; HttpOnly; SameSite=Lax",

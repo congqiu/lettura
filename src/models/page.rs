@@ -43,17 +43,14 @@ impl Serialize for PageSummary {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        // The plaintext password is intentionally returned to the owner so the
-        // UI can render a copy-ready share URL (`/p/<slug>?p=<password>`).
-        // This endpoint is owner-authenticated; the password never leaves the
-        // owner's session.
-        let mut state = serializer.serialize_struct("PageSummary", 11)?;
+        // Only expose whether a password is set; the actual hash is never
+        // returned to the client.
+        let mut state = serializer.serialize_struct("PageSummary", 10)?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("slug", &self.slug)?;
         state.serialize_field("title", &self.title)?;
         state.serialize_field("description", &self.description)?;
         state.serialize_field("has_password", &self.password.is_some())?;
-        state.serialize_field("password", &self.password)?;
         state.serialize_field("status", &self.status)?;
         state.serialize_field("file_count", &self.file_count)?;
         state.serialize_field("expires_at", &self.expires_at)?;

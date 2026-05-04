@@ -29,15 +29,8 @@ export default function PageCard({ page }: PageCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const pageUrl = `${window.location.origin}/p/${page.slug}`;
 
-  const getFullUrl = () => {
-    if (page.has_password && page.password) {
-      return `${pageUrl}?p=${encodeURIComponent(page.password)}`;
-    }
-    return pageUrl;
-  };
-
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(getFullUrl());
+    navigator.clipboard.writeText(pageUrl);
     toast.success('链接已复制');
   };
 
@@ -81,7 +74,7 @@ export default function PageCard({ page }: PageCardProps) {
             </h3>
             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
               <button
-                onClick={() => window.open(getFullUrl(), '_blank')}
+                onClick={() => window.open(pageUrl, '_blank')}
                 className="flex items-center gap-1 hover:text-primary font-mono"
               >
                 /p/{page.slug}
@@ -103,7 +96,7 @@ export default function PageCard({ page }: PageCardProps) {
           <div className="flex items-center gap-0.5 shrink-0">
             {!isDeleted && (
               <>
-                <Button variant="ghost" size="icon" onClick={() => window.open(getFullUrl(), '_blank')} title="新窗口打开">
+                <Button variant="ghost" size="icon" onClick={() => window.open(pageUrl, '_blank')} title="新窗口打开">
                   <ExternalLink size={15} />
                 </Button>
                 <Button variant="ghost" size="icon" onClick={handleCopyLink} title="复制链接">

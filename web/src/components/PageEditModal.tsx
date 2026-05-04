@@ -34,7 +34,8 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(page.title);
-  const [password, setPassword] = useState(page.password || '');
+  const [password, setPassword] = useState('');
+  const [clearPassword, setClearPassword] = useState(false);
   const [expiry, setExpiry] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -78,7 +79,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
   const saveMutation = useMutation({
     mutationFn: () => updatePage(page.id, {
       title,
-      password: password || '',
+      password: clearPassword ? '' : (password || undefined),
       expires_at: expiry === '' ? undefined : (expiry === '__clear__' ? null : computeExpiry(expiry)),
       upload_id: uploadResult?.upload_id || undefined,
       entry_file: uploadResult ? entryFile : undefined,
@@ -176,15 +177,16 @@ export default function PageEditModal({ page, open, onClose }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              访问密码 {page.has_password && <span className="text-amber-500 text-xs">(已设置)</span>}
+              访问密码 {page.has_password && !clearPassword && <span className="text-amber-500 text-xs">(已设置)</span>}
+              {clearPassword && <span className="text-green-500 text-xs">(将清除)</span>}
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
                   type="text"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="留空则无密码"
+                  onChange={(e) => { setPassword(e.target.value); setClearPassword(false); }}
+                  placeholder={page.has_password ? "输入新密码替换旧密码，留空保持不变" : "留空则无密码"}
                   className="font-mono pr-8"
                 />
                 {password && (
@@ -203,11 +205,23 @@ export default function PageEditModal({ page, open, onClose }: Props) {
                 onClick={() => {
                   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
                   setPassword(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));
+                  setClearPassword(false);
                 }}
                 title="自动生成密码"
               >
                 <RefreshCw size={14} />
               </Button>
+              {page.has_password && !clearPassword && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setClearPassword(true); setPassword(''); }}
+                  title="清除密码"
+                  className="text-destructive hover:text-destructive"
+                >
+                  清除
+                </Button>
+              )}
             </div>
           </div>
 

@@ -252,7 +252,8 @@ pub async fn create_page_handler(
     let file_count = count_files_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let password = match &req.password {
-        Some(pw) if !pw.is_empty() => Some(pw.clone()),
+        Some(pw) if !pw.is_empty() => Some(crate::auth::password::hash_page_password(pw)
+            .map_err(|_| ApiError::BadRequest("password too long (max 128 chars)".to_string()))?),
         _ => None,
     };
 
@@ -270,7 +271,7 @@ pub async fn create_page_handler(
     ).await?;
 
     let slug = new_page.slug.clone();
-    let password_for_url = req.password.clone();
+    let has_password = password.is_some();
 
     if state.config.storage_type == "local" {
         let pages_base = pages_storage_path(&state).join(&slug);
@@ -291,9 +292,6 @@ pub async fn create_page_handler(
     tracing::info!(page_id = %new_page.id, slug = %slug, "page created");
 
     let url = format!("/p/{}", new_page.slug);
-    let url_with_password = password_for_url.as_ref()
-        .filter(|pw| !pw.is_empty())
-        .map(|pw| format!("{}?p={}", url, pw));
 
     audit_log::log_success(
         &state.pool,
@@ -310,8 +308,7 @@ pub async fn create_page_handler(
         "slug": new_page.slug,
         "title": new_page.title,
         "url": url,
-        "url_with_password": url_with_password,
-        "has_password": password_for_url.as_ref().filter(|pw| !pw.is_empty()).is_some(),
+        "has_password": has_password,
         "created_at": new_page.created_at,
     })))
 }
@@ -476,12 +473,20 @@ pub async fn update_page_handler(
         (req.entry_file.clone(), None)
     };
 
+    // Hash password before storing if a new password is provided
+    let password = match req.password {
+        Some(ref pw) if !pw.is_empty() => Some(crate::auth::password::hash_page_password(pw)
+            .map_err(|_| ApiError::BadRequest("password too long (max 128 chars)".to_string()))?),
+        Some(ref pw) if pw.is_empty() => Some(String::new()), // empty string signals "clear password"
+        _ => None,
+    };
+
     let updated = page::update_page(
         &state.pool, auth.user_id, page_id,
         &page::UpdatePageParams {
             title: req.title,
             description: req.description,
-            password: req.password,
+            password,
             status: req.status,
             expires_at,
             entry_file,
@@ -544,7 +549,6 @@ pub async fn restore_page_handler(
 #[derive(Debug, Serialize)]
 pub struct ShareUrlResponse {
     pub url: String,
-    pub password: Option<String>,
     pub has_password: bool,
 }
 
@@ -562,7 +566,6 @@ pub async fn get_share_url_handler(
     
     Ok(Json(ShareUrlResponse {
         url: base_url,
-        password: page.password,
         has_password,
     }))
 }

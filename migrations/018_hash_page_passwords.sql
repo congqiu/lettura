@@ -1,0 +1,3 @@
+-- No-op migration. Existing plaintext page passwords will be
+-- lazily upgraded to argon2 hashes on next successful authentication.
+-- verify_page_password handles both formats.
