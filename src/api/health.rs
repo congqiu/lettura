@@ -21,14 +21,20 @@ pub async fn health_check(
     let db_ok = db_result.is_ok();
     let db_msg = match &db_result {
         Ok(_) => "ok".to_string(),
-        Err(e) => format!("error: {e}"),
+        Err(e) => {
+            tracing::error!("health check failed (db): {e}");
+            "error".to_string()
+        }
     };
 
     let search_result = state.search_index.doc_count();
     let search_ok = search_result.is_ok();
     let search_msg = match &search_result {
         Ok(count) => format!("ok ({count} docs)"),
-        Err(e) => format!("error: {e}"),
+        Err(e) => {
+            tracing::error!("health check failed (search): {e}");
+            "error".to_string()
+        }
     };
 
     // ok = all good, degraded = partial failure, error = all down

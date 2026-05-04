@@ -27,6 +27,7 @@ pub struct Config {
     pub production: bool,
     // Metrics
     pub metrics_enabled: bool,
+    pub metrics_bearer_token: Option<String>,
     // Fetch
     pub user_agent: String,
     pub fetch_timeout_secs: u64,
@@ -101,6 +102,7 @@ impl Config {
             cors_origins,
             production,
             metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
+            metrics_bearer_token: env::var("LETTURA_METRICS_BEARER_TOKEN").ok(),
             user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
             }),
@@ -113,7 +115,7 @@ impl Config {
             render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
             render_timeout_ms: env::var("LETTURA_RENDER_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(15000),
             public_base_url: env::var("LETTURA_PUBLIC_BASE_URL").ok(),
-            import_max_body_bytes: env::var("LETTURA_IMPORT_MAX_BODY_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(500 * 1024 * 1024),
+            import_max_body_bytes: env::var("LETTURA_IMPORT_MAX_BODY_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(50 * 1024 * 1024),
             pages_max_upload_bytes: env::var("LETTURA_PAGES_MAX_UPLOAD_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
             max_image_size: env::var("LETTURA_MAX_IMAGE_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
             auth_rate_limit: env::var("LETTURA_AUTH_RATE_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(10),

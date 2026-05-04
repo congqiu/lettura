@@ -1,3 +1,4 @@
+use axum::response::IntoResponse;
 use std::sync::atomic::Ordering;
 use tracing_subscriber::EnvFilter;
 
@@ -87,10 +88,29 @@ async fn main() {
             .install_recorder()
             .expect("failed to install metrics recorder");
 
-        let metrics_route = axum::Router::new().route(
-            "/metrics",
-            axum::routing::get(move || async move { recorder_handle.render() }),
-        );
+        let metrics_route = if let Some(ref token) = config.metrics_bearer_token {
+            let token_clone = token.clone();
+            axum::Router::new().route(
+                "/metrics",
+                axum::routing::get(move || async move { recorder_handle.render() }),
+            ).layer(axum::middleware::from_fn(move |req: axum::extract::Request, next: axum::middleware::Next| {
+                let expected = token_clone.clone();
+                async move {
+                    let auth = req.headers().get("authorization")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.strip_prefix("Bearer "));
+                    match auth {
+                        Some(provided) if subtle::ConstantTimeEq::ct_eq(provided.as_bytes(), expected.as_bytes()).into() => {
+                            next.run(req).await
+                        }
+                        _ => (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response()
+                    }
+                }
+            }))
+        } else {
+            // No bearer token configured — metrics endpoint is not exposed
+            axum::Router::new()
+        };
 
         // Background task to periodically report gauge metrics
         let fetch_depth = fetch_queue.queue_depth.clone();
