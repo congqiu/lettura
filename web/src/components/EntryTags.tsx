@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { addTagToEntry, removeTagFromEntry, fetchTagStats, type Tag, type TagStats } from '../api/tags';
+import api from '../api/client';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,10 +27,8 @@ export default function EntryTags({ entryId }: { entryId: string }) {
   const { data: entryTags = [] } = useQuery({
     queryKey: ['entry-tags', entryId],
     queryFn: async (): Promise<Tag[]> => {
-      const res = await fetch(`/api/v1/entries/${entryId}/tags`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-      });
-      return res.json();
+      const res = await api.get(`/entries/${entryId}/tags`);
+      return res.data;
     },
   });
 

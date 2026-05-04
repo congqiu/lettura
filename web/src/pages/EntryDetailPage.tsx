@@ -257,7 +257,10 @@ export default function EntryDetailPage() {
             <a href={entry.url} target="_blank" className="underline ml-1">查看原文</a>
           </p>
         ) : entry.content ? (
-          <article ref={articleRef} className="entry-content prose prose-gray dark:prose-invert max-w-none overflow-x-hidden" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content) }} />
+          <article ref={articleRef} className="entry-content prose prose-gray dark:prose-invert max-w-none overflow-x-hidden" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
+            FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
+            FORBID_ATTR: ['formaction', 'xlink:href'],
+          }) }} />
         ) : (
           <p className="text-muted-foreground">暂无内容</p>
         )}
