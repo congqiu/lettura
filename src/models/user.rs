@@ -174,3 +174,27 @@ fn generate_feed_token() -> String {
     rand::thread_rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_feed_token_length() {
+        let token = generate_feed_token();
+        assert_eq!(token.len(), 64);
+    }
+
+    #[test]
+    fn generate_feed_token_is_hex() {
+        let token = generate_feed_token();
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn generate_feed_token_uniqueness() {
+        let a = generate_feed_token();
+        let b = generate_feed_token();
+        assert_ne!(a, b);
+    }
+}

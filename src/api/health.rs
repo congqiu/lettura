@@ -38,13 +38,7 @@ pub async fn health_check(
     };
 
     // ok = all good, degraded = partial failure, error = all down
-    let (status, code) = if db_ok && search_ok {
-        ("ok", StatusCode::OK)
-    } else if db_ok {
-        ("degraded", StatusCode::OK)
-    } else {
-        ("error", StatusCode::SERVICE_UNAVAILABLE)
-    };
+    let (status, code) = determine_status(db_ok, search_ok);
 
     (
         code,
@@ -54,4 +48,63 @@ pub async fn health_check(
             search: search_msg,
         }),
     )
+}
+
+/// Determine overall health status and HTTP status code from component states.
+/// Extracted as a pure function for testability.
+fn determine_status(db_ok: bool, search_ok: bool) -> (&'static str, StatusCode) {
+    if db_ok && search_ok {
+        ("ok", StatusCode::OK)
+    } else if db_ok {
+        ("degraded", StatusCode::OK)
+    } else {
+        ("error", StatusCode::SERVICE_UNAVAILABLE)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    #[test]
+    fn status_both_healthy() {
+        let (status, code) = determine_status(true, true);
+        assert_eq!(status, "ok");
+        assert_eq!(code, StatusCode::OK);
+    }
+
+    #[test]
+    fn status_db_ok_search_down() {
+        let (status, code) = determine_status(true, false);
+        assert_eq!(status, "degraded");
+        assert_eq!(code, StatusCode::OK);
+    }
+
+    #[test]
+    fn status_db_down_search_ok() {
+        let (status, code) = determine_status(false, true);
+        assert_eq!(status, "error");
+        assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn status_both_down() {
+        let (status, code) = determine_status(false, false);
+        assert_eq!(status, "error");
+        assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn health_response_serializes() {
+        let resp = HealthResponse {
+            status: "ok".to_string(),
+            db: "ok".to_string(),
+            search: "ok (42 docs)".to_string(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["status"], "ok");
+        assert_eq!(json["db"], "ok");
+        assert_eq!(json["search"], "ok (42 docs)");
+    }
 }

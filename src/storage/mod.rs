@@ -106,8 +106,17 @@ fn mime_to_ext(content_type: &str) -> Option<&'static str> {
 
 /// Extract extension from URL
 fn url_extension(url: &str) -> Option<&'static str> {
-    let ext = url.rsplit(|c| c == '?' || c == '#').next()?;
-    let ext = ext.trim_end_matches(|c| c == '/' || c == '.');
+    // Strip query string and fragment first
+    let path = url.split(|c| c == '?' || c == '#').next()?;
+    // Get the last path segment (filename)
+    let filename = path.rsplit('/').next()?;
+    let filename = filename.trim_end_matches('.');
+    // Extract extension after the last dot
+    let ext = filename.rsplit('.').next()?;
+    // If there's no dot or the "extension" is the whole filename, no extension
+    if ext.eq_ignore_ascii_case(filename) {
+        return None;
+    }
     match ext.to_ascii_lowercase().as_str() {
         "jpg" | "jpeg" => Some("jpg"),
         "png" => Some("png"),
@@ -187,4 +196,183 @@ pub async fn process_images(
         result = result.replace(&old_url, &new_url);
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- mime_to_ext ---
+
+    #[test]
+    fn mime_to_ext_svg() {
+        assert_eq!(mime_to_ext("image/svg+xml"), Some("svg"));
+    }
+
+    #[test]
+    fn mime_to_ext_png() {
+        assert_eq!(mime_to_ext("image/png"), Some("png"));
+    }
+
+    #[test]
+    fn mime_to_ext_gif() {
+        assert_eq!(mime_to_ext("image/gif"), Some("gif"));
+    }
+
+    #[test]
+    fn mime_to_ext_webp() {
+        assert_eq!(mime_to_ext("image/webp"), Some("webp"));
+    }
+
+    #[test]
+    fn mime_to_ext_jpeg() {
+        assert_eq!(mime_to_ext("image/jpeg"), Some("jpg"));
+    }
+
+    #[test]
+    fn mime_to_ext_jpg() {
+        assert_eq!(mime_to_ext("image/jpg"), Some("jpg"));
+    }
+
+    #[test]
+    fn mime_to_ext_avif() {
+        assert_eq!(mime_to_ext("image/avif"), Some("avif"));
+    }
+
+    #[test]
+    fn mime_to_ext_x_icon() {
+        assert_eq!(mime_to_ext("image/x-icon"), Some("ico"));
+    }
+
+    #[test]
+    fn mime_to_ext_vnd_microsoft_icon() {
+        assert_eq!(mime_to_ext("image/vnd.microsoft.icon"), Some("ico"));
+    }
+
+    #[test]
+    fn mime_to_ext_charset_suffix() {
+        assert_eq!(mime_to_ext("image/jpeg; charset=binary"), Some("jpg"));
+    }
+
+    #[test]
+    fn mime_to_ext_text_html_returns_none() {
+        assert_eq!(mime_to_ext("text/html"), None);
+    }
+
+    #[test]
+    fn mime_to_ext_empty_returns_none() {
+        assert_eq!(mime_to_ext(""), None);
+    }
+
+    #[test]
+    fn mime_to_ext_unknown_returns_none() {
+        assert_eq!(mime_to_ext("unknown/type"), None);
+    }
+
+    // --- url_extension ---
+
+    #[test]
+    fn url_extension_png() {
+        assert_eq!(url_extension("https://example.com/img.png"), Some("png"));
+    }
+
+    #[test]
+    fn url_extension_jpg() {
+        assert_eq!(url_extension("https://example.com/img.jpg"), Some("jpg"));
+    }
+
+    #[test]
+    fn url_extension_jpeg() {
+        assert_eq!(url_extension("https://example.com/img.jpeg"), Some("jpg"));
+    }
+
+    #[test]
+    fn url_extension_gif() {
+        assert_eq!(url_extension("https://example.com/img.gif"), Some("gif"));
+    }
+
+    #[test]
+    fn url_extension_webp() {
+        assert_eq!(url_extension("https://example.com/img.webp"), Some("webp"));
+    }
+
+    #[test]
+    fn url_extension_svg() {
+        assert_eq!(url_extension("https://example.com/img.svg"), Some("svg"));
+    }
+
+    #[test]
+    fn url_extension_ico() {
+        assert_eq!(url_extension("https://example.com/img.ico"), Some("ico"));
+    }
+
+    #[test]
+    fn url_extension_avif() {
+        assert_eq!(url_extension("https://example.com/img.avif"), Some("avif"));
+    }
+
+    #[test]
+    fn url_extension_case_insensitive() {
+        assert_eq!(url_extension("https://example.com/img.PNG"), Some("png"));
+    }
+
+    #[test]
+    fn url_extension_strips_query() {
+        assert_eq!(url_extension("https://example.com/img.png?w=200"), Some("png"));
+    }
+
+    #[test]
+    fn url_extension_strips_fragment() {
+        assert_eq!(url_extension("https://example.com/img.png#anchor"), Some("png"));
+    }
+
+    #[test]
+    fn url_extension_no_ext_returns_none() {
+        assert_eq!(url_extension("https://example.com/img"), None);
+    }
+
+    #[test]
+    fn url_extension_unsupported_ext_returns_none() {
+        assert_eq!(url_extension("https://example.com/img.txt"), None);
+    }
+
+    // --- image_key_from_url ---
+
+    #[test]
+    fn image_key_deterministic() {
+        let key1 = image_key_from_url("https://example.com/img.png", None);
+        let key2 = image_key_from_url("https://example.com/img.png", None);
+        assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn image_key_different_urls() {
+        let key1 = image_key_from_url("https://example.com/a.png", None);
+        let key2 = image_key_from_url("https://example.com/b.png", None);
+        assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn image_key_content_type_overrides_url_ext() {
+        let key = image_key_from_url("https://x.com/img.png", Some("image/gif"));
+        assert!(key.ends_with(".gif"), "expected key ending with .gif, got: {key}");
+    }
+
+    #[test]
+    fn image_key_no_content_type_uses_url_ext() {
+        let key = image_key_from_url("https://x.com/img.png", None);
+        assert!(key.ends_with(".png"), "expected key ending with .png, got: {key}");
+    }
+
+    #[test]
+    fn image_key_no_ext_defaults_to_jpg() {
+        let key = image_key_from_url("https://x.com/img", None);
+        assert!(key.ends_with(".jpg"), "expected key ending with .jpg, got: {key}");
+    }
+
+    #[test]
+    fn image_key_starts_with_images_prefix() {
+        let key = image_key_from_url("https://x.com/img.png", None);
+        assert!(key.starts_with("images/"), "expected key starting with images/, got: {key}");
+    }
 }

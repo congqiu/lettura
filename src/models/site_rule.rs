@@ -125,3 +125,41 @@ pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<
         Ok(false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_site_rule_validation_empty_domain() {
+        let rule = CreateSiteRule {
+            domain: "".to_string(),
+            content_selector: ".content".to_string(),
+            title_selector: None,
+            strip_selectors: None,
+        };
+        assert!(rule.validate().is_err());
+    }
+
+    #[test]
+    fn create_site_rule_validation_empty_content_selector() {
+        let rule = CreateSiteRule {
+            domain: "example.com".to_string(),
+            content_selector: "".to_string(),
+            title_selector: None,
+            strip_selectors: None,
+        };
+        assert!(rule.validate().is_err());
+    }
+
+    #[test]
+    fn create_site_rule_validation_valid() {
+        let rule = CreateSiteRule {
+            domain: "example.com".to_string(),
+            content_selector: ".content".to_string(),
+            title_selector: Some("h1".to_string()),
+            strip_selectors: Some(vec![".ad".to_string()]),
+        };
+        assert!(rule.validate().is_ok());
+    }
+}

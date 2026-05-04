@@ -142,3 +142,67 @@ pub async fn delete_token(
         Err(ApiError::NotFound("token".into()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::middleware::{AuthSource, PatScope};
+
+    fn make_auth(source: AuthSource) -> AuthUser {
+        AuthUser {
+            user_id: uuid::Uuid::new_v4(),
+            is_admin: false,
+            source,
+        }
+    }
+
+    // ── require_jwt ──
+
+    #[test]
+    fn require_jwt_with_jwt_source_returns_ok() {
+        let auth = make_auth(AuthSource::Jwt);
+        assert!(require_jwt(&auth).is_ok());
+    }
+
+    #[test]
+    fn require_jwt_with_pat_source_returns_forbidden() {
+        let auth = make_auth(AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: uuid::Uuid::new_v4(),
+        });
+        let err = require_jwt(&auth).unwrap_err();
+        match err {
+            ApiError::Forbidden(msg) => {
+                assert!(msg.contains("interactive login"));
+            }
+            other => panic!("expected Forbidden, got {:?}", other),
+        }
+    }
+
+    // ── validate_scope ──
+
+    #[test]
+    fn validate_scope_read_is_ok() {
+        assert!(validate_scope("read").is_ok());
+    }
+
+    #[test]
+    fn validate_scope_write_is_ok() {
+        assert!(validate_scope("write").is_ok());
+    }
+
+    #[test]
+    fn validate_scope_admin_is_err() {
+        assert!(validate_scope("admin").is_err());
+    }
+
+    #[test]
+    fn validate_scope_empty_is_err() {
+        assert!(validate_scope("").is_err());
+    }
+
+    #[test]
+    fn validate_scope_is_case_sensitive() {
+        assert!(validate_scope("READ").is_err());
+    }
+}

@@ -409,4 +409,23 @@ mod tests {
         assert_ne!(AuditAction::ArchiveEntry, AuditAction::UnarchiveEntry);
         assert_ne!(AuditAction::BulkArchive, AuditAction::BulkStar);
     }
+
+    #[test]
+    fn list_audit_logs_filter_default() {
+        let filter = ListAuditLogsFilter::default();
+        assert_eq!(filter.limit, 50);
+        assert_eq!(filter.offset, 0);
+    }
+
+    #[test]
+    fn audit_details_skip_serializing_if() {
+        let details = AuditDetails {
+            before: None,
+            after: None,
+            extras: None,
+        };
+        let json = serde_json::to_string(&details).unwrap();
+        let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&json).unwrap();
+        assert!(!map.contains_key("after"), "after key should be absent when None");
+    }
 }

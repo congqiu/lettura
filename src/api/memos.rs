@@ -127,3 +127,64 @@ fn extract_url(text: &str) -> Option<String> {
         .and_then(|word| url::Url::parse(word).ok())
         .map(|u| u.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_url ──
+
+    #[test]
+    fn extract_url_finds_http_url() {
+        assert_eq!(
+            extract_url("check out http://example.com/page"),
+            Some("http://example.com/page".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_url_finds_https_url() {
+        assert_eq!(
+            extract_url("see https://example.com"),
+            Some("https://example.com/".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_url_returns_first_when_multiple() {
+        let result = extract_url("http://first.com and https://second.com");
+        assert_eq!(result, Some("http://first.com/".to_string()));
+    }
+
+    #[test]
+    fn extract_url_returns_none_when_no_url() {
+        assert_eq!(extract_url("just some plain text here"), None);
+    }
+
+    #[test]
+    fn extract_url_returns_none_without_scheme() {
+        assert_eq!(extract_url("visit example.com today"), None);
+    }
+
+    #[test]
+    fn extract_url_finds_url_surrounded_by_text() {
+        assert_eq!(
+            extract_url("before https://mid.com after"),
+            Some("https://mid.com/".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_url_returns_none_for_invalid_url() {
+        // "http://" alone fails url::Url::parse (no host)
+        assert_eq!(extract_url("http://"), None);
+    }
+
+    #[test]
+    fn extract_url_preserves_fragment_and_query() {
+        assert_eq!(
+            extract_url("https://example.com/path?q=1#section"),
+            Some("https://example.com/path?q=1#section".to_string())
+        );
+    }
+}

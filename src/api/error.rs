@@ -116,3 +116,124 @@ impl From<crate::models::error::ModelError> for ApiError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+
+    // --- Display tests ---
+
+    #[test]
+    fn display_bad_request() {
+        assert_eq!(ApiError::BadRequest("msg".to_string()).to_string(), "bad request: msg");
+    }
+
+    #[test]
+    fn display_unauthorized() {
+        assert_eq!(ApiError::Unauthorized("msg".to_string()).to_string(), "unauthorized: msg");
+    }
+
+    #[test]
+    fn display_forbidden() {
+        assert_eq!(ApiError::Forbidden("msg".to_string()).to_string(), "forbidden: msg");
+    }
+
+    #[test]
+    fn display_not_found() {
+        assert_eq!(ApiError::NotFound("msg".to_string()).to_string(), "not found: msg");
+    }
+
+    #[test]
+    fn display_conflict() {
+        assert_eq!(ApiError::Conflict("msg".to_string()).to_string(), "conflict: msg");
+    }
+
+    #[test]
+    fn display_internal() {
+        assert_eq!(ApiError::Internal("msg".to_string()).to_string(), "internal: msg");
+    }
+
+    #[test]
+    fn display_validation() {
+        let mut fields = HashMap::new();
+        fields.insert("email".to_string(), vec!["invalid".to_string()]);
+        let displayed = ApiError::Validation(fields).to_string();
+        assert!(displayed.starts_with("validation error:"));
+    }
+
+    // --- IntoResponse status code tests ---
+
+    #[tokio::test]
+    async fn into_response_bad_request() {
+        let response = ApiError::BadRequest("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn into_response_unauthorized() {
+        let response = ApiError::Unauthorized("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn into_response_forbidden() {
+        let response = ApiError::Forbidden("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn into_response_not_found() {
+        let response = ApiError::NotFound("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn into_response_conflict() {
+        let response = ApiError::Conflict("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn into_response_internal() {
+        let response = ApiError::Internal("msg".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn into_response_validation() {
+        let mut fields = HashMap::new();
+        fields.insert("field".to_string(), vec!["error".to_string()]);
+        let response = ApiError::Validation(fields).into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // --- From<ModelError> tests ---
+
+    #[test]
+    fn from_model_error_not_found() {
+        let err = crate::models::error::ModelError::NotFound("item".to_string());
+        match ApiError::from(err) {
+            ApiError::NotFound(_) => {}
+            other => panic!("expected NotFound, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn from_model_error_conflict() {
+        let err = crate::models::error::ModelError::Conflict("dup".to_string());
+        match ApiError::from(err) {
+            ApiError::Conflict(_) => {}
+            other => panic!("expected Conflict, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn from_model_error_database() {
+        let err = crate::models::error::ModelError::Database("db fail".to_string());
+        match ApiError::from(err) {
+            ApiError::Internal(_) => {}
+            other => panic!("expected Internal, got {:?}", other),
+        }
+    }
+}

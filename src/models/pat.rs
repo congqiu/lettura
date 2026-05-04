@@ -228,4 +228,10 @@ mod tests {
         assert!(!json.contains("token_hash"),
             "token_hash key appeared in JSON: {json}");
     }
+
+    #[test]
+    fn scope_as_str() {
+        assert_eq!(Scope::Read.as_str(), "read");
+        assert_eq!(Scope::Write.as_str(), "write");
+    }
 }

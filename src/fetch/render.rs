@@ -218,3 +218,76 @@ async fn fetch_page_content(
     let _ = page.close().await;
     Ok(html)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failure_threshold_constant() {
+        assert_eq!(FAILURE_THRESHOLD, 5);
+    }
+
+    #[test]
+    fn cooldown_constant_is_sixty_seconds() {
+        assert_eq!(COOLDOWN, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn new_service_concurrency_floored_to_one() {
+        let svc = RenderService::new(None, 0, 5000);
+        // Semaphore capacity is concurrency.max(1); we verify the service was
+        // created successfully (no panic) and that the internal semaphore has
+        // at least 1 permit available.
+        assert!(
+            svc.sem.try_acquire().is_ok(),
+            "semaphore should have at least 1 permit when concurrency=0"
+        );
+    }
+
+    #[test]
+    fn new_service_timeout_floored_to_one_second() {
+        let svc = RenderService::new(None, 2, 100);
+        assert_eq!(svc.timeout, Duration::from_millis(1000));
+    }
+
+    #[test]
+    fn new_service_timeout_uses_provided_value_when_above_minimum() {
+        let svc = RenderService::new(None, 2, 5000);
+        assert_eq!(svc.timeout, Duration::from_millis(5000));
+    }
+
+    #[test]
+    fn new_service_stores_chromium_path() {
+        let svc = RenderService::new(Some("/usr/bin/chromedriver".to_string()), 2, 5000);
+        assert_eq!(svc.chromium_path.as_deref(), Some("/usr/bin/chromedriver"));
+    }
+
+    #[test]
+    fn new_service_chromium_path_none_by_default() {
+        let svc = RenderService::new(None, 2, 5000);
+        assert!(svc.chromium_path.is_none());
+    }
+
+    #[test]
+    fn new_service_initial_failure_count_is_zero() {
+        let svc = RenderService::new(None, 2, 5000);
+        assert_eq!(svc.failures.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn new_service_concurrency_respects_valid_value() {
+        let svc = RenderService::new(None, 4, 3000);
+        // Should be able to acquire 4 permits concurrently
+        let p1 = svc.sem.try_acquire().unwrap();
+        let p2 = svc.sem.try_acquire().unwrap();
+        let p3 = svc.sem.try_acquire().unwrap();
+        let p4 = svc.sem.try_acquire().unwrap();
+        // A 5th should fail (only 4 permits)
+        assert!(svc.sem.try_acquire().is_err());
+        drop(p1);
+        drop(p2);
+        drop(p3);
+        drop(p4);
+    }
+}

@@ -5,6 +5,13 @@ use s3::region::Region;
 
 use super::{ImageStorage, StorageError};
 
+/// Check whether an S3 error message indicates a "not found" (404) response.
+/// This is a pure logic function extracted for testability.
+pub fn is_not_found_error(msg: &str) -> bool {
+    let lower = msg.to_lowercase();
+    lower.contains("no such key") || lower.contains("not found") || lower.contains("404")
+}
+
 pub struct OssStorage {
     bucket: Box<Bucket>,
     public_url_prefix: String,
@@ -66,8 +73,8 @@ impl ImageStorage for OssStorage {
         match self.bucket.get_object(key).await {
             Ok(data) => Ok(Some(data.to_vec())),
             Err(e) => {
-                let msg = e.to_string().to_lowercase();
-                if msg.contains("no such key") || msg.contains("not found") || msg.contains("404") {
+                let msg = e.to_string();
+                if is_not_found_error(&msg) {
                     Ok(None)
                 } else {
                     Err(StorageError::Io(e.to_string()))
@@ -88,5 +95,62 @@ impl ImageStorage for OssStorage {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- is_not_found_error tests ---
+
+    #[test]
+    fn not_found_no_such_key() {
+        assert!(is_not_found_error("no such key: The specified key does not exist"));
+        assert!(is_not_found_error("No such key"));
+        assert!(is_not_found_error("NO SUCH KEY"));
+    }
+
+    #[test]
+    fn not_found_not_found() {
+        assert!(is_not_found_error("Object not found in bucket"));
+    }
+
+    #[test]
+    fn not_found_404() {
+        assert!(is_not_found_error("HTTP 404 Not Found"));
+    }
+
+    #[test]
+    fn not_found_case_insensitive() {
+        assert!(is_not_found_error("NO SUCH KEY"));
+        assert!(is_not_found_error("Not Found"));
+        assert!(is_not_found_error("http 404"));
+    }
+
+    #[test]
+    fn not_other_error() {
+        assert!(!is_not_found_error("Access Denied"));
+        assert!(!is_not_found_error("Internal Server Error"));
+        assert!(!is_not_found_error("timeout"));
+    }
+
+    #[test]
+    fn not_found_empty_string() {
+        assert!(!is_not_found_error(""));
+    }
+
+    // --- StorageError display formatting tests ---
+
+    #[test]
+    fn storage_error_io_display() {
+        let err = StorageError::Io("disk full".into());
+        assert_eq!(format!("{err}"), "storage io error: disk full");
+    }
+
+    #[test]
+    fn storage_error_upload_display() {
+        let err = StorageError::Upload("connection refused".into());
+        assert_eq!(format!("{err}"), "storage upload error: connection refused");
     }
 }

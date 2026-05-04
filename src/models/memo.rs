@@ -53,3 +53,26 @@ pub async fn set_promoted_entry(pool: &PgPool, memo_id: Uuid, entry_id: Uuid) ->
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_memo_validation_empty_content() {
+        let memo = CreateMemo {
+            content: "".to_string(),
+            source_url: None,
+        };
+        assert!(memo.validate().is_err());
+    }
+
+    #[test]
+    fn create_memo_validation_valid() {
+        let memo = CreateMemo {
+            content: "some memo content".to_string(),
+            source_url: Some("https://example.com".to_string()),
+        };
+        assert!(memo.validate().is_ok());
+    }
+}

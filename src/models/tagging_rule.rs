@@ -283,4 +283,164 @@ mod tests {
         });
         assert!(evaluate_rule(&rule, &test_fields()));
     }
+
+    // --- evaluate_condition edge cases ---
+
+    #[test]
+    fn neq_operator_false_when_equal() {
+        let cond = json!({"field": "title", "op": "neq", "value": "Hello"});
+        let fields = EntryFields {
+            title: "Hello".to_string(),
+            ..test_fields()
+        };
+        assert!(!evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn neq_operator_true_when_not_equal() {
+        let cond = json!({"field": "title", "op": "neq", "value": "Hello"});
+        let fields = EntryFields {
+            title: "World".to_string(),
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn not_contains_operator_false_when_contains() {
+        let cond = json!({"field": "title", "op": "not_contains", "value": "Hello"});
+        let fields = EntryFields {
+            title: "Hello World".to_string(),
+            ..test_fields()
+        };
+        assert!(!evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn not_contains_operator_true_when_not_contains() {
+        let cond = json!({"field": "title", "op": "not_contains", "value": "Hello"});
+        let fields = EntryFields {
+            title: "Goodbye World".to_string(),
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn reading_time_gt_true() {
+        let cond = json!({"field": "readingTime", "op": "gt", "value": 5});
+        let fields = EntryFields {
+            reading_time: 10,
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn reading_time_gt_false() {
+        let cond = json!({"field": "readingTime", "op": "gt", "value": 5});
+        let fields = EntryFields {
+            reading_time: 3,
+            ..test_fields()
+        };
+        assert!(!evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn reading_time_lt_true() {
+        let cond = json!({"field": "readingTime", "op": "lt", "value": 5});
+        let fields = EntryFields {
+            reading_time: 3,
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn reading_time_lt_false() {
+        let cond = json!({"field": "readingTime", "op": "lt", "value": 5});
+        let fields = EntryFields {
+            reading_time: 10,
+            ..test_fields()
+        };
+        assert!(!evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn reading_time_eq_true() {
+        let cond = json!({"field": "readingTime", "op": "eq", "value": 5});
+        let fields = EntryFields {
+            reading_time: 5,
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn content_type_eq_true() {
+        let cond = json!({"field": "contentType", "op": "eq", "value": "article"});
+        let fields = EntryFields {
+            content_type: "article".to_string(),
+            ..test_fields()
+        };
+        assert!(evaluate_condition(&cond, &fields));
+    }
+
+    #[test]
+    fn invalid_field_name_returns_false() {
+        let cond = json!({"field": "nonexistent", "op": "eq", "value": "something"});
+        assert!(!evaluate_condition(&cond, &test_fields()));
+    }
+
+    #[test]
+    fn invalid_operator_returns_false() {
+        let cond = json!({"field": "title", "op": "invalid_op", "value": "Hello"});
+        assert!(!evaluate_condition(&cond, &test_fields()));
+    }
+
+    #[test]
+    fn matches_regex_redos_pattern_completes() {
+        // A pathological ReDoS pattern should not hang thanks to size_limit
+        let cond = json!({"field": "title", "op": "matches", "value": "(a+)+"});
+        let long_string = "a".repeat(100);
+        let fields = EntryFields {
+            title: long_string,
+            ..test_fields()
+        };
+        // Just verify it completes without hanging
+        let _ = evaluate_condition(&cond, &fields);
+    }
+
+    // --- CreateTaggingRule validation ---
+
+    #[test]
+    fn create_tagging_rule_empty_tags_fails_validation() {
+        let params = CreateTaggingRule {
+            rule: json!({"operator": "AND", "conditions": []}),
+            tags: vec![],
+            priority: None,
+        };
+        assert!(params.validate().is_err());
+    }
+
+    // --- Nested group rules ---
+
+    #[test]
+    fn or_group_inside_and_group() {
+        // AND with one condition true + one nested OR (one true, one false) -> true
+        let rule = json!({
+            "operator": "AND",
+            "conditions": [
+                {"field": "domainName", "op": "eq", "value": "github.com"},
+                {
+                    "operator": "OR",
+                    "conditions": [
+                        {"field": "language", "op": "eq", "value": "zh"},
+                        {"field": "title", "op": "contains", "value": "Rust"}
+                    ]
+                }
+            ]
+        });
+        assert!(evaluate_rule(&rule, &test_fields()));
+    }
 }

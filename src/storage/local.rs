@@ -74,4 +74,52 @@ mod tests {
         let data = storage.get("nope.txt").await.unwrap();
         assert!(data.is_none());
     }
+
+    #[tokio::test]
+    async fn test_delete_existing_file() {
+        let dir = TempDir::new().unwrap();
+        let storage = LocalStorage::new(dir.path().to_str().unwrap());
+
+        // Store a file first
+        storage.store("delete_me.txt", b"to be deleted", "text/plain").await.unwrap();
+
+        // Verify it exists
+        let data = storage.get("delete_me.txt").await.unwrap();
+        assert_eq!(data, Some(b"to be deleted".to_vec()));
+
+        // Delete it
+        storage.delete("delete_me.txt").await.unwrap();
+
+        // Verify it's gone
+        let data = storage.get("delete_me.txt").await.unwrap();
+        assert!(data.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_nonexistent_file() {
+        let dir = TempDir::new().unwrap();
+        let storage = LocalStorage::new(dir.path().to_str().unwrap());
+
+        // Deleting a non-existent key should return an error (file not found),
+        // not panic or return Ok.
+        let result = storage.delete("ghost.txt").await;
+        assert!(result.is_err(), "deleting a nonexistent file should return an error");
+    }
+
+    #[tokio::test]
+    async fn test_store_with_nested_key() {
+        let dir = TempDir::new().unwrap();
+        let storage = LocalStorage::new(dir.path().to_str().unwrap());
+
+        // Store with a nested key that requires subdirectory creation
+        storage.store("subdir/nested/file.txt", b"deep content", "text/plain").await.unwrap();
+
+        // Verify retrieval works
+        let data = storage.get("subdir/nested/file.txt").await.unwrap();
+        assert_eq!(data, Some(b"deep content".to_vec()));
+
+        // Verify the URL format
+        let url = storage.store("subdir/nested/file.txt", b"deep content", "text/plain").await.unwrap();
+        assert_eq!(url, "/storage/subdir/nested/file.txt");
+    }
 }

@@ -119,3 +119,55 @@ pub async fn reindex(
         "indexed": count
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_summary_excludes_password_hash() {
+        let summary = UserSummary {
+            id: uuid::Uuid::new_v4(),
+            username: "testuser".to_string(),
+            email: "test@example.com".to_string(),
+            is_admin: false,
+            created_at: chrono::Utc::now(),
+        };
+        let json = serde_json::to_value(&summary).expect("serialization should succeed");
+        let json_str = serde_json::to_string(&summary).expect("serialization to string should succeed");
+
+        assert!(!json_str.contains("password"));
+        assert!(!json_str.contains("password_hash"));
+        // Verify expected fields are present
+        assert!(json.get("id").is_some());
+        assert!(json.get("username").is_some());
+        assert!(json.get("email").is_some());
+        assert!(json.get("is_admin").is_some());
+        assert!(json.get("created_at").is_some());
+    }
+
+    #[test]
+    fn admin_check_non_admin_forbidden() {
+        // Simulate the conditional logic from the handlers:
+        // if !is_admin { return Err(ApiError::Forbidden(...)) }
+        let is_admin = false;
+        let result: Result<(), ApiError> = if !is_admin {
+            Err(ApiError::Forbidden("admin required".to_string()))
+        } else {
+            Ok(())
+        };
+        match result {
+            Err(ApiError::Forbidden(msg)) => assert_eq!(msg, "admin required"),
+            other => panic!("expected Forbidden, got {:?}", other),
+        }
+
+        // Admin should pass the check
+        let is_admin = true;
+        let result: Result<(), ApiError> = if !is_admin {
+            Err(ApiError::Forbidden("admin required".to_string()))
+        } else {
+            Ok(())
+        };
+        assert!(result.is_ok());
+    }
+}

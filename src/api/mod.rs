@@ -324,27 +324,15 @@ async fn serve_storage(
     // Prevent path traversal: reject any segment that escapes the base
     // directory or anchors to root. `path.contains("..")` would also reject
     // legitimate filenames like `foo..bar.png`, so check Components instead.
-    let candidate = std::path::Path::new(&path);
-    for c in candidate.components() {
-        match c {
-            std::path::Component::Normal(_) => {}
-            _ => {
-                return (axum::http::StatusCode::FORBIDDEN, "invalid path").into_response();
-            }
-        }
+    if !is_safe_storage_path(&path) {
+        return (axum::http::StatusCode::FORBIDDEN, "invalid path").into_response();
     }
     let file_path = std::path::Path::new(&state.config.storage_local_path).join(&path);
     match tokio::fs::read(&file_path).await {
         Ok(data) => {
             let mime = mime_guess::from_path(&path).first_or_octet_stream();
             let mime_str = mime.as_ref();
-            // Force dangerous content types to download instead of render inline.
-            // Prevents stored XSS via user-uploaded HTML/JS files.
-            let is_dangerous = mime_str.starts_with("text/html")
-                || mime_str.starts_with("application/javascript")
-                || mime_str.starts_with("application/xhtml")
-                || mime_str.starts_with("text/javascript");
-            let content_disposition = if is_dangerous {
+            let content_disposition = if is_dangerous_mime(mime_str) {
                 "attachment"
             } else {
                 "inline"
@@ -363,3 +351,141 @@ async fn serve_storage(
 
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
+
+/// Check if a path component is safe for storage file serving.
+/// Returns false if any component is not `Normal` (e.g., `..`, root, prefix).
+/// Extracted as a pure function for testability.
+fn is_safe_storage_path(path: &str) -> bool {
+    let candidate = std::path::Path::new(path);
+    candidate.components().all(|c| matches!(c, std::path::Component::Normal(_)))
+}
+
+/// Determine whether a MIME type is dangerous (should be served as attachment).
+fn is_dangerous_mime(mime_str: &str) -> bool {
+    mime_str.starts_with("text/html")
+        || mime_str.starts_with("application/javascript")
+        || mime_str.starts_with("application/xhtml")
+        || mime_str.starts_with("text/javascript")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::middleware::{AuthSource, AuthUser, PatScope};
+
+    // --- auth_source_str tests ---
+
+    #[test]
+    fn auth_source_str_jwt() {
+        let auth = AuthUser {
+            user_id: uuid::Uuid::new_v4(),
+            is_admin: false,
+            source: AuthSource::Jwt,
+        };
+        assert_eq!(auth_source_str(&auth), "jwt");
+    }
+
+    #[test]
+    fn auth_source_str_pat_read() {
+        let auth = AuthUser {
+            user_id: uuid::Uuid::new_v4(),
+            is_admin: false,
+            source: AuthSource::Pat {
+                scope: PatScope::Read,
+                token_id: uuid::Uuid::new_v4(),
+            },
+        };
+        assert_eq!(auth_source_str(&auth), "pat");
+    }
+
+    #[test]
+    fn auth_source_str_pat_write() {
+        let auth = AuthUser {
+            user_id: uuid::Uuid::new_v4(),
+            is_admin: true,
+            source: AuthSource::Pat {
+                scope: PatScope::Write,
+                token_id: uuid::Uuid::new_v4(),
+            },
+        };
+        assert_eq!(auth_source_str(&auth), "pat");
+    }
+
+    // --- is_safe_storage_path tests ---
+
+    #[test]
+    fn safe_path_simple_filename() {
+        assert!(is_safe_storage_path("image.png"));
+    }
+
+    #[test]
+    fn safe_path_nested_normal() {
+        assert!(is_safe_storage_path("subdir/image.png"));
+    }
+
+    #[test]
+    fn safe_path_deeply_nested() {
+        assert!(is_safe_storage_path("a/b/c/image.png"));
+    }
+
+    #[test]
+    fn unsafe_path_parent_traversal() {
+        assert!(!is_safe_storage_path("../etc/passwd"));
+    }
+
+    #[test]
+    fn unsafe_path_mixed_traversal() {
+        assert!(!is_safe_storage_path("images/../../etc/passwd"));
+    }
+
+    #[test]
+    fn unsafe_path_absolute() {
+        assert!(!is_safe_storage_path("/etc/passwd"));
+    }
+
+    #[test]
+    fn unsafe_path_current_dir_prefix() {
+        assert!(!is_safe_storage_path("./secret"));
+    }
+
+    #[test]
+    fn safe_path_double_dot_in_filename() {
+        // Filenames like `foo..bar.png` should be allowed
+        assert!(is_safe_storage_path("foo..bar.png"));
+    }
+
+    // --- is_dangerous_mime tests ---
+
+    #[test]
+    fn dangerous_html() {
+        assert!(is_dangerous_mime("text/html"));
+        assert!(is_dangerous_mime("text/html; charset=utf-8"));
+    }
+
+    #[test]
+    fn dangerous_javascript() {
+        assert!(is_dangerous_mime("application/javascript"));
+        assert!(is_dangerous_mime("text/javascript"));
+    }
+
+    #[test]
+    fn dangerous_xhtml() {
+        assert!(is_dangerous_mime("application/xhtml+xml"));
+    }
+
+    #[test]
+    fn safe_image_mime() {
+        assert!(!is_dangerous_mime("image/png"));
+        assert!(!is_dangerous_mime("image/jpeg"));
+    }
+
+    #[test]
+    fn safe_json_mime() {
+        assert!(!is_dangerous_mime("application/json"));
+    }
+
+    #[test]
+    fn safe_plain_text() {
+        assert!(!is_dangerous_mime("text/plain"));
+    }
+}

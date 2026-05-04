@@ -294,3 +294,144 @@ fn mime_for_file(name: &str) -> &'static str {
         _ => "application/octet-stream",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{HeaderMap, HeaderValue};
+
+    // ── sign_cookie / verify_cookie ──────────────────────────────
+
+    #[test]
+    fn sign_and_verify_round_trip() {
+        let secret = "super-secret-key-for-testing";
+        let slug = "my-page";
+        let sig = sign_cookie(secret, slug);
+        assert!(verify_cookie(secret, slug, &sig));
+    }
+
+    #[test]
+    fn verify_rejects_different_secret() {
+        let secret = "secret-a";
+        let other = "secret-b";
+        let slug = "my-page";
+        let sig = sign_cookie(secret, slug);
+        assert!(!verify_cookie(other, slug, &sig));
+    }
+
+    #[test]
+    fn verify_rejects_different_slug() {
+        let secret = "super-secret-key";
+        let sig = sign_cookie(secret, "slug-a");
+        assert!(!verify_cookie(secret, "slug-b", &sig));
+    }
+
+    #[test]
+    fn verify_rejects_different_value() {
+        let secret = "super-secret-key";
+        let slug = "my-page";
+        let _sig = sign_cookie(secret, slug);
+        assert!(!verify_cookie(secret, slug, "tampered-value"));
+    }
+
+    #[test]
+    fn empty_slug_still_works() {
+        let secret = "super-secret-key";
+        let sig = sign_cookie(secret, "");
+        assert!(verify_cookie(secret, "", &sig));
+    }
+
+    // ── get_cookie_value ─────────────────────────────────────────
+
+    #[test]
+    fn single_cookie_found() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("page_auth_abc=signature123"));
+        assert_eq!(get_cookie_value(&headers, "abc"), Some("signature123".to_string()));
+    }
+
+    #[test]
+    fn cookie_in_middle_of_multiple() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("theme=dark; page_auth_abc=signature123; lang=en"));
+        assert_eq!(get_cookie_value(&headers, "abc"), Some("signature123".to_string()));
+    }
+
+    #[test]
+    fn missing_cookie_returns_none() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("theme=dark; lang=en"));
+        assert_eq!(get_cookie_value(&headers, "abc"), None);
+    }
+
+    #[test]
+    fn empty_cookie_header_returns_none() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static(""));
+        assert_eq!(get_cookie_value(&headers, "abc"), None);
+    }
+
+    #[test]
+    fn cookie_with_empty_value() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("page_auth_abc="));
+        assert_eq!(get_cookie_value(&headers, "abc"), Some("".to_string()));
+    }
+
+    // ── mime_for_file ────────────────────────────────────────────
+
+    #[test]
+    fn mime_css() {
+        assert_eq!(mime_for_file("style.css"), "text/css; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_js() {
+        assert_eq!(mime_for_file("app.js"), "application/javascript");
+    }
+
+    #[test]
+    fn mime_png() {
+        assert_eq!(mime_for_file("image.png"), "image/png");
+    }
+
+    #[test]
+    fn mime_jpg() {
+        assert_eq!(mime_for_file("image.jpg"), "image/jpeg");
+    }
+
+    #[test]
+    fn mime_webp() {
+        assert_eq!(mime_for_file("image.webp"), "image/webp");
+    }
+
+    #[test]
+    fn mime_woff2() {
+        assert_eq!(mime_for_file("font.woff2"), "font/woff2");
+    }
+
+    #[test]
+    fn mime_mp4() {
+        assert_eq!(mime_for_file("video.mp4"), "video/mp4");
+    }
+
+    #[test]
+    fn mime_mp3() {
+        assert_eq!(mime_for_file("audio.mp3"), "audio/mpeg");
+    }
+
+    #[test]
+    fn mime_webmanifest() {
+        assert_eq!(mime_for_file("manifest.webmanifest"), "application/manifest+json");
+    }
+
+    #[test]
+    fn mime_xml() {
+        assert_eq!(mime_for_file("data.xml"), "application/xml");
+    }
+
+    #[test]
+    fn mime_unknown() {
+        assert_eq!(mime_for_file("unknown.xyz"), "application/octet-stream");
+    }
+}

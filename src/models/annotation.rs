@@ -68,3 +68,28 @@ pub async fn delete(pool: &PgPool, annotation_id: Uuid, user_id: Uuid) -> Result
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_annotation_validation_empty_quote() {
+        let annotation = CreateAnnotation {
+            quote: "".to_string(),
+            text: None,
+            ranges: serde_json::json!([]),
+        };
+        assert!(annotation.validate().is_err());
+    }
+
+    #[test]
+    fn create_annotation_validation_valid() {
+        let annotation = CreateAnnotation {
+            quote: "some quoted text".to_string(),
+            text: Some("a note".to_string()),
+            ranges: serde_json::json!([]),
+        };
+        assert!(annotation.validate().is_ok());
+    }
+}

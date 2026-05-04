@@ -114,3 +114,169 @@ fn build_rss(channel_title: &str, entries: &[FeedEntry]) -> Response {
     )
         .into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    fn make_entry(
+        id: &str,
+        url: &str,
+        title: Option<&str>,
+        content: Option<&str>,
+        created_at: chrono::DateTime<chrono::Utc>,
+    ) -> FeedEntry {
+        FeedEntry {
+            id: uuid::Uuid::parse_str(id).unwrap(),
+            url: url.to_string(),
+            title: title.map(|s| s.to_string()),
+            content: content.map(|s| s.to_string()),
+            created_at,
+        }
+    }
+
+    // --- xml_escape tests ---
+
+    #[test]
+    fn xml_escape_ampersand() {
+        assert_eq!(xml_escape("&"), "&amp;");
+    }
+
+    #[test]
+    fn xml_escape_less_than() {
+        assert_eq!(xml_escape("<"), "&lt;");
+    }
+
+    #[test]
+    fn xml_escape_greater_than() {
+        assert_eq!(xml_escape(">"), "&gt;");
+    }
+
+    #[test]
+    fn xml_escape_double_quote() {
+        assert_eq!(xml_escape("\""), "&quot;");
+    }
+
+    #[test]
+    fn xml_escape_single_quote() {
+        assert_eq!(xml_escape("'"), "&apos;");
+    }
+
+    #[test]
+    fn xml_escape_no_special_chars() {
+        assert_eq!(xml_escape("hello world"), "hello world");
+    }
+
+    #[test]
+    fn xml_escape_multiple_special_chars() {
+        assert_eq!(
+            xml_escape("a&b<c>d\"e'f"),
+            "a&amp;b&lt;c&gt;d&quot;e&apos;f"
+        );
+    }
+
+    #[test]
+    fn xml_escape_empty_string() {
+        assert_eq!(xml_escape(""), "");
+    }
+
+    // --- build_rss tests ---
+
+    #[tokio::test]
+    async fn build_rss_empty_entries() {
+        let response = build_rss("Lettura - Unread", &[]);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let xml = String::from_utf8(body.to_vec()).unwrap();
+        assert!(xml.contains("<title>Lettura - Unread</title>"));
+        assert!(xml.contains("<rss version=\"2.0\">"));
+        assert!(!xml.contains("<item>"));
+    }
+
+    #[tokio::test]
+    async fn build_rss_single_entry() {
+        let now = chrono::Utc::now();
+        let entry = make_entry(
+            "550e8400-e29b-41d4-a716-446655440000",
+            "https://example.com/article",
+            Some("Test Article"),
+            Some("<p>Hello</p>"),
+            now,
+        );
+        let response = build_rss("Lettura - Unread", &[entry]);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let xml = String::from_utf8(body.to_vec()).unwrap();
+        assert!(xml.contains("<item>"));
+        assert!(xml.contains("<title><![CDATA[Test Article]]></title>"));
+        assert!(xml.contains("<link>https://example.com/article</link>"));
+        assert!(xml.contains("<guid>550e8400-e29b-41d4-a716-446655440000</guid>"));
+        assert!(xml.contains("<pubDate>"));
+        assert!(xml.contains("<description><![CDATA[<p>Hello</p>]]></description>"));
+    }
+
+    #[tokio::test]
+    async fn build_rss_cdata_injection_title() {
+        let now = chrono::Utc::now();
+        let entry = make_entry(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "https://example.com/xss",
+            Some("Evil ]]> Title"),
+            None,
+            now,
+        );
+        let response = build_rss("Feed", &[entry]);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let xml = String::from_utf8(body.to_vec()).unwrap();
+        assert!(xml.contains("Evil ]]&gt; Title"));
+        assert!(!xml.contains("Evil ]]> Title"));
+    }
+
+    #[tokio::test]
+    async fn build_rss_cdata_injection_content() {
+        let now = chrono::Utc::now();
+        let entry = make_entry(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "https://example.com/xss2",
+            Some("Safe Title"),
+            Some("Evil ]]> Content"),
+            now,
+        );
+        let response = build_rss("Feed", &[entry]);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let xml = String::from_utf8(body.to_vec()).unwrap();
+        assert!(xml.contains("Evil ]]&gt; Content"));
+        assert!(!xml.contains("Evil ]]> Content"));
+    }
+
+    #[tokio::test]
+    async fn build_rss_date_rfc2822_format() {
+        let now = chrono::Utc::now();
+        let entry = make_entry(
+            "550e8400-e29b-41d4-a716-446655440003",
+            "https://example.com/date-test",
+            Some("Date Test"),
+            None,
+            now,
+        );
+        let response = build_rss("Feed", &[entry]);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let xml = String::from_utf8(body.to_vec()).unwrap();
+        // Extract pubDate content and verify it parses as RFC2822
+        let start = xml.find("<pubDate>").unwrap() + "<pubDate>".len();
+        let end = xml.find("</pubDate>").unwrap();
+        let date_str = &xml[start..end];
+        // chrono's to_rfc2822 produces parseable RFC2822 dates
+        let parsed = chrono::DateTime::parse_from_rfc2822(date_str);
+        assert!(parsed.is_ok(), "pubDate '{}' is not valid RFC2822", date_str);
+    }
+}

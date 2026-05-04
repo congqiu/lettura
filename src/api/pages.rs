@@ -603,3 +603,311 @@ pub async fn get_share_url_handler(
         has_password,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    // ── is_safe_relative_path ──────────────────────────────────────
+
+    #[test]
+    fn is_safe_relative_path_normal_relative() {
+        assert!(is_safe_relative_path("dir/file.html"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_traversal() {
+        assert!(!is_safe_relative_path("../etc/passwd"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_absolute() {
+        assert!(!is_safe_relative_path("/etc/passwd"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_backslash() {
+        assert!(!is_safe_relative_path("dir\\file.html"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_hidden_file() {
+        assert!(!is_safe_relative_path(".env"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_hidden_dir() {
+        assert!(!is_safe_relative_path(".git/config"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_macosx() {
+        assert!(!is_safe_relative_path("__MACOSX/file"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_directory_entry() {
+        assert!(!is_safe_relative_path("dir/"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_normal_multi_level() {
+        assert!(is_safe_relative_path("css/style.css"));
+    }
+
+    #[test]
+    fn is_safe_relative_path_dot_in_middle() {
+        assert!(is_safe_relative_path("my.file.html"));
+    }
+
+    // ── sanitize_filename ──────────────────────────────────────────
+
+    #[test]
+    fn sanitize_filename_removes_double_dot() {
+        assert_eq!(sanitize_filename("dir/../file.html"), "dir/file.html");
+    }
+
+    #[test]
+    fn sanitize_filename_filters_empty_and_dot_prefixed() {
+        // "../.hidden/./file.html" → after replace("..","") → "./.hidden/./file.html"
+        // split by '/' → ["", ".hidden", "", "file.html"]
+        // filter empty & dot-prefixed → ["file.html"]
+        assert_eq!(sanitize_filename("../.hidden/./file.html"), "file.html");
+    }
+
+    #[test]
+    fn sanitize_filename_normal_unchanged() {
+        assert_eq!(sanitize_filename("style.css"), "style.css");
+    }
+
+    #[test]
+    fn sanitize_filename_collapses_multiple_slashes() {
+        assert_eq!(sanitize_filename("dir///file.html"), "dir/file.html");
+    }
+
+    // ── extract_title ──────────────────────────────────────────────
+
+    #[test]
+    fn extract_title_from_tag() {
+        let html = b"<html><head><title>My Title</title></head><body></body></html>";
+        assert_eq!(extract_title(html, "fallback.html"), "My Title");
+    }
+
+    #[test]
+    fn extract_title_case_insensitive() {
+        // The implementation lowercases the content for searching, then slices
+        // the original — so mixed-case tags are found but the extracted text
+        // retains its original casing from the source bytes.
+        let html = b"<HTML><HEAD><TITLE>My Title</TITLE></HEAD><BODY></BODY></HTML>";
+        assert_eq!(extract_title(html, "fallback.html"), "My Title");
+    }
+
+    #[test]
+    fn extract_title_empty_falls_back_to_filename() {
+        let html = b"<html><head><title></title></head><body></body></html>";
+        assert_eq!(extract_title(html, "page.html"), "page");
+    }
+
+    #[test]
+    fn extract_title_no_tag_falls_back_to_filename() {
+        let html = b"<html><head></head><body></body></html>";
+        assert_eq!(extract_title(html, "page.html"), "page");
+    }
+
+    #[test]
+    fn extract_title_whitespace_trimmed() {
+        let html = b"<html><head><title>  Spaced Title  </title></head><body></body></html>";
+        assert_eq!(extract_title(html, "fallback.html"), "Spaced Title");
+    }
+
+    // ── strip_common_prefix ────────────────────────────────────────
+
+    #[test]
+    fn strip_common_prefix_strips() {
+        let mut files = vec![
+            ("root/index.html".to_string(), vec![1u8]),
+            ("root/style.css".to_string(), vec![2u8]),
+        ];
+        strip_common_prefix(&mut files);
+        assert_eq!(files[0].0, "index.html");
+        assert_eq!(files[1].0, "style.css");
+    }
+
+    #[test]
+    fn strip_common_prefix_no_common() {
+        let mut files = vec![
+            ("a/index.html".to_string(), vec![1u8]),
+            ("b/style.css".to_string(), vec![2u8]),
+        ];
+        strip_common_prefix(&mut files);
+        assert_eq!(files[0].0, "a/index.html");
+        assert_eq!(files[1].0, "b/style.css");
+    }
+
+    #[test]
+    fn strip_common_prefix_single_file_no_slash() {
+        let mut files = vec![
+            ("index.html".to_string(), vec![1u8]),
+        ];
+        strip_common_prefix(&mut files);
+        assert_eq!(files[0].0, "index.html");
+    }
+
+    #[test]
+    fn strip_common_prefix_empty_list() {
+        let mut files: Vec<(String, Vec<u8>)> = vec![];
+        strip_common_prefix(&mut files);
+        assert!(files.is_empty());
+    }
+
+    // ── mime_for_path ──────────────────────────────────────────────
+
+    #[test]
+    fn mime_for_path_html() {
+        assert_eq!(mime_for_path("page.html"), "text/html; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_for_path_htm() {
+        assert_eq!(mime_for_path("page.htm"), "text/html; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_for_path_css() {
+        assert_eq!(mime_for_path("style.css"), "text/css; charset=utf-8");
+    }
+
+    #[test]
+    fn mime_for_path_js() {
+        assert_eq!(mime_for_path("app.js"), "application/javascript");
+    }
+
+    #[test]
+    fn mime_for_path_mjs() {
+        assert_eq!(mime_for_path("app.mjs"), "application/javascript");
+    }
+
+    #[test]
+    fn mime_for_path_json() {
+        assert_eq!(mime_for_path("data.json"), "application/json");
+    }
+
+    #[test]
+    fn mime_for_path_svg() {
+        assert_eq!(mime_for_path("logo.svg"), "image/svg+xml");
+    }
+
+    #[test]
+    fn mime_for_path_png() {
+        assert_eq!(mime_for_path("img.png"), "image/png");
+    }
+
+    #[test]
+    fn mime_for_path_jpg() {
+        assert_eq!(mime_for_path("img.jpg"), "image/jpeg");
+    }
+
+    #[test]
+    fn mime_for_path_jpeg() {
+        assert_eq!(mime_for_path("img.jpeg"), "image/jpeg");
+    }
+
+    #[test]
+    fn mime_for_path_gif() {
+        assert_eq!(mime_for_path("img.gif"), "image/gif");
+    }
+
+    #[test]
+    fn mime_for_path_webp() {
+        assert_eq!(mime_for_path("img.webp"), "image/webp");
+    }
+
+    #[test]
+    fn mime_for_path_ico() {
+        assert_eq!(mime_for_path("favicon.ico"), "image/x-icon");
+    }
+
+    #[test]
+    fn mime_for_path_woff() {
+        assert_eq!(mime_for_path("font.woff"), "font/woff");
+    }
+
+    #[test]
+    fn mime_for_path_woff2() {
+        assert_eq!(mime_for_path("font.woff2"), "font/woff2");
+    }
+
+    #[test]
+    fn mime_for_path_ttf() {
+        assert_eq!(mime_for_path("font.ttf"), "font/ttf");
+    }
+
+    #[test]
+    fn mime_for_path_unknown() {
+        assert_eq!(mime_for_path("archive.zip"), "application/octet-stream");
+    }
+
+    // ── extract_zip ────────────────────────────────────────────────
+
+    /// Helper: build a zip archive in memory with the given entries.
+    fn build_zip(entries: Vec<(&str, &[u8])>) -> Vec<u8> {
+        let buf = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(buf);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, data) in entries {
+            writer.start_file(name, options).unwrap();
+            writer.write_all(data).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn extract_zip_too_many_entries() {
+        // Build a zip with 501 entries (limit is 500).
+        let entries: Vec<(&str, &[u8])> = (0..501)
+            .map(|i| {
+                let name = Box::leak(format!("file{i}.html").into_boxed_str());
+                (name as &str, b"x" as &[u8])
+            })
+            .collect();
+        let data = build_zip(entries);
+        let result = extract_zip(&data);
+        match result {
+            Err(ApiError::BadRequest(msg)) => {
+                assert!(msg.contains("too many zip entries"), "unexpected msg: {msg}");
+            }
+            other => panic!("expected BadRequest, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn extract_zip_entry_name_too_long() {
+        let long_name = "a".repeat(256); // limit is 255
+        let entries: Vec<(&str, &[u8])> = vec![(&long_name, b"data" as &[u8])];
+        let data = build_zip(entries);
+        let result = extract_zip(&data);
+        match result {
+            Err(ApiError::BadRequest(msg)) => {
+                assert!(msg.contains("name too long"), "unexpected msg: {msg}");
+            }
+            other => panic!("expected BadRequest, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn extract_zip_too_large() {
+        // Limit is 50 MB uncompressed. Build one entry that exceeds it.
+        let big_data = vec![0u8; 51 * 1024 * 1024]; // 51 MB
+        let entries: Vec<(&str, &[u8])> = vec![("big.html", &big_data)];
+        let data = build_zip(entries);
+        let result = extract_zip(&data);
+        match result {
+            Err(ApiError::BadRequest(msg)) => {
+                assert!(msg.contains("zip too large"), "unexpected msg: {msg}");
+            }
+            other => panic!("expected BadRequest, got: {other:?}"),
+        }
+    }
+}

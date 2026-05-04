@@ -55,6 +55,11 @@ impl<T: Clone + Send + Sync + 'static> UserCache<T> {
     pub fn entry_count(&self) -> u64 {
         self.inner.entry_count()
     }
+
+    /// Run pending maintenance tasks (e.g. eviction) to make entry_count accurate.
+    pub async fn run_pending_tasks(&self) {
+        self.inner.run_pending_tasks().await;
+    }
 }
 
 // ============================================================================
@@ -129,5 +134,63 @@ mod tests {
         // Wait for TTL
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert!(cache.get(user_id).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn invalidate_all() {
+        let cache: UserCache<TestData> = UserCache::new(100, Duration::from_secs(60));
+        let user1 = Uuid::new_v4();
+        let user2 = Uuid::new_v4();
+
+        cache.insert(user1, vec![TestData { value: 1 }]).await;
+        cache.insert(user2, vec![TestData { value: 2 }]).await;
+
+        assert!(cache.get(user1).await.is_some());
+        assert!(cache.get(user2).await.is_some());
+
+        cache.invalidate_all().await;
+
+        assert!(cache.get(user1).await.is_none());
+        assert!(cache.get(user2).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn entry_count() {
+        let cache: UserCache<TestData> = UserCache::new(100, Duration::from_secs(60));
+
+        let user1 = Uuid::new_v4();
+        let user2 = Uuid::new_v4();
+
+        cache.insert(user1, vec![TestData { value: 1 }]).await;
+        cache.run_pending_tasks().await;
+        assert_eq!(cache.entry_count(), 1);
+
+        cache.insert(user2, vec![TestData { value: 2 }]).await;
+        cache.run_pending_tasks().await;
+        assert_eq!(cache.entry_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn multi_user_isolation() {
+        let cache: UserCache<TestData> = UserCache::new(100, Duration::from_secs(60));
+        let user1 = Uuid::new_v4();
+        let user2 = Uuid::new_v4();
+
+        cache.insert(user1, vec![TestData { value: 10 }, TestData { value: 20 }]).await;
+        cache.insert(user2, vec![TestData { value: 30 }]).await;
+
+        let result1 = cache.get(user1).await.unwrap();
+        assert_eq!(result1.len(), 2);
+        assert_eq!(result1[0].value, 10);
+        assert_eq!(result1[1].value, 20);
+
+        let result2 = cache.get(user2).await.unwrap();
+        assert_eq!(result2.len(), 1);
+        assert_eq!(result2[0].value, 30);
+
+        // Invalidate user1 does not affect user2
+        cache.invalidate(user1).await;
+        assert!(cache.get(user1).await.is_none());
+        assert!(cache.get(user2).await.is_some());
     }
 }

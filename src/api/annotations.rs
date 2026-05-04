@@ -84,3 +84,28 @@ pub async fn delete_annotation(
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use validator::Validate;
+
+    #[test]
+    fn create_annotation_request_validation() {
+        // Empty quote should fail validation (min length = 1)
+        let params = annotation::CreateAnnotation {
+            quote: "".to_string(),
+            text: None,
+            ranges: serde_json::json!({}),
+        };
+        assert!(params.validate().is_err());
+
+        // Non-empty quote should pass validation
+        let params = annotation::CreateAnnotation {
+            quote: "highlighted text".to_string(),
+            text: Some("a note".to_string()),
+            ranges: serde_json::json!({}),
+        };
+        assert!(params.validate().is_ok());
+    }
+}

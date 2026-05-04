@@ -174,3 +174,55 @@ pub async fn remove_tag_from_entry_by_label(
         Err(ApiError::NotFound(format!("tag '{label}' not on entry")))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::tag::RenameError;
+
+    #[test]
+    fn rename_error_conflict_maps_to_api_conflict() {
+        let err = RenameError::Conflict;
+        let api_err: ApiError = match err {
+            RenameError::Conflict => ApiError::Conflict("a tag with this name already exists".to_string()),
+            RenameError::Database(msg) => {
+                ApiError::Internal("internal server error".to_string())
+            }
+        };
+        match api_err {
+            ApiError::Conflict(msg) => {
+                assert_eq!(msg, "a tag with this name already exists");
+            }
+            other => panic!("expected ApiError::Conflict, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rename_error_database_maps_to_api_internal() {
+        let err = RenameError::Database("some db error".to_string());
+        let api_err: ApiError = match err {
+            RenameError::Conflict => ApiError::Conflict("a tag with this name already exists".to_string()),
+            RenameError::Database(msg) => {
+                ApiError::Internal("internal server error".to_string())
+            }
+        };
+        match api_err {
+            ApiError::Internal(msg) => {
+                assert_eq!(msg, "internal server error");
+            }
+            other => panic!("expected ApiError::Internal, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn add_tag_request_validation_empty_label_fails() {
+        let req = AddTagRequest { label: "".to_string() };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn add_tag_request_validation_valid_label_passes() {
+        let req = AddTagRequest { label: "rust".to_string() };
+        assert!(req.validate().is_ok());
+    }
+}

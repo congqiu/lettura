@@ -29,3 +29,26 @@ impl From<sqlx::Error> for ModelError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_error_display_not_found() {
+        let err = ModelError::NotFound("x".into());
+        assert!(err.to_string().contains("x"));
+    }
+
+    #[test]
+    fn model_error_display_conflict() {
+        let err = ModelError::Conflict("y".into());
+        assert!(err.to_string().contains("y"));
+    }
+
+    #[test]
+    fn model_error_display_database() {
+        let err = ModelError::Database("z".into());
+        assert!(err.to_string().contains("z"));
+    }
+}

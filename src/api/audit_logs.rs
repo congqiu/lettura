@@ -30,6 +30,39 @@ fn default_limit() -> i64 {
     50
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_limit_returns_50() {
+        assert_eq!(default_limit(), 50);
+    }
+
+    #[test]
+    fn limit_clamp_within_range() {
+        assert_eq!(50i64.clamp(1, 200), 50);
+    }
+
+    #[test]
+    fn limit_clamp_below_minimum() {
+        assert_eq!(0i64.clamp(1, 200), 1);
+        assert_eq!((-5i64).clamp(1, 200), 1);
+    }
+
+    #[test]
+    fn limit_clamp_above_maximum() {
+        assert_eq!(300i64.clamp(1, 200), 200);
+        assert_eq!(1000i64.clamp(1, 200), 200);
+    }
+
+    #[test]
+    fn limit_clamp_at_boundaries() {
+        assert_eq!(1i64.clamp(1, 200), 1);
+        assert_eq!(200i64.clamp(1, 200), 200);
+    }
+}
+
 #[derive(Serialize)]
 pub struct ListAuditLogsResponse {
     data: Vec<AuditLog>,

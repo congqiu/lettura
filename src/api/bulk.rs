@@ -364,3 +364,44 @@ pub async fn bulk_archive_by_ids(
 
     Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_ids(n: usize) -> Vec<uuid::Uuid> {
+        (0..n).map(|_| uuid::Uuid::new_v4()).collect()
+    }
+
+    #[test]
+    fn check_max_exceeds_limit() {
+        let ids = make_ids(5);
+        let result = check_max(&ids, Some(3));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ApiError::BadRequest(msg) => assert!(msg.contains("exceeds max")),
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn check_max_equals_limit() {
+        let ids = make_ids(3);
+        let result = check_max(&ids, Some(3));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_max_below_limit() {
+        let ids = make_ids(2);
+        let result = check_max(&ids, Some(3));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_max_none_always_ok() {
+        let ids = make_ids(999);
+        let result = check_max(&ids, None);
+        assert!(result.is_ok());
+    }
+}

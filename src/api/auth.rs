@@ -373,3 +373,115 @@ pub async fn change_password(
         message: "password changed".to_string(),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{HeaderMap, HeaderValue};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    fn peer() -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 1234)
+    }
+
+    // --- extract_ip ---
+
+    #[test]
+    fn extract_ip_trust_proxy_xff_single() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4"));
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_trust_proxy_xff_multiple() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("  1.2.3.4 , 5.6.7.8 , 9.10.11.12 "));
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_trust_proxy_x_real_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", HeaderValue::from_static("5.6.7.8"));
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("5.6.7.8".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_trust_proxy_xff_priority_over_x_real_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4"));
+        headers.insert("x-real-ip", HeaderValue::from_static("5.6.7.8"));
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("1.2.3.4".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_no_trust_proxy_falls_back_to_peer_addr() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4"));
+        let result = extract_ip(&headers, false, Some(&peer()));
+        assert_eq!(result, Some("10.0.0.1".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_trust_proxy_no_headers_falls_back_to_peer_addr() {
+        let headers = HeaderMap::new();
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("10.0.0.1".to_string()));
+    }
+
+    #[test]
+    fn extract_ip_trust_proxy_no_headers_no_peer() {
+        let headers = HeaderMap::new();
+        let result = extract_ip(&headers, true, None);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn extract_ip_truncates_to_45_chars() {
+        let long_ip = "a".repeat(60);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_str(&long_ip).unwrap());
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("a".repeat(45)));
+    }
+
+    #[test]
+    fn extract_ip_xff_empty_after_comma_falls_through_to_x_real_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static(" ,5.6.7.8"));
+        headers.insert("x-real-ip", HeaderValue::from_static("9.10.11.12"));
+        let result = extract_ip(&headers, true, Some(&peer()));
+        assert_eq!(result, Some("9.10.11.12".to_string()));
+    }
+
+    // --- extract_ua ---
+
+    #[test]
+    fn extract_ua_normal() {
+        let mut headers = HeaderMap::new();
+        headers.insert("user-agent", HeaderValue::from_static("Mozilla/5.0"));
+        let result = extract_ua(&headers);
+        assert_eq!(result, Some("Mozilla/5.0".to_string()));
+    }
+
+    #[test]
+    fn extract_ua_truncates_to_255_chars() {
+        let long_ua = "a".repeat(300);
+        let mut headers = HeaderMap::new();
+        headers.insert("user-agent", HeaderValue::from_str(&long_ua).unwrap());
+        let result = extract_ua(&headers);
+        assert_eq!(result, Some("a".repeat(255)));
+    }
+
+    #[test]
+    fn extract_ua_missing() {
+        let headers = HeaderMap::new();
+        let result = extract_ua(&headers);
+        assert_eq!(result, None);
+    }
+}

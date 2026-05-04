@@ -76,3 +76,31 @@ pub async fn delete_rule(
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use validator::Validate;
+
+    #[test]
+    fn create_site_rule_request_validation_empty_domain() {
+        let params = CreateSiteRule {
+            domain: "".to_string(),
+            content_selector: ".content".to_string(),
+            title_selector: None,
+            strip_selectors: None,
+        };
+        assert!(params.validate().is_err());
+    }
+
+    #[test]
+    fn create_site_rule_request_validation_valid() {
+        let params = CreateSiteRule {
+            domain: "example.com".to_string(),
+            content_selector: ".content".to_string(),
+            title_selector: Some("h1".to_string()),
+            strip_selectors: Some(vec![".ad".to_string()]),
+        };
+        assert!(params.validate().is_ok());
+    }
+}

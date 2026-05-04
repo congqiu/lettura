@@ -267,4 +267,42 @@ mod tests {
         let slugs: std::collections::HashSet<String> = (0..100).map(|_| generate_slug()).collect();
         assert_eq!(slugs.len(), 100);
     }
+
+    #[test]
+    fn page_summary_serialization_hides_password() {
+        let summary = PageSummary {
+            id: Uuid::new_v4(),
+            slug: "abc123".to_string(),
+            title: "Test".to_string(),
+            description: None,
+            password: Some("hashed_value".to_string()),
+            status: "active".to_string(),
+            file_count: 1,
+            expires_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        assert!(json.contains("\"has_password\":true"));
+        assert!(!json.contains("hashed_value"));
+        assert!(!json.contains("\"password\""));
+    }
+
+    #[test]
+    fn page_summary_serialization_no_password() {
+        let summary = PageSummary {
+            id: Uuid::new_v4(),
+            slug: "abc123".to_string(),
+            title: "Test".to_string(),
+            description: None,
+            password: None,
+            status: "active".to_string(),
+            file_count: 1,
+            expires_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        assert!(json.contains("\"has_password\":false"));
+    }
 }

@@ -76,3 +76,29 @@ pub async fn delete_rule(
     ).await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use validator::Validate;
+
+    #[test]
+    fn create_tagging_rule_request_validation_empty_tags() {
+        let params = CreateTaggingRule {
+            rule: serde_json::json!({"operator": "AND", "conditions": []}),
+            tags: vec![],
+            priority: None,
+        };
+        assert!(params.validate().is_err());
+    }
+
+    #[test]
+    fn create_tagging_rule_request_validation_valid() {
+        let params = CreateTaggingRule {
+            rule: serde_json::json!({"operator": "AND", "conditions": []}),
+            tags: vec!["rust".to_string()],
+            priority: Some(1),
+        };
+        assert!(params.validate().is_ok());
+    }
+}

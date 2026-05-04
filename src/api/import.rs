@@ -213,3 +213,43 @@ pub async fn import_browser(
         "skipped": skipped
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wallabag_entry_deserialization() {
+        let json = r#"{
+            "url": "https://example.com/article",
+            "title": "Example Article",
+            "content": "<p>Hello</p>",
+            "is_archived": 1,
+            "is_starred": 0,
+            "tags": ["rust", "programming"]
+        }"#;
+        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        assert_eq!(entry.url.as_deref(), Some("https://example.com/article"));
+        assert_eq!(entry.title.as_deref(), Some("Example Article"));
+        assert_eq!(entry.content.as_deref(), Some("<p>Hello</p>"));
+        assert_eq!(entry.is_archived, Some(1));
+        assert_eq!(entry.is_starred, Some(0));
+        assert_eq!(entry.tags, Some(vec!["rust".to_string(), "programming".to_string()]));
+    }
+
+    #[test]
+    fn wallabag_entry_with_null_url() {
+        let json = r#"{"url": null, "title": "No URL"}"#;
+        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        assert!(entry.url.is_none());
+        assert_eq!(entry.title.as_deref(), Some("No URL"));
+    }
+
+    #[test]
+    fn wallabag_entry_with_empty_url() {
+        let json = r#"{"url": "", "title": "Empty URL"}"#;
+        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        assert_eq!(entry.url, Some("".to_string()));
+        assert_eq!(entry.title.as_deref(), Some("Empty URL"));
+    }
+}
