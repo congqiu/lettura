@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star } from 'lucide-react';
+import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star, ArrowUp } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -83,6 +83,7 @@ export default function EntryListPage({ filter }: Props) {
 
   const isMobile = useIsMobile();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -106,6 +107,13 @@ export default function EntryListPage({ filter }: Props) {
     checkScrollTop();
     return () => window.removeEventListener('scroll', checkScrollTop);
   }, [isMobile]);
+
+  // Show scroll-to-top button when scrolled down
+  useEffect(() => {
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const tagFilter = searchParams.get('tag') || '';
   const excludeTag = searchParams.get('exclude_tag') || '';
@@ -493,6 +501,16 @@ export default function EntryListPage({ filter }: Props) {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Scroll to top */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed right-5 bottom-6 z-40 h-10 w-10 rounded-full bg-card border border-border/60 shadow-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border transition-all animate-fade-in"
+        >
+          <ArrowUp size={18} />
+        </button>
       )}
 
       {/* Delete confirmation dialog */}

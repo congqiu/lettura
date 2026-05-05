@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="${LETTURA_REPO:-qiu/lettura}"
+REPO="${LETTURA_REPO:-congqiu/lettura}"
 VERSION="${LETTURA_CLI_VERSION:-latest}"
 INSTALL_DIR="${LETTURA_INSTALL_DIR:-$HOME/.local/bin}"
 

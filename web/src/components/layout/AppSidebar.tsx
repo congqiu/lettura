@@ -1,4 +1,4 @@
-import { NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/auth';
@@ -65,12 +65,12 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-border/60">
       <SidebarHeader className="px-4 py-5">
-        <div className="flex items-center gap-2.5">
+        <Link to="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm shadow-primary/20">
             <span className="text-primary-foreground font-bold text-sm">L</span>
           </div>
           <span className="font-semibold text-lg text-foreground select-none tracking-tight">Lettura</span>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="px-2 overflow-x-hidden">

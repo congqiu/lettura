@@ -64,7 +64,7 @@ AI-first 命令行工具，通过 Personal Access Token 与 Lettura HTTP API 通
 ### 安装
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/qiu/lettura/main/scripts/install-cli.sh | sh
+curl -sSL https://raw.githubusercontent.com/congqiu/lettura/main/scripts/install-cli.sh | sh
 ```
 
 或指定版本 / Fork：
