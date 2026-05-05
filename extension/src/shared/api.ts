@@ -113,18 +113,18 @@ export async function authenticatedRequest<T>(
   if (auth_mode === 'pat') {
     const { pat_token } = await getLocalStorage(['pat_token']);
     if (!pat_token) {
-      throw new Error('Not authenticated. Please login via the popup.');
+      throw new Error('未登录，请通过弹窗登录');
     }
 
     const resp = await apiRequest<T>({ method, path, body, accessToken: pat_token });
 
     if (resp.status === 401) {
       await clearAllStorage();
-      throw new Error('Token expired or invalid. Please login again.');
+      throw new Error('令牌已过期或无效，请重新登录');
     }
     if (resp.status === 403) {
       const errData = await resp.json().catch(() => null);
-      const msg = errData?.message ?? 'Token has read-only scope. Use a write-scope token.';
+      const msg = errData?.message ?? '令牌为只读权限，请使用读写权限的令牌';
       throw new Error(msg);
     }
 
@@ -136,7 +136,7 @@ export async function authenticatedRequest<T>(
   if (!token) {
     token = await refreshToken();
     if (!token) {
-      throw new Error('Not authenticated. Please login via the popup.');
+      throw new Error('未登录，请通过弹窗登录');
     }
   }
 
@@ -145,7 +145,7 @@ export async function authenticatedRequest<T>(
   if (resp.status === 401) {
     const newToken = await refreshToken();
     if (!newToken) {
-      throw new Error('Session expired. Please login again via the popup.');
+      throw new Error('登录已过期，请重新登录');
     }
     resp = await apiRequest<T>({ method, path, body, accessToken: newToken });
   }
@@ -196,12 +196,12 @@ export async function connectWithToken(
 
   // Validate server URL uses HTTPS
   if (!normalized.startsWith('https://') && !normalized.startsWith('http://localhost') && !normalized.startsWith('http://127.0.0.1')) {
-    throw new Error('Server URL must use HTTPS (or http://localhost for development).');
+    throw new Error('服务器地址必须使用 HTTPS（开发环境可用 http://localhost）');
   }
 
   // Validate token format
   if (!token.startsWith('lta_')) {
-    throw new Error('Token must start with lta_');
+    throw new Error('令牌必须以 lta_ 开头');
   }
 
   // Validate token by calling /api/v1/auth/me
@@ -213,13 +213,13 @@ export async function connectWithToken(
   });
 
   if (resp.status === 401) {
-    throw new Error('Token is invalid or expired.');
+    throw new Error('令牌无效或已过期');
   }
   if (resp.status === 403) {
-    throw new Error('Token has read-only scope. Use a token with write scope.');
+    throw new Error('令牌为只读权限，请使用读写权限的令牌');
   }
   if (!resp.ok) {
-    throw new Error(`Verification failed (${resp.status})`);
+    throw new Error(`验证失败 (${resp.status})`);
   }
 
   // Clear any existing JWT tokens before storing PAT data

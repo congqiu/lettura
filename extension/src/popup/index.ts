@@ -90,24 +90,24 @@ async function doLogin(): Promise<void> {
   const password = passwordInput.value;
 
   if (!serverUrl) {
-    showMessage(loginError, 'Please enter the server URL.', 'error');
+    showMessage(loginError, '请输入服务器地址', 'error');
     return;
   }
   if (!serverUrl.startsWith('https://') && !serverUrl.startsWith('http://localhost') && !serverUrl.startsWith('http://127.0.0.1')) {
-    showMessage(loginError, 'Server URL must use HTTPS (or http://localhost for development).', 'error');
+    showMessage(loginError, '服务器地址必须使用 HTTPS（开发环境可用 http://localhost）', 'error');
     return;
   }
   if (!email) {
-    showMessage(loginError, 'Please enter your email.', 'error');
+    showMessage(loginError, '请输入邮箱', 'error');
     return;
   }
   if (!password) {
-    showMessage(loginError, 'Please enter your password.', 'error');
+    showMessage(loginError, '请输入密码', 'error');
     return;
   }
 
   loginBtn.disabled = true;
-  loginBtn.textContent = 'Logging in...';
+  loginBtn.textContent = '登录中...';
 
   try {
     await setLocalStorage({ server_url: serverUrl.replace(/\/+$/, '') });
@@ -124,12 +124,12 @@ async function doLogin(): Promise<void> {
   } catch (err) {
     showMessage(
       loginError,
-      err instanceof Error ? err.message : 'Login failed',
+      err instanceof Error ? err.message : '登录失败',
       'error'
     );
   } finally {
     loginBtn.disabled = false;
-    loginBtn.textContent = 'Login';
+    loginBtn.textContent = '登录';
   }
 }
 
@@ -139,24 +139,24 @@ async function doTokenLogin(): Promise<void> {
   const token = tokenInput.value.trim();
 
   if (!serverUrl) {
-    showMessage(tokenError, 'Please enter the server URL.', 'error');
+    showMessage(tokenError, '请输入服务器地址', 'error');
     return;
   }
   if (!serverUrl.startsWith('https://') && !serverUrl.startsWith('http://localhost') && !serverUrl.startsWith('http://127.0.0.1')) {
-    showMessage(tokenError, 'Server URL must use HTTPS (or http://localhost for development).', 'error');
+    showMessage(tokenError, '服务器地址必须使用 HTTPS（开发环境可用 http://localhost）', 'error');
     return;
   }
   if (!token) {
-    showMessage(tokenError, 'Please enter your token.', 'error');
+    showMessage(tokenError, '请输入令牌', 'error');
     return;
   }
   if (!token.startsWith('lta_')) {
-    showMessage(tokenError, 'Token must start with lta_.', 'error');
+    showMessage(tokenError, '令牌必须以 lta_ 开头', 'error');
     return;
   }
 
   tokenBtn.disabled = true;
-  tokenBtn.textContent = 'Connecting...';
+  tokenBtn.textContent = '连接中...';
 
   try {
     await connectWithToken(serverUrl, token);
@@ -164,51 +164,51 @@ async function doTokenLogin(): Promise<void> {
   } catch (err) {
     showMessage(
       tokenError,
-      err instanceof Error ? err.message : 'Connection failed',
+      err instanceof Error ? err.message : '连接失败',
       'error'
     );
   } finally {
     tokenBtn.disabled = false;
-    tokenBtn.textContent = 'Connect';
+    tokenBtn.textContent = '连接';
   }
 }
 
 async function doSave(): Promise<void> {
   hideMessage(saveStatus);
   saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving...';
+  saveBtn.textContent = '保存中...';
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) {
-      showMessage(saveStatus, 'Cannot get current tab URL.', 'error');
+      showMessage(saveStatus, '无法获取当前页面地址', 'error');
       return;
     }
 
     const resp = await saveEntry(tab.url);
 
     if (resp.ok) {
-      showMessage(saveStatus, 'Page saved successfully!', 'success');
+      showMessage(saveStatus, '保存成功！', 'success');
     } else if (resp.status === 409) {
-      showMessage(saveStatus, 'This page was already saved.', 'info');
+      showMessage(saveStatus, '该页面已保存过', 'info');
     } else if (resp.status === 401) {
-      showMessage(saveStatus, 'Session expired. Please login again.', 'error');
+      showMessage(saveStatus, '登录已过期，请重新登录', 'error');
       await clearAllStorage();
       setTimeout(() => init(), 1000);
     } else {
       const errData = await resp.json().catch(() => null);
-      const msg = errData?.message ?? `Failed to save (${resp.status})`;
+      const msg = errData?.message ?? `保存失败 (${resp.status})`;
       showMessage(saveStatus, msg, 'error');
     }
   } catch (err) {
     showMessage(
       saveStatus,
-      err instanceof Error ? err.message : 'Failed to save page.',
+      err instanceof Error ? err.message : '保存失败',
       'error'
     );
   } finally {
     saveBtn.disabled = false;
-    saveBtn.textContent = 'Save this page';
+    saveBtn.textContent = '保存此页面';
   }
 }
 

@@ -19,14 +19,14 @@ chrome.runtime.onInstalled.addListener(() => {
   // "Save to Lettura" — available on all pages
   chrome.contextMenus.create({
     id: 'save-page',
-    title: 'Save to Lettura',
+    title: '保存到 Lettura',
     contexts: ['page', 'link'],
   });
 
   // "Save as Memo" — available when text is selected
   chrome.contextMenus.create({
     id: 'save-memo',
-    title: 'Save as Memo',
+    title: '保存为备忘',
     contexts: ['selection'],
   });
 });

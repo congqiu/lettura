@@ -16,50 +16,50 @@
     <!-- Login form -->
     <div id="login-section" class="section hidden">
       <h1 class="title">Lettura</h1>
-      <p class="subtitle">Save articles for later</p>
+      <p class="subtitle">稍后阅读</p>
 
       <div class="tabs">
-        <button id="tab-password" class="tab active">Password</button>
-        <button id="tab-token" class="tab">Token</button>
+        <button id="tab-password" class="tab active">密码登录</button>
+        <button id="tab-token" class="tab">令牌登录</button>
       </div>
 
       <!-- Password login form -->
       <div id="form-password" class="tab-content">
         <div class="form-group">
-          <label for="server-url">Server URL</label>
+          <label for="server-url">服务器地址</label>
           <input type="url" id="server-url" placeholder="https://your-lettura-instance.com" />
         </div>
 
         <div class="form-group">
-          <label for="email">Email</label>
+          <label for="email">邮箱</label>
           <input type="email" id="email" placeholder="you@example.com" />
         </div>
 
         <div class="form-group">
-          <label for="password">Password</label>
+          <label for="password">密码</label>
           <input type="password" id="password" placeholder="••••••••" />
         </div>
 
         <div id="login-error" class="message error hidden"></div>
 
-        <button id="login-btn" class="btn btn-primary">Login</button>
+        <button id="login-btn" class="btn btn-primary">登录</button>
       </div>
 
       <!-- Token login form -->
       <div id="form-token" class="tab-content hidden">
         <div class="form-group">
-          <label for="token-server-url">Server URL</label>
+          <label for="token-server-url">服务器地址</label>
           <input type="url" id="token-server-url" placeholder="https://your-lettura-instance.com" />
         </div>
 
         <div class="form-group">
-          <label for="token-input">Token</label>
+          <label for="token-input">令牌</label>
           <input type="password" id="token-input" placeholder="lta_..." />
         </div>
 
         <div id="token-error" class="message error hidden"></div>
 
-        <button id="token-btn" class="btn btn-primary">Connect</button>
+        <button id="token-btn" class="btn btn-primary">连接</button>
       </div>
     </div>
 
@@ -73,10 +73,10 @@
         </div>
       </div>
 
-      <button id="save-btn" class="btn btn-primary btn-block">Save this page</button>
+      <button id="save-btn" class="btn btn-primary btn-block">保存此页面</button>
       <div id="save-status" class="message hidden"></div>
 
-      <button id="logout-btn" class="btn btn-secondary btn-block">Logout</button>
+      <button id="logout-btn" class="btn btn-secondary btn-block">退出登录</button>
     </div>
   </div>
 

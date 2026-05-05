@@ -12,7 +12,7 @@ const manifest = {
   manifest_version: 3,
   name: 'Lettura',
   version: '1.2.0',
-  description: 'Save articles to your Lettura instance',
+  description: '保存文章到你的 Lettura 实例',
   permissions: ['activeTab', 'contextMenus', 'storage'],
   host_permissions: ['<all_urls>'],
   action: {
