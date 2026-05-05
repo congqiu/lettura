@@ -1,17 +1,24 @@
-name: release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  cli:
-    name: build ${{ matrix.target }}
+  # ── Build CLI binaries ──────────────────────────────────────────
+  build-cli:
+    name: build-cli ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -25,6 +32,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -43,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.get_version.outputs.version }}"
           NAME="lettura-cli-${VERSION}-${{ matrix.target }}"
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/lettura-cli" "dist/lettura-cli"
@@ -51,7 +70,263 @@ jobs:
           echo "asset_path=dist/${NAME}.tar.gz" >> "$GITHUB_OUTPUT"
           echo "asset_name=${NAME}.tar.gz" >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - uses: actions/upload-artifact@v4
         with:
-          files: ${{ steps.package.outputs.asset_path }}
+          name: cli-${{ matrix.target }}
+          path: ${{ steps.package.outputs.asset_path }}
+
+  # ── Build and push Docker image ─────────────────────────────────
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_number=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Build browser extension ─────────────────────────────────────
+  build-extension:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Get extension version
+        id: ext
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build
+
+      - name: Package extension
+        run: |
+          cd dist
+          zip -r "../lettura-extension-v${{ steps.ext.outputs.version }}.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: extension/lettura-extension-v${{ steps.ext.outputs.version }}.zip
+
+  # ── Create GitHub Release ───────────────────────────────────────
+  create-release:
+    name: Create Release
+    needs: [build-cli, build-docker, build-extension]
+    if: always() && needs.build-cli.result == 'success' && needs.build-docker.result == 'success' && needs.build-extension.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '' }}
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_number=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Get extension version
+        id: ext
+        run: echo "version=$(jq -r .version extension/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Find previous tag
+        id: prev_tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${VERSION}$" | head -1 || echo "")
+          echo "tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          VERSION_NUM="${{ steps.get_version.outputs.version_number }}"
+          EXT_VERSION="${{ steps.ext.outputs.version }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.tag }}"
+
+          # Get commits since last tag
+          if [[ -n "$PREV_TAG" ]]; then
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" --no-merges)
+            BODIES=$(git log ${PREV_TAG}..HEAD --pretty=format:"%B---COMMIT_SEP---" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"%s" --no-merges -50)
+            BODIES=$(git log --pretty=format:"%B---COMMIT_SEP---" --no-merges -50)
+          fi
+
+          # Categorize commits
+          BREAKING=""
+          ADDED=""
+          CHANGED=""
+          FIXED=""
+          SECURITY=""
+
+          # Build parallel arrays of subjects and bodies
+          SUBJECTS=()
+          BODIES_ARR=()
+          while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            SUBJECTS+=("$line")
+          done <<< "$COMMITS"
+
+          while IFS= read -r chunk; do
+            [[ -z "$chunk" ]] && continue
+            BODIES_ARR+=("$chunk")
+          done < <(echo "$BODIES" | awk -F'---COMMIT_SEP---' '{for(i=1;i<=NF;i++) if($i) print $i}')
+
+          for i in "${!SUBJECTS[@]}"; do
+            line="${SUBJECTS[$i]}"
+            body="${BODIES_ARR[$i]:-}"
+
+            # Check for breaking change: ! in prefix or body contains BREAKING CHANGE
+            IS_BREAKING=false
+            if [[ "$line" =~ ^[a-z]+(\(.+\))?!: ]]; then
+              IS_BREAKING=true
+            fi
+            if [[ "$body" == *"BREAKING CHANGE"* ]]; then
+              IS_BREAKING=true
+            fi
+
+            # Strip prefix for description
+            DESC="$line"
+            if [[ "$line" =~ ^[a-z]+(\(.+\))?!?: ]]; then
+              DESC="${line#*: }"
+            fi
+
+            if [[ "$line" =~ ^security(\(.+\))?: ]]; then
+              SECURITY="${SECURITY}- ${DESC}"$'\n'
+            elif [[ "$line" =~ ^feat(\(.+\))?!?: ]]; then
+              ADDED="${ADDED}- ${DESC}"$'\n'
+            elif [[ "$line" =~ ^fix(\(.+\))?!?: ]]; then
+              FIXED="${FIXED}- ${DESC}"$'\n'
+            elif [[ "$line" =~ ^(refactor|perf)(\(.+\))?!?: ]]; then
+              CHANGED="${CHANGED}- ${DESC}"$'\n'
+            elif [[ "$line" =~ ^(docs|chore|ci|test|style)(\(.+\))?!?: ]]; then
+              : # skip
+            else
+              CHANGED="${CHANGED}- ${line}"$'\n'
+            fi
+
+            if [[ "$IS_BREAKING" == true ]]; then
+              BREAKING="${BREAKING}- ${DESC}"$'\n'
+            fi
+          done
+
+          # Build release notes
+          {
+            echo "## Lettura ${VERSION}"
+            echo ""
+            [[ -n "$BREAKING" ]] && { echo "### Breaking Changes"; echo "$BREAKING"; echo ""; }
+            [[ -n "$ADDED" ]]    && { echo "### Added"; echo "$ADDED"; echo ""; }
+            [[ -n "$CHANGED" ]]  && { echo "### Changed"; echo "$CHANGED"; echo ""; }
+            [[ -n "$FIXED" ]]    && { echo "### Fixed"; echo "$FIXED"; echo ""; }
+            [[ -n "$SECURITY" ]] && { echo "### Security"; echo "$SECURITY"; echo ""; }
+            echo "### Docker"
+            echo ""
+            echo "\`\`\`"
+            echo "docker pull ghcr.io/${{ github.repository }}:${VERSION_NUM}"
+            echo "\`\`\`"
+            echo ""
+            echo "### CLI Install"
+            echo ""
+            echo "\`\`\`"
+            echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install-cli.sh | bash"
+            echo "\`\`\`"
+            echo ""
+            echo "### Browser Extension"
+            echo ""
+            echo "Download \`lettura-extension-v${EXT_VERSION}.zip\` from assets below."
+            echo ""
+            echo "---"
+            echo ""
+            if [[ -n "$PREV_TAG" ]]; then
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}"
+            fi
+          } > release_notes.md
+
+      - name: Download CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: cli-artifacts
+          merge-multiple: true
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension
+          path: extension-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+          files: |
+            cli-artifacts/*.tar.gz
+            extension-artifacts/*.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
