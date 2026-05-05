@@ -1,5 +1,5 @@
 // Post-build script: copy manifest and icons to dist
-import { copyFileSync, mkdirSync, existsSync, writeFileSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, writeFileSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -7,11 +7,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const dist = resolve(root, 'dist');
 
+// Read version from package.json
+const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+const version = pkg.version;
+
 // Create manifest.json for the extension
 const manifest = {
   manifest_version: 3,
   name: 'Lettura',
-  version: '1.2.0',
+  version: version,
   description: '保存文章到你的 Lettura 实例',
   permissions: ['activeTab', 'contextMenus', 'storage'],
   host_permissions: ['<all_urls>'],
@@ -35,7 +39,7 @@ const manifest = {
 
 // Write manifest
 writeFileSync(resolve(dist, 'manifest.json'), JSON.stringify(manifest, null, 2));
-console.log('Created manifest.json');
+console.log(`Created manifest.json (version ${version})`);
 
 // Copy icons
 const iconsDir = resolve(dist, 'icons');
