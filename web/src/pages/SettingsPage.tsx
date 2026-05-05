@@ -6,7 +6,7 @@ import { listRules, createRule, updateRule, deleteRule, type TaggingRule, type C
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import TokensPanel from '../components/settings/TokensPanel';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, Upload, Download, Settings2, Tag, FileJson, Shield } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -41,6 +41,33 @@ const OPERATOR_LABELS: Record<string, string> = {
 
 const FIELDS = Object.keys(FIELD_LABELS);
 const OPERATORS = Object.keys(OPERATOR_LABELS);
+
+function SectionCard({
+  icon: Icon,
+  title,
+  children,
+  action,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <section className="mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Icon size={17} className="text-muted-foreground/60" />
+          <h3 className="font-semibold text-foreground text-[15px]">{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div className="bg-card border border-border/60 rounded-xl p-5">
+        {children}
+      </div>
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -228,116 +255,124 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h2 className="text-xl font-semibold mb-6 text-foreground">设置</h2>
+    <div className="max-w-2xl animate-fade-in">
+      <div className="flex items-center gap-2.5 mb-6">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          <Settings2 size={18} />
+        </div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">设置</h2>
+      </div>
 
-      <section className="mb-8">
-        <h3 className="font-medium mb-3 text-foreground">标签管理</h3>
+      {/* Tags management */}
+      <SectionCard icon={Tag} title="标签管理">
         {tagStats.length === 0 ? (
           <p className="text-sm text-muted-foreground">暂无标签</p>
         ) : (
           <>
-          <div className="border border-border rounded-lg overflow-hidden hidden sm:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left px-4 py-2 font-medium">标签名</th>
-                  <th className="text-right px-4 py-2 font-medium">文章数</th>
-                  <th className="text-right px-4 py-2 font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tagStats.map((tag) => (
-                  <tr key={tag.id} className="border-b border-border last:border-b-0">
-                    <td className="px-4 py-2">
-                      {editingTagId === tag.id ? (
-                        <Input
-                          value={editingLabel}
-                          onChange={(e) => setEditingLabel(e.target.value)}
-                          onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
-                          onBlur={() => setEditingTagId(null)}
-                          className="h-7 text-sm"
-                          autoFocus
-                        />
-                      ) : (
-                        tag.label
-                      )}
-                    </td>
-                    <td className="text-right px-4 py-2 text-muted-foreground">{tag.entry_count}</td>
-                    <td className="text-right px-4 py-2">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => {
-                            setEditingTagId(tag.id);
-                            setEditingLabel(tag.label);
-                          }}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 hover:text-destructive"
-                          onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </td>
+            {/* Desktop table */}
+            <div className="border border-border/50 rounded-lg overflow-hidden hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/50 bg-muted/30">
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-[13px]">标签名</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-[13px]">文章数</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-[13px]">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="space-y-2 sm:hidden">
-            {tagStats.map((tag) => (
-              <div key={tag.id} className="border border-border rounded-lg p-3 bg-card">
-                <div className="flex items-center justify-between mb-2">
-                  {editingTagId === tag.id ? (
-                    <Input
-                      value={editingLabel}
-                      onChange={(e) => setEditingLabel(e.target.value)}
-                      onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
-                      onBlur={() => setEditingTagId(null)}
-                      className="h-7 text-sm flex-1 mr-2"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="font-medium text-card-foreground">{tag.label}</span>
-                  )}
-                  <span className="text-sm text-muted-foreground">{tag.entry_count} 篇</span>
+                </thead>
+                <tbody>
+                  {tagStats.map((tag) => (
+                    <tr key={tag.id} className="border-b border-border/40 last:border-b-0 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2.5">
+                        {editingTagId === tag.id ? (
+                          <Input
+                            value={editingLabel}
+                            onChange={(e) => setEditingLabel(e.target.value)}
+                            onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
+                            onBlur={() => setEditingTagId(null)}
+                            className="h-7 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="font-medium">{tag.label}</span>
+                        )}
+                      </td>
+                      <td className="text-right px-4 py-2.5 text-muted-foreground tabular-nums">{tag.entry_count}</td>
+                      <td className="text-right px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-lg"
+                            onClick={() => {
+                              setEditingTagId(tag.id);
+                              setEditingLabel(tag.label);
+                            }}
+                          >
+                            <Pencil size={13} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-lg hover:text-destructive"
+                            onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
+                          >
+                            <Trash2 size={13} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="space-y-2 sm:hidden">
+              {tagStats.map((tag) => (
+                <div key={tag.id} className="border border-border/50 rounded-lg p-3.5 bg-card">
+                  <div className="flex items-center justify-between mb-2">
+                    {editingTagId === tag.id ? (
+                      <Input
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
+                        onBlur={() => setEditingTagId(null)}
+                        className="h-7 text-sm flex-1 mr-2"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="font-medium text-card-foreground">{tag.label}</span>
+                    )}
+                    <span className="text-sm text-muted-foreground tabular-nums">{tag.entry_count} 篇</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 rounded-lg"
+                      onClick={() => { setEditingTagId(tag.id); setEditingLabel(tag.label); }}
+                    >
+                      <Pencil size={13} className="mr-1.5" /> 编辑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 rounded-lg hover:text-destructive"
+                      onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
+                    >
+                      <Trash2 size={13} className="mr-1.5" /> 删除
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2"
-                    onClick={() => { setEditingTagId(tag.id); setEditingLabel(tag.label); }}
-                  >
-                    <Pencil size={14} className="mr-1" /> 编辑
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 hover:text-destructive"
-                    onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
-                  >
-                    <Trash2 size={14} className="mr-1" /> 删除
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           </>
         )}
-      </section>
+      </SectionCard>
 
-      {/* Tag management delete confirmation */}
+      {/* Tag delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除标签</AlertDialogTitle>
             <AlertDialogDescription>
@@ -345,9 +380,10 @@ export default function SettingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              className="rounded-lg"
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
               删除
@@ -356,11 +392,12 @@ export default function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Tagging rules section */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-foreground">标签规则</h3>
-          {!showRuleForm && (
+      {/* Tagging rules */}
+      <SectionCard
+        icon={Shield}
+        title="标签规则"
+        action={
+          !showRuleForm && (
             <Button
               size="sm"
               variant="outline"
@@ -368,19 +405,20 @@ export default function SettingsPage() {
                 resetRuleForm();
                 setShowRuleForm(true);
               }}
+              className="h-8 rounded-lg"
             >
-              <Plus size={14} className="mr-1" /> 新增规则
+              <Plus size={14} className="mr-1.5" /> 新增规则
             </Button>
-          )}
-        </div>
-
+          )
+        }
+      >
         {showRuleForm && (
-          <form onSubmit={handleSaveRule} className="border border-border rounded-lg p-4 mb-4 space-y-3">
+          <form onSubmit={handleSaveRule} className="border border-border/50 rounded-xl p-4 mb-4 space-y-3 bg-muted/20">
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={ruleField}
                 onChange={(e) => setRuleField(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
               >
                 {FIELDS.map((f) => (
                   <option key={f} value={f}>{FIELD_LABELS[f]}</option>
@@ -389,7 +427,7 @@ export default function SettingsPage() {
               <select
                 value={ruleOperator}
                 onChange={(e) => setRuleOperator(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
               >
                 {OPERATORS.map((op) => (
                   <option key={op} value={op}>{OPERATOR_LABELS[op]}</option>
@@ -399,7 +437,7 @@ export default function SettingsPage() {
                 value={ruleValue}
                 onChange={(e) => setRuleValue(e.target.value)}
                 placeholder="值"
-                className="h-8 text-sm flex-1 min-w-[120px]"
+                className="h-9 text-sm flex-1 min-w-[120px] rounded-lg"
               />
             </div>
             <div ref={ruleTagContainerRef} className="relative">
@@ -408,7 +446,7 @@ export default function SettingsPage() {
                   value={ruleTags}
                   onChange={(e) => setRuleTags(e.target.value)}
                   placeholder="标签（逗号分隔）"
-                  className="h-8 text-sm flex-1"
+                  className="h-9 text-sm flex-1 rounded-lg"
                 />
                 <Input
                   value={ruleTagInput}
@@ -418,12 +456,12 @@ export default function SettingsPage() {
                   }}
                   onFocus={() => setShowRuleTagSuggest(true)}
                   placeholder="搜索标签..."
-                  className="h-8 text-sm w-36"
+                  className="h-9 text-sm w-36 rounded-lg"
                 />
               </div>
               {showRuleTagSuggest && ruleTagInput && ruleTagSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1">
-                  <Command className="border border-border shadow-md">
+                  <Command className="border border-border/60 shadow-lg rounded-xl">
                     <CommandList>
                       <CommandEmpty>无匹配</CommandEmpty>
                       <CommandGroup>
@@ -443,10 +481,10 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button type="submit" size="sm" disabled={!ruleValue.trim() || !ruleTags.trim()}>
+              <Button type="submit" size="sm" disabled={!ruleValue.trim() || !ruleTags.trim()} className="rounded-lg h-8">
                 {editingRuleId ? '更新规则' : '创建规则'}
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={resetRuleForm}>
+              <Button type="button" size="sm" variant="ghost" onClick={resetRuleForm} className="rounded-lg h-8">
                 取消
               </Button>
             </div>
@@ -460,7 +498,7 @@ export default function SettingsPage() {
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className="flex items-center justify-between border border-border rounded-lg px-4 py-2"
+                className="flex items-center justify-between border border-border/50 rounded-xl px-4 py-3 hover:bg-muted/20 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-sm">{formatRuleSummary(rule)}</span>
@@ -468,33 +506,33 @@ export default function SettingsPage() {
                     → {rule.tags.join(', ')}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 shrink-0 ml-3">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0"
+                    className="h-7 w-7 p-0 rounded-lg"
                     onClick={() => handleEditRule(rule)}
                   >
-                    <Pencil size={14} />
+                    <Pencil size={13} />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 hover:text-destructive"
+                    className="h-7 w-7 p-0 rounded-lg hover:text-destructive"
                     onClick={() => setDeleteRuleTarget({ id: rule.id, rule: formatRuleSummary(rule) })}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </Button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
 
       {/* Rule delete confirmation */}
       <AlertDialog open={!!deleteRuleTarget} onOpenChange={(open) => { if (!open) setDeleteRuleTarget(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除规则</AlertDialogTitle>
             <AlertDialogDescription>
@@ -502,9 +540,10 @@ export default function SettingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              className="rounded-lg"
               onClick={() => deleteRuleTarget && deleteRuleMutation.mutate(deleteRuleTarget.id)}
             >
               删除
@@ -513,46 +552,51 @@ export default function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <section className="mb-8">
-        <h3 className="font-medium mb-3 text-foreground">导入</h3>
-        <div className="space-y-2">
-          <label className="text-sm text-muted-foreground block mb-1">Wallabag JSON 导入</label>
+      {/* Import */}
+      <SectionCard icon={Upload} title="导入">
+        <div className="space-y-3">
+          <label className="text-sm text-muted-foreground block">Wallabag JSON 导入</label>
           <div className="flex items-center gap-2">
             <Input
               type="file"
               accept=".json"
               onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
-              className="text-sm"
+              className="text-sm rounded-lg h-9"
             />
             <Button
               onClick={() => importFile && importWallabag.mutate(importFile)}
               disabled={!importFile || importWallabag.isPending}
+              className="rounded-lg h-9"
             >
               {importWallabag.isPending ? '导入中...' : '导入'}
             </Button>
           </div>
-          {importResult && <p className="text-sm text-green-600 dark:text-green-400 mt-1">{importResult}</p>}
+          {importResult && (
+            <p className="text-sm text-success font-medium">{importResult}</p>
+          )}
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="mb-8">
-        <h3 className="font-medium mb-3 text-foreground">导出</h3>
+      {/* Export */}
+      <SectionCard icon={Download} title="导出">
         <Button
           onClick={() => exportAll.mutate()}
           disabled={exportAll.isPending}
           variant="outline"
+          className="rounded-lg h-9"
         >
+          <FileJson size={15} className="mr-2" />
           {exportAll.isPending ? '导出中...' : '导出全部数据 (JSON)'}
         </Button>
-      </section>
+      </SectionCard>
 
-      <section className="mb-8">
-        <h3 className="font-medium mb-3 text-foreground">API 令牌</h3>
+      {/* API Tokens */}
+      <SectionCard icon={Shield} title="API 令牌">
         <p className="text-sm text-muted-foreground mb-4">
           管理用于 lettura-cli 或其他第三方客户端访问你数据的个人访问令牌。
         </p>
         <TokensPanel />
-      </section>
+      </SectionCard>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, Tag, Tags, Archive, Trash2, X } from 'lucide-react';
+import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -28,12 +28,14 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Props {
   filter?: 'unread' | 'archived' | 'starred';
 }
 
 const TITLES = { unread: '未读', archived: '归档', starred: '收藏' };
+const TITLE_ICONS = { unread: Sparkles, archived: Archive, starred: Star };
 
 // Intersection Observer hook for infinite scroll
 function useIntersectionObserver(
@@ -98,8 +100,6 @@ export default function EntryListPage({ filter }: Props) {
     if (!isMobile || !refreshRef.current) return;
     const el = refreshRef.current;
     const checkScrollTop = () => {
-      // Use 'manipulation' to allow vertical scroll while preventing double-tap zoom.
-      // The useSwipe hook handles vertical gesture detection via touch events.
       el.style.touchAction = window.scrollY === 0 ? 'manipulation' : 'auto';
     };
     window.addEventListener('scroll', checkScrollTop, { passive: true });
@@ -155,6 +155,7 @@ export default function EntryListPage({ filter }: Props) {
   useListKeyboardNav(entries, selectedIndex, setSelectedIndex);
 
   const title = TITLES[filter || 'unread'];
+  const TitleIcon = TITLE_ICONS[filter || 'unread'];
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -241,21 +242,77 @@ export default function EntryListPage({ filter }: Props) {
   };
 
   return (
-    <div ref={isMobile ? refreshRef : undefined}>
+    <div ref={isMobile ? refreshRef : undefined} className="animate-fade-in">
+      {/* Pull to refresh indicator */}
       {(isPulling || isRefreshing) && (
         <div className="flex items-center justify-center py-3 text-sm text-muted-foreground">
-          <Loader2 size={16} className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <Loader2 size={16} className={cn('mr-2', isRefreshing && 'animate-spin')} />
           {isRefreshing ? '刷新中...' : '下拉刷新'}
         </div>
       )}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5">
+          <div className={cn(
+            'w-9 h-9 rounded-xl flex items-center justify-center',
+            filter === 'starred' && 'bg-amber-500/10 text-amber-500',
+            filter === 'archived' && 'bg-success/10 text-success',
+            (!filter || filter === 'unread') && 'bg-primary/10 text-primary',
+          )}>
+            <TitleIcon size={18} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
+            {entries.length > 0 && !isLoading && (
+              <p className="text-xs text-muted-foreground">{entries.length} 篇文章</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+        <Button
+            variant={selectionMode ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              if (selectionMode) {
+                clearSelection();
+              } else {
+                setSelectionMode(true);
+              }
+            }}
+            className="h-8 px-3 rounded-lg text-[13px]"
+          >
+            {selectionMode ? '取消' : '多选'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+        <Input
+          type="text"
+          placeholder="搜索文章标题、内容..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10 pr-10 h-10 bg-card border-border/60 rounded-xl focus-visible:ring-primary/30"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Active filters */}
+      {(domain || tagFilter || untagged) && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           {domain && (
-            <TagBadge
-              label={domain}
-              onRemove={() => setDomain('')}
-            />
+            <TagBadge label={domain} onRemove={() => setDomain('')} />
           )}
           {tagFilter && (
             <TagBadge
@@ -277,43 +334,32 @@ export default function EntryListPage({ filter }: Props) {
             />
           )}
         </div>
-        <Button
-          variant={selectionMode ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            if (selectionMode) {
-              clearSelection();
-            } else {
-              setSelectionMode(true);
-            }
-          }}
-        >
-          {selectionMode ? '取消多选' : '多选'}
-        </Button>
-      </div>
-      <div className="relative mb-6 sm:w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="搜索..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-card"
-        />
-      </div>
+      )}
 
+      {/* Add entry form */}
       {!filter || filter === 'unread' ? <AddEntryForm /> : null}
 
+      {/* Content states */}
       {isLoading ? (
-        <div className="bg-card border border-border rounded-xl p-12 flex justify-center">
-          <div className="w-5 h-5 border-2 border-muted border-t-primary rounded-full animate-spin" />
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card border border-border/50 rounded-xl p-5 animate-pulse">
+              <div className="h-5 bg-muted rounded w-3/4 mb-3" />
+              <div className="h-4 bg-muted rounded w-1/2 mb-4" />
+              <div className="h-4 bg-muted rounded w-24" />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <ErrorState onRetry={() => refetch()} />
       ) : entries.length === 0 ? (
-        <EmptyState icon="book" title="暂无文章" description="粘贴 URL 保存你的第一篇文章" />
+        <EmptyState
+          icon="book"
+          title={`暂无${title}文章`}
+          description={!filter || filter === 'unread' ? '粘贴 URL 保存你的第一篇文章' : undefined}
+        />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 stagger-children">
           {entries.map((entry, i) => (
             <div key={entry.id}>
               <EntryCard
@@ -334,14 +380,14 @@ export default function EntryListPage({ filter }: Props) {
 
           {/* Loading indicator */}
           {isFetchingNextPage && (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex justify-center py-5">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/50" />
             </div>
           )}
 
           {/* End of list indicator */}
           {!hasNextPage && entries.length > 0 && (
-            <div className="text-center text-muted-foreground text-sm py-4">
+            <div className="text-center text-muted-foreground/50 text-sm py-6">
               已加载全部文章
             </div>
           )}
@@ -350,9 +396,11 @@ export default function EntryListPage({ filter }: Props) {
 
       {/* Bulk action bar */}
       {selectionMode && selectedIds.size > 0 && (
-        <div className="fixed left-0 right-0 z-50 bg-background border-t border-border shadow-lg pb-[env(safe-area-inset-bottom)]" style={{ bottom: 'var(--bottom-nav-height, 0px)' }}>
+        <div className="fixed left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border/60 shadow-lg pb-[env(safe-area-inset-bottom)] animate-slide-in-right">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium">已选 {selectedIds.size} 篇</span>
+            <span className="text-sm font-semibold shrink-0">
+              已选 {selectedIds.size} 篇
+            </span>
 
             {/* Tag input */}
             <div className="relative flex items-center gap-1">
@@ -365,11 +413,11 @@ export default function EntryListPage({ filter }: Props) {
                   }}
                   onFocus={() => setShowBulkTagSuggest(true)}
                   placeholder="打标签..."
-                  className="h-8 w-28 text-sm"
+                  className="h-8 w-28 text-sm rounded-lg"
                 />
                 {showBulkTagSuggest && bulkTagInput && tagSuggestions.length > 0 && (
                   <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
-                    <Command className="border border-border shadow-md">
+                    <Command className="border border-border/60 shadow-lg rounded-xl">
                       <CommandList>
                         <CommandEmpty>无匹配</CommandEmpty>
                         <CommandGroup>
@@ -388,7 +436,7 @@ export default function EntryListPage({ filter }: Props) {
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="outline" onClick={() => handleBulkTag()} disabled={!bulkTagInput.trim()}>
+              <Button size="sm" variant="outline" onClick={() => handleBulkTag()} disabled={!bulkTagInput.trim()} className="h-8 w-8 p-0 rounded-lg">
                 <Tag size={14} />
               </Button>
             </div>
@@ -404,11 +452,11 @@ export default function EntryListPage({ filter }: Props) {
                   }}
                   onFocus={() => setShowBulkUntagSuggest(true)}
                   placeholder="取消标签..."
-                  className="h-8 w-28 text-sm"
+                  className="h-8 w-28 text-sm rounded-lg"
                 />
                 {showBulkUntagSuggest && bulkUntagInput && untagSuggestions.length > 0 && (
                   <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
-                    <Command className="border border-border shadow-md">
+                    <Command className="border border-border/60 shadow-lg rounded-xl">
                       <CommandList>
                         <CommandEmpty>无匹配</CommandEmpty>
                         <CommandGroup>
@@ -427,20 +475,20 @@ export default function EntryListPage({ filter }: Props) {
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()}>
+              <Button size="sm" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()} className="h-8 w-8 p-0 rounded-lg">
                 <Tags size={14} />
               </Button>
             </div>
 
-            <Button size="sm" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))}>
+            <Button size="sm" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))} className="h-8 rounded-lg">
               <Archive size={14} className="mr-1" /> 归档
             </Button>
 
-            <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
+            <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="h-8 rounded-lg">
               <Trash2 size={14} className="mr-1" /> 删除
             </Button>
 
-            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto">
+            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto h-8 w-8 p-0 rounded-lg">
               <X size={14} />
             </Button>
           </div>
@@ -449,7 +497,7 @@ export default function EntryListPage({ filter }: Props) {
 
       {/* Delete confirmation dialog */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
             <AlertDialogDescription>
@@ -457,9 +505,10 @@ export default function EntryListPage({ filter }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              className="rounded-lg"
               onClick={() => {
                 bulkDeleteMutation.mutate(Array.from(selectedIds));
                 setDeleteConfirmOpen(false);

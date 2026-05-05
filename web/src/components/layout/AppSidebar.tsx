@@ -1,5 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
-import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon } from 'lucide-react';
+import { NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/auth';
 import { useThemeStore } from '../../store/theme';
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/', label: '未读', icon: BookOpen, end: true },
@@ -30,6 +31,13 @@ export function AppSidebar() {
   const { logout } = useAuthStore();
   const navigate = useNavigate();
   const { theme, setTheme } = useThemeStore();
+  const [searchParams] = useSearchParams();
+  const currentTag = searchParams.get('tag') || '';
+  const location = useLocation();
+  const isActivePath = (to: string, end?: boolean) => {
+    if (end) return location.pathname === to && !location.search;
+    return location.pathname === to;
+  };
 
   const { data: tagStats = [] } = useQuery({
     queryKey: ['tags', 'stats'],
@@ -55,51 +63,72 @@ export function AppSidebar() {
   const ThemeIcon = themeIcon;
 
   return (
-    <Sidebar>
-      <SidebarHeader className="px-4 py-4">
-        <span className="font-bold text-lg text-primary select-none">Lettura</span>
+    <Sidebar className="border-r border-border/60">
+      <SidebarHeader className="px-4 py-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm shadow-primary/20">
+            <span className="text-primary-foreground font-bold text-sm">L</span>
+          </div>
+          <span className="font-semibold text-lg text-foreground select-none tracking-tight">Lettura</span>
+        </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2 overflow-x-hidden">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        isActive ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-                      }
-                    >
-                      <item.icon size={18} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <SidebarMenu className="space-y-0.5">
+              {navItems.map((item) => {
+                const active = isActivePath(item.to, item.end);
+                return (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild isActive={active} className="group/menu-button">
+                      <NavLink
+                        to={item.to}
+                        end={item.end}
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                          active
+                            ? 'bg-primary/15 text-primary shadow-sm'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        )}
+                      >
+                        <item.icon size={17} className="shrink-0" />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
         {topTags.length > 0 && (
           <SidebarGroup>
+            <div className="px-3 mb-1.5 mt-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                常用标签
+              </span>
+            </div>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-0.5">
                 {topTags.map((tag) => (
                   <SidebarMenuItem key={tag.id}>
                     <SidebarMenuButton asChild>
                       <NavLink
                         to={`/?tag=${encodeURIComponent(tag.label)}`}
-                        className={({ isActive }) =>
-                          isActive ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-                        }
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150',
+                          currentTag === tag.label
+                            ? 'bg-primary/15 text-primary font-medium'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        )}
                       >
-                        <TagIcon size={18} />
+                        <TagIcon size={14} className="shrink-0 opacity-60" />
                         <span className="truncate">{tag.label}</span>
-                        <span className="ml-auto text-xs text-muted-foreground">{tag.entry_count}</span>
+                        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded-full">
+                          {tag.entry_count}
+                        </span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -109,10 +138,10 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink
                         to="/tags"
-                        className="text-muted-foreground"
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-150"
                       >
-                        <TagIcon size={18} />
-                        <span>查看全部</span>
+                        <span className="ml-[22px]">查看全部标签</span>
+                        <ChevronRight size={12} className="ml-auto opacity-50" />
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -122,70 +151,85 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        <Separator className="mx-0 w-full" />
+        <Separator className="mx-3 w-auto my-3 opacity-60" />
 
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {toolItems.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        isActive ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-                      }
-                    >
-                      <item.icon size={18} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+            <SidebarMenu className="space-y-0.5">
+              {toolItems.map((item) => {
+                const active = isActivePath(item.to, item.end);
+                return (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild isActive={active}>
+                      <NavLink
+                        to={item.to}
+                        end={item.end}
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                          active
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        )}
+                      >
+                        <item.icon size={17} className="shrink-0" />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        <Separator className="mb-2" />
-        <SidebarMenu>
+      <SidebarFooter className="px-2 pb-4">
+        <Separator className="mb-2 mx-2 w-auto opacity-60" />
+        <SidebarMenu className="space-y-0.5">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild isActive={isActivePath('/settings', false)}>
               <NavLink
                 to="/settings"
-                className={({ isActive }) =>
-                  isActive ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-                }
+                className={cn(
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                  isActivePath('/settings', false)
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )}
               >
-                <Settings size={18} />
+                <Settings size={17} />
                 <span>设置</span>
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-                <ThemeIcon size={18} />
+              <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-150">
+                <ThemeIcon size={17} />
                 <span>主题</span>
+                <span className="ml-auto text-[11px] text-muted-foreground/50">
+                  {theme === 'dark' ? '深色' : theme === 'light' ? '浅色' : '跟随系统'}
+                </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start">
+              <DropdownMenuContent side="top" align="start" className="min-w-[140px]">
                 <DropdownMenuItem onClick={() => setTheme('light')}>
-                  <Sun size={16} className="mr-2" /> 浅色
+                  <Sun size={15} className="mr-2" /> 浅色
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme('dark')}>
-                  <Moon size={16} className="mr-2" /> 深色
+                  <Moon size={15} className="mr-2" /> 深色
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme('system')}>
-                  <Monitor size={16} className="mr-2" /> 跟随系统
+                  <Monitor size={15} className="mr-2" /> 跟随系统
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} className="text-muted-foreground">
-              <LogOut size={18} />
+            <SidebarMenuButton
+              onClick={handleLogout}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-150"
+            >
+              <LogOut size={17} />
               <span>退出</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

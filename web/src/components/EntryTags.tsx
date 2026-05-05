@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { addTagToEntry, removeTagFromEntry, fetchTagStats, type Tag, type TagStats } from '../api/tags';
 import api from '../api/client';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tag as TagIcon, X, Loader2 } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -101,21 +101,25 @@ export default function EntryTags({ entryId }: { entryId: string }) {
   };
 
   return (
-    <div className="mt-6 pt-4 border-t border-border">
-      <h4 className="text-sm font-medium text-muted-foreground mb-2">标签</h4>
-      <div className="flex flex-wrap gap-2 mb-2">
+    <div className="mt-8 pt-5 border-t border-border/60">
+      <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+        <TagIcon size={14} className="text-muted-foreground/50" />
+        标签
+      </h4>
+      <div className="flex flex-wrap gap-2 mb-3">
         {entryTags.map((tag) => (
-          <Badge key={tag.id} variant="secondary" className="flex items-center gap-1">
+          <span
+            key={tag.id}
+            className="inline-flex items-center gap-1 text-[12px] font-medium px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground"
+          >
             {tag.label}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-4 w-4 p-0 hover:text-destructive"
+            <button
               onClick={() => removeTag.mutate(tag.id)}
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
             >
-              &times;
-            </Button>
-          </Badge>
+              <X size={10} strokeWidth={2.5} />
+            </button>
+          </span>
         ))}
       </div>
       <div ref={containerRef} className="relative">
@@ -129,16 +133,20 @@ export default function EntryTags({ entryId }: { entryId: string }) {
             }}
             onFocus={() => setShowSuggestions(true)}
             placeholder="添加标签..."
-            className="h-8 text-sm"
+            className="h-9 text-sm rounded-lg"
             disabled={isAdding}
           />
-          <Button type="submit" size="sm" disabled={!input.trim() || isAdding}>
-            {isAdding ? '添加中...' : '添加'}
+          <Button type="submit" size="sm" disabled={!input.trim() || isAdding} className="h-9 rounded-lg px-3">
+            {isAdding ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              '添加'
+            )}
           </Button>
         </form>
         {showSuggestions && debouncedInput && suggestions.length > 0 && (
           <div className="absolute z-50 w-full mt-1">
-            <Command className="border border-border shadow-md">
+            <Command className="border border-border/60 shadow-lg rounded-xl">
               <CommandList>
                 <CommandEmpty>无匹配标签</CommandEmpty>
                 <CommandGroup>
@@ -149,7 +157,7 @@ export default function EntryTags({ entryId }: { entryId: string }) {
                       onSelect={() => handleSelect(tag.label)}
                     >
                       {tag.label}
-                      <span className="ml-auto text-xs text-muted-foreground">{tag.entry_count}</span>
+                      <span className="ml-auto text-xs text-muted-foreground tabular-nums">{tag.entry_count}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>

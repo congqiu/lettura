@@ -19,7 +19,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Star, Archive, RefreshCw, Edit3, MessageSquare, Trash2, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Star, Archive, RefreshCw, Edit3, MessageSquare, Trash2, MoreHorizontal, ExternalLink, Clock, Globe } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +41,7 @@ export default function EntryDetailPage() {
     });
   };
 
-  // Single swipe handler: edge swipe for back, content swipe for article switching
+  // Swipe handler
   const { swipeOffset, isSwiping: isGestureActive, ref: gestureRef } = useSwipe(
     {
       onSwipeRight: () => navigateToEntry('prev'),
@@ -49,6 +50,7 @@ export default function EntryDetailPage() {
     },
     { threshold: 100, direction: 'horizontal', edgeStart: 30 },
   );
+
   const [editing, setEditing] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -71,31 +73,25 @@ export default function EntryDetailPage() {
     pres.forEach((pre) => {
       if (pre.parentElement?.classList.contains('code-block-wrapper')) return;
       const wrapper = document.createElement('div');
-      wrapper.className = 'code-block-wrapper relative';
+      wrapper.className = 'code-block-wrapper relative group/code';
       pre.parentNode?.insertBefore(wrapper, pre);
       wrapper.appendChild(pre);
 
       const btn = document.createElement('button');
-      btn.className = 'absolute top-2 right-2 p-1.5 rounded-md bg-muted/80 text-muted-foreground hover:text-foreground opacity-0 transition-opacity cursor-pointer';
+      btn.className = 'absolute top-2.5 right-2.5 p-1.5 rounded-md bg-muted/90 text-muted-foreground hover:text-foreground opacity-0 group-hover/code:opacity-100 transition-all cursor-pointer border border-border/50 shadow-sm';
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
       btn.title = '复制代码';
       wrapper.appendChild(btn);
-
-      const showBtn = () => { btn.style.opacity = '1'; };
-      const hideBtn = () => { btn.style.opacity = '0'; };
-      wrapper.addEventListener('mouseenter', showBtn);
-      wrapper.addEventListener('mouseleave', hideBtn);
-      cleanups.push(() => { wrapper.removeEventListener('mouseenter', showBtn); wrapper.removeEventListener('mouseleave', hideBtn); });
 
       btn.addEventListener('click', async () => {
         const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? '';
         try {
           await navigator.clipboard.writeText(code);
           btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-          btn.classList.add('text-green-500');
+          btn.classList.add('text-success');
           setTimeout(() => {
             btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
-            btn.classList.remove('text-green-500');
+            btn.classList.remove('text-success');
           }, 2000);
         } catch {
           toast.error('复制失败');
@@ -134,44 +130,70 @@ export default function EntryDetailPage() {
   });
 
   if (isLoading) return (
-    <div className="space-y-4 py-8">
-      <Skeleton className="h-8 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="h-64 w-full" />
+    <div className="space-y-4 py-6 animate-fade-in">
+      <Skeleton className="h-9 w-3/4 rounded-lg" />
+      <Skeleton className="h-4 w-1/2 rounded-lg" />
+      <div className="flex gap-2 mt-6">
+        <Skeleton className="h-9 w-20 rounded-lg" />
+        <Skeleton className="h-9 w-20 rounded-lg" />
+        <Skeleton className="h-9 w-20 rounded-lg" />
+      </div>
+      <Skeleton className="h-64 w-full rounded-xl mt-4" />
+      <Skeleton className="h-4 w-full rounded-lg" />
+      <Skeleton className="h-4 w-5/6 rounded-lg" />
+      <Skeleton className="h-4 w-4/6 rounded-lg" />
     </div>
   );
-  if (error) return <div className="py-8"><ErrorState message="文章加载失败" onRetry={() => refetchEntryQuery()} /></div>;
-  if (!entry) return <div className="py-8"><ErrorState message="文章未找到" /></div>;
+
+  if (error) return (
+    <div className="py-8 animate-fade-in">
+      <ErrorState message="文章加载失败" onRetry={() => refetchEntryQuery()} />
+    </div>
+  );
+
+  if (!entry) return (
+    <div className="py-8 animate-fade-in">
+      <ErrorState message="文章未找到" />
+    </div>
+  );
 
   return (
     <div
       ref={isMobile ? gestureRef : undefined}
-      className="flex gap-0 lg:-mx-4"
+      className="flex gap-0 lg:-mx-4 animate-fade-in"
       style={isMobile && isGestureActive ? {
         transform: `translateX(${swipeOffset.x}px)`,
         transition: swipeOffset.x === 0 ? 'transform 0.2s ease-out' : 'none',
       } : undefined}
     >
-      <div className={`flex-1 px-4 w-full overflow-hidden lg:max-w-3xl ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-4 -ml-2 text-muted-foreground">
-          <ArrowLeft size={16} className="mr-1" /> 返回
+      <div className={`flex-1 px-0 sm:px-4 w-full overflow-hidden lg:max-w-3xl ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
+        {/* Back button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(-1)}
+          className="mb-5 -ml-2 text-muted-foreground hover:text-foreground rounded-lg"
+        >
+          <ArrowLeft size={16} className="mr-1.5" />
+          返回
         </Button>
 
+        {/* Title */}
         {editingTitle ? (
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-3 animate-fade-in">
             <input
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
-              className="flex-1 text-2xl font-bold px-2 py-1 border border-input rounded-lg bg-card text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="flex-1 text-xl sm:text-2xl font-bold px-3 py-2 border border-input rounded-xl bg-card text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') saveTitle.mutate(titleDraft); if (e.key === 'Escape') setEditingTitle(false); }}
             />
-            <Button size="sm" onClick={() => saveTitle.mutate(titleDraft)}>保存</Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditingTitle(false)}>取消</Button>
+            <Button size="sm" onClick={() => saveTitle.mutate(titleDraft)} className="rounded-lg">保存</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditingTitle(false)} className="rounded-lg">取消</Button>
           </div>
         ) : (
           <h1
-            className="text-2xl font-bold mb-2 cursor-pointer hover:text-primary group"
+            className="text-xl sm:text-[1.75rem] font-bold mb-3 cursor-pointer hover:text-primary group leading-tight tracking-tight"
             onClick={() => { setTitleDraft(entry.title || ''); setEditingTitle(true); }}
             title="点击编辑标题"
           >
@@ -180,45 +202,90 @@ export default function EntryDetailPage() {
           </h1>
         )}
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+        {/* Meta info */}
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] text-muted-foreground mb-5">
           {entry.domain_name && (
-            <a href={entry.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+            <a
+              href={entry.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+            >
+              <Globe size={12} />
               {entry.domain_name}
             </a>
           )}
-          {entry.published_by && <span>作者: {entry.published_by}</span>}
-          {entry.reading_time && <span>{entry.reading_time} 分钟阅读</span>}
-          {entry.language && <span>{entry.language}</span>}
+          {entry.published_by && (
+            <>
+              <span className="text-border">·</span>
+              <span>{entry.published_by}</span>
+            </>
+          )}
+          {entry.reading_time && (
+            <>
+              <span className="text-border">·</span>
+              <span className="inline-flex items-center gap-1">
+                <Clock size={12} />
+                {entry.reading_time} 分钟阅读
+              </span>
+            </>
+          )}
+          {entry.language && (
+            <>
+              <span className="text-border">·</span>
+              <span className="uppercase">{entry.language}</span>
+            </>
+          )}
         </div>
 
+        {/* Action buttons */}
         <div className="flex gap-2 mb-6 flex-wrap">
           <Button
             variant={entry.is_starred ? 'default' : 'outline'}
             size="sm"
             onClick={() => toggleStar.mutate()}
-            className={entry.is_starred ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''}
+            className={cn(
+              'h-9 rounded-lg gap-1.5 text-[13px]',
+              entry.is_starred && 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
+            )}
           >
-            <Star size={14} className={`mr-1 ${entry.is_starred ? 'fill-current' : ''}`} />
+            <Star size={15} className={cn(entry.is_starred && 'fill-current')} />
             {entry.is_starred ? '已收藏' : '收藏'}
           </Button>
+
           <Button
             variant={entry.is_archived ? 'default' : 'outline'}
             size="sm"
             onClick={() => toggleArchive.mutate()}
-            className={entry.is_archived ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+            className={cn(
+              'h-9 rounded-lg gap-1.5 text-[13px]',
+              entry.is_archived && 'bg-success hover:bg-success/90 text-white border-success'
+            )}
           >
-            <Archive size={14} className={`mr-1 ${entry.is_archived ? 'fill-current' : ''}`} />
+            <Archive size={15} className={cn(entry.is_archived && 'fill-current')} />
             {entry.is_archived ? '已归档' : '归档'}
           </Button>
 
-          <Button variant="outline" size="sm" onClick={() => refetch.mutate()} disabled={refetch.isPending}>
-            <RefreshCw size={14} className={`mr-1 ${refetch.isPending ? 'animate-spin' : ''}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch.mutate()}
+            disabled={refetch.isPending}
+            className="h-9 rounded-lg gap-1.5 text-[13px]"
+          >
+            <RefreshCw size={15} className={cn(refetch.isPending && 'animate-spin')} />
             {refetch.isPending ? '抓取中...' : '重新抓取'}
           </Button>
 
           {entry.content && !editing && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Edit3 size={14} className="mr-1" /> 编辑内容
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+              className="h-9 rounded-lg gap-1.5 text-[13px]"
+            >
+              <Edit3 size={15} />
+              编辑
             </Button>
           )}
 
@@ -226,20 +293,21 @@ export default function EntryDetailPage() {
             variant={showAnnotations ? 'default' : 'outline'}
             size="sm"
             onClick={() => setShowAnnotations(!showAnnotations)}
+            className="h-9 rounded-lg gap-1.5 text-[13px]"
           >
-            <MessageSquare size={14} className="mr-1" />
+            <MessageSquare size={15} />
             批注
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
                 <MoreHorizontal size={16} />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:text-destructive rounded-lg cursor-pointer"
                 onClick={() => { if (confirm('确定删除这篇文章？')) remove.mutate(); }}
               >
                 <Trash2 size={14} className="mr-2" /> 删除
@@ -248,39 +316,58 @@ export default function EntryDetailPage() {
           </DropdownMenu>
         </div>
 
+        {/* Content */}
         {editing && entry.content ? (
           <ContentEditor content={entry.content} onSave={(html) => saveContent.mutate(html)} onCancel={() => setEditing(false)} />
         ) : entry.extract_method === 'pending' ? (
-          <p className="text-amber-600 dark:text-amber-400">正在抓取内容...</p>
+          <div className="flex items-center gap-2 text-warning py-8">
+            <RefreshCw size={16} className="animate-spin" />
+            <span>正在抓取内容...</span>
+          </div>
         ) : entry.extract_method === 'failed' ? (
-          <p className="text-destructive">内容提取失败。
-            <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline ml-1">查看原文</a>
-          </p>
+          <div className="rounded-xl bg-destructive/5 border border-destructive/10 p-5 text-destructive text-sm">
+            内容提取失败。
+            <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline ml-1 font-medium">查看原文</a>
+          </div>
         ) : entry.content ? (
-          <article ref={articleRef} className="entry-content prose prose-gray dark:prose-invert max-w-none overflow-x-hidden" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
-            FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
-            FORBID_ATTR: ['formaction', 'xlink:href', 'style'],
-            ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z]|$))/i,
-          }) }} />
+          <article
+            ref={articleRef}
+            className="entry-content max-w-none overflow-x-hidden"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
+              FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
+              FORBID_ATTR: ['formaction', 'xlink:href', 'style'],
+              ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z]|$))/i,
+            }) }}
+          />
         ) : (
-          <p className="text-muted-foreground">暂无内容</p>
+          <p className="text-muted-foreground py-8">暂无内容</p>
         )}
 
-        <Separator className="my-6" />
+        <Separator className="my-8" />
 
+        {/* Footer link */}
         <div>
-          <a href={entry.url} target="_blank" rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline">
-            查看原文 ↗ {entry.domain_name && `(${entry.domain_name})`}
+          <a
+            href={entry.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:opacity-70 transition-opacity"
+          >
+            查看原文
+            <ExternalLink size={13} />
+            {entry.domain_name && (
+              <span className="text-muted-foreground font-normal">({entry.domain_name})</span>
+            )}
           </a>
         </div>
 
         {id && <EntryTags entryId={id} />}
       </div>
 
+      {/* Annotations sidebar */}
       {isMobile ? (
         <Sheet open={showAnnotations} onOpenChange={setShowAnnotations}>
-          <SheetContent side="bottom" className="h-[60dvh] pb-[env(safe-area-inset-bottom)]">
+          <SheetContent side="bottom" className="h-[65dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
             {id && <AnnotationsSidebar entryId={id} compact />}
           </SheetContent>
         </Sheet>

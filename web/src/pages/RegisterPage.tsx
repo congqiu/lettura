@@ -4,6 +4,7 @@ import { register } from '../api/auth';
 import { useAuthStore } from '../store/auth';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { User, Mail, Lock, Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -30,39 +31,94 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-sm">
-        <h1 className="text-2xl font-bold mb-6 text-center text-foreground">Lettura</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Input
-            type="text"
-            placeholder="用户名"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <Input
-            type="email"
-            placeholder="邮箱"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder="密码（至少8位）"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-          />
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? '注册中...' : '注册'}
-          </Button>
-        </form>
-        <p className="mt-4 text-sm text-center text-muted-foreground">
-          已有账号？ <Link to="/login" className="text-primary hover:underline">登录</Link>
+    <div className="min-h-[100dvh] flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 mb-4">
+            <span className="text-primary-foreground font-bold text-xl">L</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">创建账号</h1>
+          <p className="text-sm text-muted-foreground mt-1">开始你的阅读之旅</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-card border border-border/80 rounded-2xl shadow-sm p-6 sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2.5 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">用户名</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                <Input
+                  type="text"
+                  placeholder="设置用户名"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="pl-10 h-11 bg-background"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">邮箱</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                <Input
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="pl-10 h-11 bg-background"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">密码</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                <Input
+                  type="password"
+                  placeholder="至少8位字符"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="pl-10 h-11 bg-background"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-11 mt-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  注册中...
+                </>
+              ) : (
+                '创建账号'
+              )}
+            </Button>
+          </form>
+        </div>
+
+        <p className="mt-5 text-sm text-center text-muted-foreground">
+          已有账号？{' '}
+          <Link to="/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
+            直接登录
+          </Link>
         </p>
       </div>
     </div>

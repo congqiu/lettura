@@ -5,7 +5,7 @@ import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { Loader2, Shield, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Loader2, Shield, ShieldAlert, ShieldCheck, ShieldIcon } from 'lucide-react';
 
 const ACTION_LABELS: Record<AuditAction, string> = {
   register: '注册',
@@ -64,28 +64,28 @@ const PAGE_SIZE = 30;
 function StatusBadge({ status }: { status: AuditLog['status'] }) {
   if (status === 'success') {
     return (
-      <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400 flex items-center gap-1">
-        <ShieldCheck size={12} /> 成功
+      <Badge variant="outline" className="border-success/50 text-success text-[11px] flex items-center gap-1">
+        <ShieldCheck size={11} /> 成功
       </Badge>
     );
   }
   if (status === 'forbidden') {
     return (
-      <Badge variant="outline" className="border-orange-500 text-orange-600 dark:text-orange-400 flex items-center gap-1">
-        <ShieldAlert size={12} /> 拒绝
+      <Badge variant="outline" className="border-warning/50 text-warning text-[11px] flex items-center gap-1">
+        <ShieldAlert size={11} /> 拒绝
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="border-red-500 text-red-600 dark:text-red-400 flex items-center gap-1">
-      <Shield size={12} /> 失败
+    <Badge variant="outline" className="border-destructive/50 text-destructive text-[11px] flex items-center gap-1">
+      <Shield size={11} /> 失败
     </Badge>
   );
 }
 
 function AuthSourceBadge({ source }: { source: 'jwt' | 'pat' }) {
   return (
-    <Badge variant="secondary" className="text-[10px]">
+    <Badge variant="secondary" className="text-[10px] tabular-nums">
       {source === 'jwt' ? 'JWT' : 'PAT'}
     </Badge>
   );
@@ -115,15 +115,22 @@ export default function AuditLogsPage() {
   const hasPrev = offset > 0;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-foreground">操作日志</h2>
-        <span className="text-sm text-muted-foreground">共 {total} 条</span>
+    <div className="animate-fade-in">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <ShieldIcon size={18} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">操作日志</h2>
+            <p className="text-xs text-muted-foreground">共 {total} 条记录</p>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+          <Loader2 size={24} className="animate-spin text-muted-foreground/50" />
         </div>
       ) : error ? (
         <ErrorState onRetry={() => refetch()} />
@@ -131,13 +138,13 @@ export default function AuditLogsPage() {
         <EmptyState icon="shield" title="暂无操作日志" description="你的操作记录将显示在这里" />
       ) : (
         <>
-          <div className="space-y-2">
+          <div className="space-y-2 stagger-children">
             {logs.map((log) => (
               <div
                 key={log.id}
-                className="bg-card border border-border rounded-lg p-3 flex items-center gap-3 hover:border-muted-foreground/20 transition-colors"
+                className="bg-card border border-border/50 rounded-xl p-3.5 flex items-center gap-3 hover:border-border transition-colors"
               >
-                <div className="flex-shrink-0 w-14 text-xs text-muted-foreground text-right leading-tight">
+                <div className="flex-shrink-0 w-14 text-[11px] text-muted-foreground text-right leading-tight tabular-nums">
                   {formatTime(log.created_at)}
                 </div>
 
@@ -150,13 +157,13 @@ export default function AuditLogsPage() {
                     <AuthSourceBadge source={log.auth_source as 'jwt' | 'pat'} />
                   </div>
                   {log.resource_type && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-1">
                       资源: {log.resource_type}
                       {log.resource_id ? ` (${log.resource_id.slice(0, 8)}...)` : ''}
                     </p>
                   )}
                   {log.error_message && (
-                    <p className="text-xs text-red-500 mt-0.5">{log.error_message}</p>
+                    <p className="text-[11px] text-destructive/80 mt-1">{log.error_message}</p>
                   )}
                 </div>
               </div>
@@ -169,10 +176,11 @@ export default function AuditLogsPage() {
               size="sm"
               onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
               disabled={!hasPrev || isLoading}
+              className="rounded-lg h-8"
             >
               上一页
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground tabular-nums">
               {offset + 1} - {Math.min(offset + PAGE_SIZE, total)} / {total}
             </span>
             <Button
@@ -180,6 +188,7 @@ export default function AuditLogsPage() {
               size="sm"
               onClick={() => setOffset((o) => o + PAGE_SIZE)}
               disabled={!hasMore || isLoading}
+              className="rounded-lg h-8"
             >
               下一页
             </Button>

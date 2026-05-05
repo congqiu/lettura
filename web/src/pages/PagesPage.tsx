@@ -5,8 +5,9 @@ import PageCard from '../components/PageCard';
 import PageUploadModal from '../components/PageUploadModal';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Globe } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { cn } from '@/lib/utils';
 
 const TABS = [
   { key: 'all', label: '全部' },
@@ -26,37 +27,48 @@ export default function PagesPage() {
   });
 
   return (
-    <>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-1 overflow-x-auto flex-nowrap scrollbar-hide">
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                tab === t.key
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+    <div className="animate-fade-in">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <Globe size={18} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Pages</h2>
+            <p className="text-xs text-muted-foreground">分享你的 HTML 页面</p>
+          </div>
         </div>
-        <Button onClick={() => setUploadOpen(true)}>
+        <Button onClick={() => setUploadOpen(true)} className="rounded-lg h-9 gap-1.5">
           <Plus size={15} />
           上传
         </Button>
       </div>
 
+      <div className="flex gap-1 overflow-x-auto flex-nowrap scrollbar-hide mb-5 pb-1">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 shrink-0',
+              tab === t.key
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-muted-foreground" />
+          <Loader2 size={24} className="animate-spin text-muted-foreground/50" />
         </div>
       ) : error ? (
         <ErrorState onRetry={() => refetch()} />
       ) : data && data.items.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-3 stagger-children">
           {data.items.map((page: PageSummary) => (
             <PageCard key={page.id} page={page} />
           ))}
@@ -66,6 +78,6 @@ export default function PagesPage() {
       )}
 
       <PageUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
-    </>
+    </div>
   );
 }

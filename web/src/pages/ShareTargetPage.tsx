@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createEntry } from '../api/entries';
 import { useAuthStore } from '../store/auth';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/;
 
@@ -44,7 +45,6 @@ export default function ShareTargetPage() {
       return;
     }
 
-    // Clean up any stale share data from sessionStorage
     sessionStorage.removeItem(SHARE_STORAGE_KEY);
 
     const urlParam = searchParams.get('url');
@@ -82,50 +82,91 @@ export default function ShareTargetPage() {
       });
   }, [isAuthenticated, searchParams, navigate]);
 
+  const statusConfig = {
+    loading: {
+      icon: <Loader2 size={40} className="animate-spin text-primary" />,
+      title: '正在保存...',
+      description: '请稍候',
+      color: 'text-primary',
+    },
+    success: {
+      icon: <CheckCircle2 size={40} className="text-success" />,
+      title: '已保存',
+      description: '正在跳转到文章...',
+      color: 'text-success',
+    },
+    duplicate: {
+      icon: <CheckCircle2 size={40} className="text-warning" />,
+      title: '该链接已保存',
+      description: '正在跳转...',
+      color: 'text-warning',
+    },
+    error: {
+      icon: <XCircle size={40} className="text-destructive" />,
+      title: '保存失败',
+      description: errorMsg,
+      color: 'text-destructive',
+    },
+    'no-url': {
+      icon: <XCircle size={40} className="text-muted-foreground" />,
+      title: '未检测到链接',
+      description: '请从浏览器分享菜单分享一个网页链接',
+      color: 'text-muted-foreground',
+    },
+  };
+
+  const config = statusConfig[status];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-sm text-center">
-        {status === 'loading' && (
-          <>
-            <Loader2 size={32} className="animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-foreground">正在保存...</p>
-          </>
-        )}
-        {status === 'success' && (
-          <>
-            <CheckCircle2 size={32} className="mx-auto mb-4 text-green-500" />
-            <p className="text-foreground mb-2">已保存</p>
-            <p className="text-sm text-muted-foreground">正在跳转到文章...</p>
-          </>
-        )}
-        {status === 'duplicate' && (
-          <>
-            <CheckCircle2 size={32} className="mx-auto mb-4 text-amber-500" />
-            <p className="text-foreground mb-2">该链接已保存</p>
-            {savedEntryId && (
-              <Button variant="outline" size="sm" onClick={() => { clearTimeout(timerRef.current); navigate(`/entry/${savedEntryId}`); }} className="mb-2">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm text-center">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20 mb-4">
+            <span className="text-primary-foreground font-bold text-xl">L</span>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/80 rounded-2xl shadow-sm p-8">
+          <div className="flex flex-col items-center">
+            <div className="mb-4">{config.icon}</div>
+            <h2 className={cn('text-lg font-semibold mb-1', config.color)}>
+              {config.title}
+            </h2>
+            <p className="text-sm text-muted-foreground">{config.description}</p>
+
+            {status === 'duplicate' && savedEntryId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { clearTimeout(timerRef.current); navigate(`/entry/${savedEntryId}`); }}
+                className="mt-4 rounded-lg gap-1.5"
+              >
                 查看文章
+                <ArrowRight size={14} />
               </Button>
             )}
-            <p className="text-sm text-muted-foreground">正在跳转...</p>
-          </>
-        )}
-        {status === 'error' && (
-          <>
-            <XCircle size={32} className="mx-auto mb-4 text-destructive" />
-            <p className="text-foreground mb-2">保存失败</p>
-            <p className="text-sm text-muted-foreground mb-4">{errorMsg}</p>
-            <Button onClick={() => window.location.reload()}>重试</Button>
-          </>
-        )}
-        {status === 'no-url' && (
-          <>
-            <XCircle size={32} className="mx-auto mb-4 text-muted-foreground" />
-            <p className="text-foreground mb-2">未检测到链接</p>
-            <p className="text-sm text-muted-foreground mb-4">请从浏览器分享菜单分享一个网页链接</p>
-            <Button variant="outline" onClick={() => navigate('/')}>返回首页</Button>
-          </>
-        )}
+
+            {status === 'error' && (
+              <Button
+                onClick={() => window.location.reload()}
+                className="mt-4 rounded-lg"
+              >
+                重试
+              </Button>
+            )}
+
+            {status === 'no-url' && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/')}
+                className="mt-4 rounded-lg"
+              >
+                返回首页
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
