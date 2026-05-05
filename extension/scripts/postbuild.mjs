@@ -11,7 +11,7 @@ const dist = resolve(root, 'dist');
 const manifest = {
   manifest_version: 3,
   name: 'Lettura',
-  version: '1.1.0',
+  version: '1.2.0',
   description: 'Save articles to your Lettura instance',
   permissions: ['activeTab', 'contextMenus', 'storage'],
   action: {
