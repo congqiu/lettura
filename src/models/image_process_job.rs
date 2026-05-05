@@ -1,16 +1,26 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::error::ModelError;
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "image_process_status", rename_all = "snake_case")]
+pub enum ImageProcessStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+}
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct ImageProcessJob {
     pub id: Uuid,
     pub entry_id: Uuid,
     pub original_html: String,
-    pub status: String,
+    pub status: ImageProcessStatus,
     pub error_message: Option<String>,
     pub retry_count: i32,
     pub created_at: DateTime<Utc>,
@@ -103,8 +113,8 @@ pub async fn mark_failed(
 pub async fn get_status_for_entry(
     pool: &PgPool,
     entry_id: Uuid,
-) -> Result<Option<String>, ModelError> {
-    let result: Option<(String,)> = sqlx::query_as(
+) -> Result<Option<ImageProcessStatus>, ModelError> {
+    let result: Option<(ImageProcessStatus,)> = sqlx::query_as(
         r#"
         SELECT status FROM image_process_jobs
         WHERE entry_id = $1
