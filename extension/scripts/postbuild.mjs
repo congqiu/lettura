@@ -14,6 +14,7 @@ const manifest = {
   version: '1.2.0',
   description: 'Save articles to your Lettura instance',
   permissions: ['activeTab', 'contextMenus', 'storage'],
+  host_permissions: ['<all_urls>'],
   action: {
     default_popup: 'src/popup/index.html',
     default_icon: {
