@@ -1,6 +1,6 @@
 // Popup script
 
-import { login, refreshToken, saveEntry } from '../shared/api';
+import { login, refreshToken, saveEntry, connectWithToken } from '../shared/api';
 import { getLocalStorage, setLocalStorage, getSessionStorage, setSessionStorage, clearAllStorage } from '../shared/storage';
 
 // --- DOM Elements ---
@@ -20,6 +20,21 @@ const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const saveStatus = document.getElementById('save-status')!;
 const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
 
+// Tab elements
+const tabPassword = document.getElementById('tab-password') as HTMLButtonElement;
+const tabToken = document.getElementById('tab-token') as HTMLButtonElement;
+const formPassword = document.getElementById('form-password')!;
+const formToken = document.getElementById('form-token')!;
+
+// Token form elements
+const tokenServerUrlInput = document.getElementById('token-server-url') as HTMLInputElement;
+const tokenInput = document.getElementById('token-input') as HTMLInputElement;
+const tokenBtn = document.getElementById('token-btn') as HTMLButtonElement;
+const tokenError = document.getElementById('token-error')!;
+
+// Token badge in main section
+const tokenBadge = document.getElementById('token-badge')!;
+
 // --- Helpers ---
 
 function showSection(section: HTMLElement): void {
@@ -38,6 +53,33 @@ function showMessage(el: HTMLElement, text: string, type: 'error' | 'success' | 
 function hideMessage(el: HTMLElement): void {
   el.classList.add('hidden');
 }
+
+// --- Tab switching ---
+
+function switchTab(tab: 'password' | 'token'): void {
+  if (tab === 'password') {
+    tabPassword.classList.add('active');
+    tabToken.classList.remove('active');
+    formPassword.classList.remove('hidden');
+    formToken.classList.add('hidden');
+    // Sync server URL from token form to password form
+    if (tokenServerUrlInput.value) {
+      serverUrlInput.value = tokenServerUrlInput.value;
+    }
+  } else {
+    tabToken.classList.add('active');
+    tabPassword.classList.remove('active');
+    formToken.classList.remove('hidden');
+    formPassword.classList.add('hidden');
+    // Sync server URL from password form to token form
+    if (serverUrlInput.value) {
+      tokenServerUrlInput.value = serverUrlInput.value;
+    }
+  }
+}
+
+tabPassword.addEventListener('click', () => switchTab('password'));
+tabToken.addEventListener('click', () => switchTab('token'));
 
 // --- Actions ---
 
@@ -73,7 +115,9 @@ async function doLogin(): Promise<void> {
 
     await setSessionStorage({ access_token: tokens.access_token });
     if (tokens.refresh_token) {
-      await setLocalStorage({ refresh_token: tokens.refresh_token });
+      await setLocalStorage({ refresh_token: tokens.refresh_token, auth_mode: 'jwt' });
+    } else {
+      await setLocalStorage({ auth_mode: 'jwt' });
     }
 
     showMainSection(serverUrl);
@@ -86,6 +130,46 @@ async function doLogin(): Promise<void> {
   } finally {
     loginBtn.disabled = false;
     loginBtn.textContent = 'Login';
+  }
+}
+
+async function doTokenLogin(): Promise<void> {
+  hideMessage(tokenError);
+  const serverUrl = tokenServerUrlInput.value.trim();
+  const token = tokenInput.value.trim();
+
+  if (!serverUrl) {
+    showMessage(tokenError, 'Please enter the server URL.', 'error');
+    return;
+  }
+  if (!serverUrl.startsWith('https://') && !serverUrl.startsWith('http://localhost') && !serverUrl.startsWith('http://127.0.0.1')) {
+    showMessage(tokenError, 'Server URL must use HTTPS (or http://localhost for development).', 'error');
+    return;
+  }
+  if (!token) {
+    showMessage(tokenError, 'Please enter your token.', 'error');
+    return;
+  }
+  if (!token.startsWith('lta_')) {
+    showMessage(tokenError, 'Token must start with lta_.', 'error');
+    return;
+  }
+
+  tokenBtn.disabled = true;
+  tokenBtn.textContent = 'Connecting...';
+
+  try {
+    await connectWithToken(serverUrl, token);
+    showMainSection(serverUrl, token);
+  } catch (err) {
+    showMessage(
+      tokenError,
+      err instanceof Error ? err.message : 'Connection failed',
+      'error'
+    );
+  } finally {
+    tokenBtn.disabled = false;
+    tokenBtn.textContent = 'Connect';
   }
 }
 
@@ -131,34 +215,49 @@ async function doSave(): Promise<void> {
 async function doLogout(): Promise<void> {
   await clearAllStorage();
   showSection(loginSection);
+  switchTab('password');
   serverUrlInput.value = '';
   emailInput.value = '';
   passwordInput.value = '';
+  tokenServerUrlInput.value = '';
+  tokenInput.value = '';
   hideMessage(loginError);
+  hideMessage(tokenError);
   hideMessage(saveStatus);
 }
 
 // --- UI state ---
 
-function showMainSection(serverUrl: string): void {
+function showMainSection(serverUrl: string, patToken?: string): void {
   serverInfo.textContent = serverUrl;
   hideMessage(saveStatus);
+
+  if (patToken) {
+    const prefix = patToken.substring(0, 12);
+    tokenBadge.textContent = `${prefix}...`;
+    tokenBadge.classList.remove('hidden');
+  } else {
+    tokenBadge.classList.add('hidden');
+  }
+
   showSection(mainSection);
 }
 
 async function init(): Promise<void> {
   showSection(loadingSection);
 
-  const { server_url, refresh_token } = await getLocalStorage(['server_url', 'refresh_token']);
+  const { server_url, refresh_token, pat_token, auth_mode } = await getLocalStorage(['server_url', 'refresh_token', 'pat_token', 'auth_mode']);
   const { access_token } = await getSessionStorage(['access_token']);
 
-  if (server_url && (access_token || refresh_token)) {
-    // We have credentials — try to ensure we have a valid access token
+  if (auth_mode === 'pat' && pat_token && server_url) {
+    showMainSection(server_url, pat_token);
+  } else if (auth_mode === 'jwt' && (access_token || refresh_token) && server_url) {
+    // JWT mode — try to ensure we have a valid access token
     if (!access_token && refresh_token) {
       const newToken = await refreshToken();
       if (!newToken) {
-        // Refresh failed, show login
         serverUrlInput.value = server_url ?? '';
+        tokenServerUrlInput.value = server_url ?? '';
         showSection(loginSection);
         return;
       }
@@ -166,6 +265,7 @@ async function init(): Promise<void> {
     showMainSection(server_url);
   } else {
     serverUrlInput.value = server_url ?? '';
+    tokenServerUrlInput.value = server_url ?? '';
     showSection(loginSection);
   }
 }
@@ -173,6 +273,7 @@ async function init(): Promise<void> {
 // --- Event listeners ---
 
 loginBtn.addEventListener('click', doLogin);
+tokenBtn.addEventListener('click', doTokenLogin);
 saveBtn.addEventListener('click', doSave);
 logoutBtn.addEventListener('click', doLogout);
 
@@ -181,6 +282,15 @@ logoutBtn.addEventListener('click', doLogout);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       doLogin();
+    }
+  });
+});
+
+// Allow Enter key to submit token form
+[tokenServerUrlInput, tokenInput].forEach((input) => {
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      doTokenLogin();
     }
   });
 });

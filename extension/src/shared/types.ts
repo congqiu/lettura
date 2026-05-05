@@ -37,3 +37,5 @@ export interface CreateMemoRequest {
 }
 
 export type BadgeStatus = 'OK' | 'DUP' | 'ERR' | '!';
+
+export type AuthMode = 'jwt' | 'pat';

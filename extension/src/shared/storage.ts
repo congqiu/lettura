@@ -34,7 +34,7 @@ export async function setSessionStorage(data: Record<string, string>): Promise<v
 
 export async function clearAllStorage(): Promise<void> {
   return new Promise((resolve) => {
-    chrome.storage.local.remove(['server_url', 'refresh_token'], () => {
+    chrome.storage.local.remove(['server_url', 'refresh_token', 'pat_token', 'auth_mode'], () => {
       chrome.storage.session.remove(['access_token'], resolve);
     });
   });

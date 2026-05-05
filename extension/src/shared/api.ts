@@ -108,6 +108,30 @@ export async function authenticatedRequest<T>(
   path: string,
   body?: unknown
 ): Promise<Response> {
+  const { auth_mode } = await getLocalStorage(['auth_mode']);
+
+  if (auth_mode === 'pat') {
+    const { pat_token } = await getLocalStorage(['pat_token']);
+    if (!pat_token) {
+      throw new Error('Not authenticated. Please login via the popup.');
+    }
+
+    const resp = await apiRequest<T>({ method, path, body, accessToken: pat_token });
+
+    if (resp.status === 401) {
+      await clearAllStorage();
+      throw new Error('Token expired or invalid. Please login again.');
+    }
+    if (resp.status === 403) {
+      const errData = await resp.json().catch(() => null);
+      const msg = errData?.message ?? 'Token has read-only scope. Use a write-scope token.';
+      throw new Error(msg);
+    }
+
+    return resp;
+  }
+
+  // JWT mode (existing logic)
   let token = await getAccessToken();
   if (!token) {
     token = await refreshToken();
@@ -158,5 +182,54 @@ export async function login(
     throw new Error(errData.message || `Login failed (${resp.status})`);
   }
 
+  // Clear any existing PAT data before storing JWT tokens
+  await chrome.storage.local.remove(['pat_token', 'auth_mode']);
+
   return resp.json();
+}
+
+export async function connectWithToken(
+  serverUrl: string,
+  token: string
+): Promise<void> {
+  const normalized = normalizeUrl(serverUrl);
+
+  // Validate server URL uses HTTPS
+  if (!normalized.startsWith('https://') && !normalized.startsWith('http://localhost') && !normalized.startsWith('http://127.0.0.1')) {
+    throw new Error('Server URL must use HTTPS (or http://localhost for development).');
+  }
+
+  // Validate token format
+  if (!token.startsWith('lta_')) {
+    throw new Error('Token must start with lta_');
+  }
+
+  // Validate token by calling /api/v1/auth/me
+  const resp = await fetch(`${normalized}/api/v1/auth/me`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (resp.status === 401) {
+    throw new Error('Token is invalid or expired.');
+  }
+  if (resp.status === 403) {
+    throw new Error('Token has read-only scope. Use a token with write scope.');
+  }
+  if (!resp.ok) {
+    throw new Error(`Verification failed (${resp.status})`);
+  }
+
+  // Clear any existing JWT tokens before storing PAT data
+  await chrome.storage.session.remove(['access_token']);
+  await chrome.storage.local.remove(['refresh_token']);
+
+  // Store PAT data
+  await setLocalStorage({
+    server_url: normalized,
+    pat_token: token,
+    auth_mode: 'pat',
+  });
 }

@@ -18,31 +18,59 @@
       <h1 class="title">Lettura</h1>
       <p class="subtitle">Save articles for later</p>
 
-      <div class="form-group">
-        <label for="server-url">Server URL</label>
-        <input type="url" id="server-url" placeholder="https://your-lettura-instance.com" />
+      <div class="tabs">
+        <button id="tab-password" class="tab active">Password</button>
+        <button id="tab-token" class="tab">Token</button>
       </div>
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="you@example.com" />
+      <!-- Password login form -->
+      <div id="form-password" class="tab-content">
+        <div class="form-group">
+          <label for="server-url">Server URL</label>
+          <input type="url" id="server-url" placeholder="https://your-lettura-instance.com" />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@example.com" />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="••••••••" />
+        </div>
+
+        <div id="login-error" class="message error hidden"></div>
+
+        <button id="login-btn" class="btn btn-primary">Login</button>
       </div>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="••••••••" />
+      <!-- Token login form -->
+      <div id="form-token" class="tab-content hidden">
+        <div class="form-group">
+          <label for="token-server-url">Server URL</label>
+          <input type="url" id="token-server-url" placeholder="https://your-lettura-instance.com" />
+        </div>
+
+        <div class="form-group">
+          <label for="token-input">Token</label>
+          <input type="password" id="token-input" placeholder="lta_..." />
+        </div>
+
+        <div id="token-error" class="message error hidden"></div>
+
+        <button id="token-btn" class="btn btn-primary">Connect</button>
       </div>
-
-      <div id="login-error" class="message error hidden"></div>
-
-      <button id="login-btn" class="btn btn-primary">Login</button>
     </div>
 
     <!-- Main section (after login) -->
     <div id="main-section" class="section hidden">
       <div class="header">
         <h1 class="title">Lettura</h1>
-        <span id="server-info" class="server-badge"></span>
+        <div class="header-badges">
+          <span id="server-info" class="server-badge"></span>
+          <span id="token-badge" class="token-badge hidden"></span>
+        </div>
       </div>
 
       <button id="save-btn" class="btn btn-primary btn-block">Save this page</button>
