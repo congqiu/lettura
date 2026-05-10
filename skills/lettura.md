@@ -75,6 +75,33 @@ lettura-cli save https://example.com/post --wait
 
 Saving the same URL twice is safe: the server returns `already_existed: true`, and tags are merged as a set union.
 
+## Scenario 4: Publish and manage static pages
+
+Publish an HTML file as a shareable page:
+
+```sh
+lettura-cli pages publish ./site/index.html --title "My Page"
+lettura-cli pages publish ./site/          # directory → auto-zip
+lettura-cli pages publish https://example.com  # URL → fetch & publish
+```
+
+List, update, and share pages:
+
+```sh
+lettura-cli pages list
+lettura-cli pages list --status disabled
+lettura-cli pages update <id> --title "New Title"
+lettura-cli pages update <id> --files ./new-site/  # replace files
+lettura-cli pages share <id>
+```
+
+Delete and restore:
+
+```sh
+lettura-cli pages delete <id>
+lettura-cli pages restore <id>
+```
+
 ## Command cheatsheet
 
 | Command | Description |
@@ -91,6 +118,12 @@ Saving the same URL twice is safe: the server returns `already_existed: true`, a
 | `tags` | List all tags |
 | `audit-logs [--action X] [--resource-type Y] [--status Z] [--limit N] [--offset N]` | Query audit logs |
 | `whoami` | Verify login |
+| `pages publish <path\|url> [--title X] [--description D] [--password P] [--expires-at E]` | Publish a page from file, directory, or URL |
+| `pages list [--status S] [--page N] [--limit N]` | List published pages |
+| `pages update <id> [--title X] [--description D] [--password P] [--clear-password] [--status S] [--expires-at E] [--files F] [--entry-file E]` | Update a page |
+| `pages delete <id>` | Delete a page (soft) |
+| `pages restore <id>` | Restore a deleted page |
+| `pages share <id>` | Get share URL for a page |
 
 ## Filter DSL
 

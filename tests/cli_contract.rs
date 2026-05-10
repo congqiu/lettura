@@ -345,3 +345,159 @@ async fn cli_get_markdown_has_frontmatter() {
     assert!(stdout.contains("url: https://contract-test.example/f"));
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn cli_pages_publish_and_list() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let temp_dir = std::env::temp_dir().join("lettura-contract-pages");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let html_file = temp_dir.join("test-page.html");
+    std::fs::write(&html_file, "<html><head><title>Test Page</title></head><body>Hello</body></html>").unwrap();
+
+    // publish
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &[
+            "pages", "publish",
+            html_file.to_str().unwrap(),
+            "--title", "My Page",
+        ],
+    )
+    .await;
+    assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
+
+    // list should include the published page
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "list"],
+    )
+    .await;
+    assert_eq!(code, 0, "list failed: stderr={stderr} stdout={stdout}");
+    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(list["items"].as_array().map(|a| !a.is_empty()).unwrap_or(false), "list should have items");
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_update_and_share() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let temp_dir = std::env::temp_dir().join("lettura-contract-pages-update");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let html_file = temp_dir.join("test-page.html");
+    std::fs::write(&html_file, "<html><head><title>Test</title></head><body>Hello</body></html>").unwrap();
+
+    // publish
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &[
+            "pages", "publish",
+            html_file.to_str().unwrap(),
+            "--title", "Original",
+        ],
+    )
+    .await;
+    assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
+
+    // get page id from list
+    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
+    assert_eq!(code, 0, "list failed: stderr={stderr}");
+    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let page_id = list["items"][0]["id"].as_str().unwrap().to_string();
+
+    // update title
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--title", "Updated"],
+    )
+    .await;
+    assert_eq!(code, 0, "update failed: stderr={stderr} stdout={stdout}");
+
+    // share
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "share", &page_id],
+    )
+    .await;
+    assert_eq!(code, 0, "share failed: stderr={stderr} stdout={stdout}");
+    let share: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(share["url"].as_str().unwrap().starts_with("/p/"));
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_delete_and_restore() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let temp_dir = std::env::temp_dir().join("lettura-contract-pages-del");
+    let _ = std::fs::remove_dir_all(&temp_dir);
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let html_file = temp_dir.join("test-page.html");
+    std::fs::write(&html_file, "<html><head><title>Test</title></head><body>Hello</body></html>").unwrap();
+
+    // publish
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &[
+            "pages", "publish",
+            html_file.to_str().unwrap(),
+            "--title", "To Delete",
+        ],
+    )
+    .await;
+    assert_eq!(code, 0, "publish failed: stderr={stderr}");
+
+    // get page id
+    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
+    assert_eq!(code, 0, "list failed: stderr={stderr}");
+    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let page_id = list["items"][0]["id"].as_str().unwrap().to_string();
+
+    // delete
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "delete", &page_id],
+    )
+    .await;
+    assert_eq!(code, 0, "delete failed: stderr={stderr} stdout={stdout}");
+
+    // restore
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "restore", &page_id],
+    )
+    .await;
+    assert_eq!(code, 0, "restore failed: stderr={stderr} stdout={stdout}");
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
