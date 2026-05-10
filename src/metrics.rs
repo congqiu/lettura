@@ -4,7 +4,8 @@ use regex::Regex;
 use std::time::Instant;
 
 static UUID_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").expect("valid UUID regex")
+    Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+        .expect("valid UUID regex")
 });
 
 /// Axum middleware to record HTTP request metrics
@@ -55,9 +56,6 @@ mod tests {
     #[test]
     fn normalize_replaces_multiple_uuids() {
         let path = "/api/entries/550e8400-e29b-41d4-a716-446655440000/tags/660e8400-e29b-41d4-a716-446655440001";
-        assert_eq!(
-            normalize_path(path),
-            "/api/entries/{id}/tags/{id}"
-        );
+        assert_eq!(normalize_path(path), "/api/entries/{id}/tags/{id}");
     }
 }

@@ -4,10 +4,7 @@ use crate::client::ApiClient;
 use crate::error::CliError;
 use crate::output::emit_json;
 
-pub async fn run(
-    client: &ApiClient,
-    args: &GetArgs,
-) -> Result<i32, CliError> {
+pub async fn run(client: &ApiClient, args: &GetArgs) -> Result<i32, CliError> {
     let entry: EntryFull = client
         .get(&format!("/api/v1/entries/{}", args.id), &[])
         .await?;
@@ -32,8 +29,8 @@ pub async fn run(
                 println!("title: {t}");
             }
             println!("tags: {:?}", entry.tags);
-            if let Some(d) = entry.created_at {
-                println!("saved_at: {}", d.to_rfc3339());
+            if let Some(d) = &entry.created_at {
+                println!("saved_at: {d}");
             }
             println!("---\n");
             let md = entry

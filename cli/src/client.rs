@@ -1,5 +1,8 @@
-use reqwest::{Client, StatusCode, header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT}};
-use serde::{de::DeserializeOwned, Serialize};
+use reqwest::{
+    Client, StatusCode,
+    header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
+};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::error::CliError;
 
@@ -94,11 +97,7 @@ impl ApiClient {
         handle_response(resp).await
     }
 
-    pub async fn get_text(
-        &self,
-        path: &str,
-        query: &[(&str, String)],
-    ) -> Result<String, CliError> {
+    pub async fn get_text(&self, path: &str, query: &[(&str, String)]) -> Result<String, CliError> {
         let resp = self
             .http
             .get(self.url(path))
@@ -124,8 +123,7 @@ async fn handle_response<T: DeserializeOwned>(resp: reqwest::Response) -> Result
     let status = resp.status();
     let retry_after = parse_retry_after(&resp);
     if status == StatusCode::NO_CONTENT {
-        return serde_json::from_str("null")
-            .map_err(|e| CliError::ServerError(e.to_string()));
+        return serde_json::from_str("null").map_err(|e| CliError::ServerError(e.to_string()));
     }
     let body = resp
         .text()
@@ -152,7 +150,10 @@ fn map_status(status: StatusCode, body: String, retry_after: Option<u64>) -> Cli
         404 => CliError::NotFound(body),
         400 | 422 => CliError::BadArgs(body),
         409 => CliError::Conflict(body),
-        429 => CliError::RateLimited { retry_after_sec: retry_after, message: body },
+        429 => CliError::RateLimited {
+            retry_after_sec: retry_after,
+            message: body,
+        },
         500..=599 => CliError::ServerError(body),
         _ => CliError::ServerError(format!("HTTP {status}: {body}")),
     }

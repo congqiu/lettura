@@ -52,27 +52,51 @@ pub mod cursor {
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Entry {
-    pub id: Uuid, pub user_id: Uuid, pub url: String, pub given_url: String,
-    pub hashed_url: String, pub hashed_given_url: String,
-    pub title: Option<String>, pub content: Option<String>, pub text_content: Option<String>,
-    pub content_type: String, pub extract_method: String, pub is_content_edited: bool,
-    pub language: Option<String>, pub http_status: Option<i16>, pub reading_time: Option<i32>,
-    pub preview_picture: Option<String>, pub domain_name: Option<String>,
-    pub published_by: Option<String>, pub metadata: serde_json::Value,
-    pub is_archived: bool, pub archived_at: Option<DateTime<Utc>>,
-    pub is_starred: bool, pub starred_at: Option<DateTime<Utc>>,
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub url: String,
+    pub given_url: String,
+    pub hashed_url: String,
+    pub hashed_given_url: String,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub text_content: Option<String>,
+    pub content_type: String,
+    pub extract_method: String,
+    pub is_content_edited: bool,
+    pub language: Option<String>,
+    pub http_status: Option<i16>,
+    pub reading_time: Option<i32>,
+    pub preview_picture: Option<String>,
+    pub domain_name: Option<String>,
+    pub published_by: Option<String>,
+    pub metadata: serde_json::Value,
+    pub is_archived: bool,
+    pub archived_at: Option<DateTime<Utc>>,
+    pub is_starred: bool,
+    pub starred_at: Option<DateTime<Utc>>,
     pub published_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct EntrySummary {
-    pub id: Uuid, pub user_id: Uuid, pub url: String, pub title: Option<String>,
-    pub content_type: String, pub extract_method: String, pub language: Option<String>,
-    pub reading_time: Option<i32>, pub preview_picture: Option<String>,
-    pub domain_name: Option<String>, pub published_by: Option<String>,
-    pub is_archived: bool, pub is_starred: bool, pub created_at: DateTime<Utc>,
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub url: String,
+    pub title: Option<String>,
+    pub content_type: String,
+    pub extract_method: String,
+    pub language: Option<String>,
+    pub reading_time: Option<i32>,
+    pub preview_picture: Option<String>,
+    pub domain_name: Option<String>,
+    pub published_by: Option<String>,
+    pub is_archived: bool,
+    pub is_starred: bool,
+    pub created_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
     #[sqlx(skip)]
     pub tags: Vec<crate::models::tag::TagLabel>,
@@ -85,7 +109,9 @@ pub fn hash_url(url: &str) -> String {
 }
 
 pub fn extract_domain(url_str: &str) -> Option<String> {
-    Url::parse(url_str).ok().and_then(|u| u.host_str().map(String::from))
+    Url::parse(url_str)
+        .ok()
+        .and_then(|u| u.host_str().map(String::from))
 }
 
 pub struct CreateEntryResult {
@@ -122,7 +148,10 @@ pub async fn create_or_get_entry(
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
     if let Some(entry) = inserted {
-        return Ok(CreateEntryResult { entry, already_existed: false });
+        return Ok(CreateEntryResult {
+            entry,
+            already_existed: false,
+        });
     }
 
     // Fallback: look up the existing entry
@@ -135,34 +164,65 @@ pub async fn create_or_get_entry(
     .await
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
-    Ok(CreateEntryResult { entry: existing, already_existed: true })
+    Ok(CreateEntryResult {
+        entry: existing,
+        already_existed: true,
+    })
 }
 
-pub async fn create_entry(pool: &PgPool, user_id: Uuid, given_url: &str) -> Result<Entry, ModelError> {
+pub async fn create_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    given_url: &str,
+) -> Result<Entry, ModelError> {
     create_or_get_entry(pool, user_id, given_url)
         .await
         .map(|r| r.entry)
 }
 
-pub async fn find_entry_by_id(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<Option<Entry>, ModelError> {
-    sqlx::query_as::<_, Entry>("SELECT * FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
-        .bind(entry_id).bind(user_id).fetch_optional(pool).await
-        .map_err(|e| ModelError::Database(e.to_string()))
+pub async fn find_entry_by_id(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+) -> Result<Option<Entry>, ModelError> {
+    sqlx::query_as::<_, Entry>(
+        "SELECT * FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+    )
+    .bind(entry_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string"
+    )]
     pub page: Option<i64>,
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_i64_from_string"
+    )]
     pub per_page: Option<i64>,
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string"
+    )]
     pub is_archived: Option<bool>,
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string"
+    )]
     pub is_starred: Option<bool>,
     /// Alias for `is_archived` (CLI Filter DSL compatibility).
     /// `is_read=true` → `is_archived = true`, `is_read=false` → `is_archived = false`.
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string"
+    )]
     pub is_read: Option<bool>,
     pub domain: Option<String>,
     /// Comma-separated tag labels; AND semantics (entry must have ALL listed tags).
@@ -170,7 +230,10 @@ pub struct ListParams {
     /// Comma-separated tag labels to exclude; entry must NOT have any of these tags.
     pub exclude_tag: Option<String>,
     /// When true, return only entries with no tags.
-    #[serde(default, deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::models::serde_helpers::deserialize_bool_from_string"
+    )]
     pub untagged: Option<bool>,
     /// Return entries created at or after this timestamp.
     pub since: Option<DateTime<Utc>>,
@@ -221,7 +284,8 @@ pub async fn list_entries(
         qb.push_bind(offset);
     }
 
-    let mut entries = qb.build_query_as::<EntrySummary>()
+    let mut entries = qb
+        .build_query_as::<EntrySummary>()
         .fetch_all(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
@@ -275,9 +339,7 @@ fn build_where_clause(
         qb.push_bind(t);
     }
     if let Some(true) = params.untagged {
-        qb.push(
-            " AND NOT EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = entries.id)",
-        );
+        qb.push(" AND NOT EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = entries.id)");
     }
     if let Some(tags_csv) = &params.tag {
         for t in tags_csv.split(',').filter(|s| !s.trim().is_empty()) {
@@ -316,23 +378,48 @@ fn build_where_clause(
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateEntryParams {
-    pub title: Option<String>, pub content: Option<String>,
-    pub is_archived: Option<bool>, pub is_starred: Option<bool>,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub is_archived: Option<bool>,
+    pub is_starred: Option<bool>,
 }
 
-pub async fn update_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, params: &UpdateEntryParams) -> Result<Entry, ModelError> {
-    let existing = find_entry_by_id(pool, user_id, entry_id).await?
+pub async fn update_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    params: &UpdateEntryParams,
+) -> Result<Entry, ModelError> {
+    let existing = find_entry_by_id(pool, user_id, entry_id)
+        .await?
         .ok_or_else(|| ModelError::NotFound("entry not found".to_string()))?;
 
-    let title = params.title.as_deref().unwrap_or(existing.title.as_deref().unwrap_or(""));
+    let title = params
+        .title
+        .as_deref()
+        .unwrap_or(existing.title.as_deref().unwrap_or(""));
     let content = params.content.as_deref().or(existing.content.as_deref());
-    let is_content_edited = if params.content.is_some() { true } else { existing.is_content_edited };
+    let is_content_edited = if params.content.is_some() {
+        true
+    } else {
+        existing.is_content_edited
+    };
     let is_archived = params.is_archived.unwrap_or(existing.is_archived);
-    let archived_at = if params.is_archived == Some(true) && !existing.is_archived { Some(Utc::now()) }
-        else if params.is_archived == Some(false) { None } else { existing.archived_at };
+    let archived_at = if params.is_archived == Some(true) && !existing.is_archived {
+        Some(Utc::now())
+    } else if params.is_archived == Some(false) {
+        None
+    } else {
+        existing.archived_at
+    };
     let is_starred = params.is_starred.unwrap_or(existing.is_starred);
-    let starred_at = if params.is_starred == Some(true) && !existing.is_starred { Some(Utc::now()) }
-        else if params.is_starred == Some(false) { None } else { existing.starred_at };
+    let starred_at = if params.is_starred == Some(true) && !existing.is_starred {
+        Some(Utc::now())
+    } else if params.is_starred == Some(false) {
+        None
+    } else {
+        existing.starred_at
+    };
 
     sqlx::query_as::<_, Entry>(
         "UPDATE entries SET title=$3, content=$4, is_content_edited=$5, is_archived=$6, archived_at=$7, is_starred=$8, starred_at=$9, updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *"
@@ -342,7 +429,11 @@ pub async fn update_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, params: 
     .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> Result<Vec<EntrySummary>, ModelError> {
+pub async fn list_entries_by_ids(
+    pool: &PgPool,
+    user_id: Uuid,
+    ids: &[Uuid],
+) -> Result<Vec<EntrySummary>, ModelError> {
     if ids.is_empty() {
         return Ok(vec![]);
     }
@@ -358,14 +449,21 @@ pub async fn list_entries_by_ids(pool: &PgPool, user_id: Uuid, ids: &[Uuid]) -> 
     Ok(entries)
 }
 
-pub async fn delete_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid) -> Result<bool, ModelError> {
+pub async fn delete_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+) -> Result<bool, ModelError> {
     let result = sqlx::query("UPDATE entries SET deleted_at = now() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL")
         .bind(entry_id).bind(user_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn list_deleted_entries(pool: &PgPool, user_id: Uuid) -> Result<Vec<EntrySummary>, ModelError> {
+pub async fn list_deleted_entries(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<EntrySummary>, ModelError> {
     let mut entries = sqlx::query_as::<_, EntrySummary>(
         "SELECT id, user_id, url, title, content_type, extract_method, language, reading_time, preview_picture, domain_name, published_by, is_archived, is_starred, created_at, deleted_at FROM entries WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC"
     )
@@ -382,15 +480,26 @@ pub async fn restore_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Resu
         .bind(entry_id).bind(user_id).execute(pool).await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() == 0 {
-        return Err(ModelError::NotFound("entry not found or not deleted".to_string()));
+        return Err(ModelError::NotFound(
+            "entry not found or not deleted".to_string(),
+        ));
     }
     Ok(())
 }
 
-pub async fn permanently_delete_entry(pool: &PgPool, entry_id: Uuid, user_id: Uuid) -> Result<(), ModelError> {
-    let result = sqlx::query("DELETE FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL")
-        .bind(entry_id).bind(user_id).execute(pool).await
-        .map_err(|e| ModelError::Database(e.to_string()))?;
+pub async fn permanently_delete_entry(
+    pool: &PgPool,
+    entry_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), ModelError> {
+    let result = sqlx::query(
+        "DELETE FROM entries WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL",
+    )
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() == 0 {
         return Err(ModelError::NotFound("entry not found".to_string()));
     }
@@ -403,21 +512,30 @@ pub async fn find_ids_matching(
     user_id: Uuid,
     params: &ListParams,
 ) -> Result<Vec<Uuid>, ModelError> {
-    let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
-        "SELECT id FROM entries WHERE user_id = ",
-    );
+    let mut qb =
+        sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT id FROM entries WHERE user_id = ");
     build_where_clause(&mut qb, user_id, params);
 
-    let rows: Vec<(Uuid,)> = qb.build_query_as().fetch_all(pool).await
+    let rows: Vec<(Uuid,)> = qb
+        .build_query_as()
+        .fetch_all(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(rows.into_iter().map(|(id,)| id).collect())
 }
 
 pub async fn update_entry_content(
-    pool: &PgPool, entry_id: Uuid,
-    title: Option<&str>, content: Option<&str>, text_content: Option<&str>,
-    language: Option<&str>, preview_picture: Option<&str>, published_by: Option<&str>,
-    reading_time: Option<i32>, http_status: i16, extract_method: &str,
+    pool: &PgPool,
+    entry_id: Uuid,
+    title: Option<&str>,
+    content: Option<&str>,
+    text_content: Option<&str>,
+    language: Option<&str>,
+    preview_picture: Option<&str>,
+    published_by: Option<&str>,
+    reading_time: Option<i32>,
+    http_status: i16,
+    extract_method: &str,
 ) -> Result<(), ModelError> {
     sqlx::query(
         "UPDATE entries SET title=COALESCE($2,title), content=$3, text_content=$4, language=$5, preview_picture=$6, published_by=$7, reading_time=$8, http_status=$9, extract_method=$10, updated_at=now() WHERE id=$1 AND is_content_edited=false"
@@ -528,25 +646,37 @@ mod tests {
     #[test]
     fn hash_url_empty() {
         let h = hash_url("");
-        assert!(!h.is_empty(), "empty input should still produce a non-empty hash");
+        assert!(
+            !h.is_empty(),
+            "empty input should still produce a non-empty hash"
+        );
     }
 
     // --- extract_domain ---
 
     #[test]
     fn extract_domain_common() {
-        assert_eq!(extract_domain("https://example.com/path"), Some("example.com".to_string()));
+        assert_eq!(
+            extract_domain("https://example.com/path"),
+            Some("example.com".to_string())
+        );
     }
 
     #[test]
     fn extract_domain_with_port() {
         // Url::host_str() does NOT include the port number
-        assert_eq!(extract_domain("http://localhost:3000/api"), Some("localhost".to_string()));
+        assert_eq!(
+            extract_domain("http://localhost:3000/api"),
+            Some("localhost".to_string())
+        );
     }
 
     #[test]
     fn extract_domain_subdomain() {
-        assert_eq!(extract_domain("https://blog.example.com/post"), Some("blog.example.com".to_string()));
+        assert_eq!(
+            extract_domain("https://blog.example.com/post"),
+            Some("blog.example.com".to_string())
+        );
     }
 
     #[test]
@@ -556,7 +686,10 @@ mod tests {
 
     #[test]
     fn extract_domain_ip() {
-        assert_eq!(extract_domain("http://192.168.1.1/path"), Some("192.168.1.1".to_string()));
+        assert_eq!(
+            extract_domain("http://192.168.1.1/path"),
+            Some("192.168.1.1".to_string())
+        );
     }
 
     // --- next_cursor_from ---
@@ -564,10 +697,14 @@ mod tests {
     #[test]
     fn next_cursor_full_page() {
         let per_page: i64 = 3;
-        let items: Vec<EntrySummary> = (0..3).map(|i| {
-            let ts = Utc.timestamp_micros(1_700_000_000_000_000 + i as i64).unwrap();
-            mock_summary(Uuid::new_v4(), ts)
-        }).collect();
+        let items: Vec<EntrySummary> = (0..3)
+            .map(|i| {
+                let ts = Utc
+                    .timestamp_micros(1_700_000_000_000_000 + i as i64)
+                    .unwrap();
+                mock_summary(Uuid::new_v4(), ts)
+            })
+            .collect();
 
         let cursor = next_cursor_from(&items, per_page);
         assert!(cursor.is_some(), "full page should produce a cursor");
@@ -582,17 +719,27 @@ mod tests {
     #[test]
     fn next_cursor_partial_page() {
         let per_page: i64 = 10;
-        let items: Vec<EntrySummary> = (0..3).map(|i| {
-            let ts = Utc.timestamp_micros(1_700_000_000_000_000 + i as i64).unwrap();
-            mock_summary(Uuid::new_v4(), ts)
-        }).collect();
+        let items: Vec<EntrySummary> = (0..3)
+            .map(|i| {
+                let ts = Utc
+                    .timestamp_micros(1_700_000_000_000_000 + i as i64)
+                    .unwrap();
+                mock_summary(Uuid::new_v4(), ts)
+            })
+            .collect();
 
-        assert!(next_cursor_from(&items, per_page).is_none(), "partial page should return None");
+        assert!(
+            next_cursor_from(&items, per_page).is_none(),
+            "partial page should return None"
+        );
     }
 
     #[test]
     fn next_cursor_empty() {
         let items: Vec<EntrySummary> = vec![];
-        assert!(next_cursor_from(&items, 10).is_none(), "empty list should return None");
+        assert!(
+            next_cursor_from(&items, 10).is_none(),
+            "empty list should return None"
+        );
     }
 }

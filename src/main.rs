@@ -28,10 +28,12 @@ async fn main() {
         eprintln!("Database error: {e}");
         std::process::exit(1);
     });
-    lettura::db::run_migrations(&pool).await.unwrap_or_else(|e| {
-        eprintln!("Migration error: {e}");
-        std::process::exit(1);
-    });
+    lettura::db::run_migrations(&pool)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("Migration error: {e}");
+            std::process::exit(1);
+        });
 
     let (app, search_index, fetch_queue, storage) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
@@ -45,7 +47,9 @@ async fn main() {
     {
         let idx = search_index.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.search_commit_interval_secs));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                config.search_commit_interval_secs,
+            ));
             let mut consecutive_failures: u64 = 0;
             loop {
                 interval.tick().await;
@@ -71,11 +75,15 @@ async fn main() {
     {
         let cleanup_pool = pool.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.token_cleanup_interval_secs));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                config.token_cleanup_interval_secs,
+            ));
             loop {
                 interval.tick().await;
                 match lettura::models::user::cleanup_expired_refresh_tokens(&cleanup_pool).await {
-                    Ok(count) if count > 0 => tracing::info!(removed = count, "cleaned up expired refresh tokens"),
+                    Ok(count) if count > 0 => {
+                        tracing::info!(removed = count, "cleaned up expired refresh tokens")
+                    }
                     Err(e) => tracing::warn!("refresh token cleanup failed: {e}"),
                     _ => {}
                 }
@@ -90,23 +98,36 @@ async fn main() {
 
         let metrics_route = if let Some(ref token) = config.metrics_bearer_token {
             let token_clone = token.clone();
-            axum::Router::new().route(
-                "/metrics",
-                axum::routing::get(move || async move { recorder_handle.render() }),
-            ).layer(axum::middleware::from_fn(move |req: axum::extract::Request, next: axum::middleware::Next| {
-                let expected = token_clone.clone();
-                async move {
-                    let auth = req.headers().get("authorization")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.strip_prefix("Bearer "));
-                    match auth {
-                        Some(provided) if subtle::ConstantTimeEq::ct_eq(provided.as_bytes(), expected.as_bytes()).into() => {
-                            next.run(req).await
+            axum::Router::new()
+                .route(
+                    "/metrics",
+                    axum::routing::get(move || async move { recorder_handle.render() }),
+                )
+                .layer(axum::middleware::from_fn(
+                    move |req: axum::extract::Request, next: axum::middleware::Next| {
+                        let expected = token_clone.clone();
+                        async move {
+                            let auth = req
+                                .headers()
+                                .get("authorization")
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(|s| s.strip_prefix("Bearer "));
+                            match auth {
+                                Some(provided)
+                                    if subtle::ConstantTimeEq::ct_eq(
+                                        provided.as_bytes(),
+                                        expected.as_bytes(),
+                                    )
+                                    .into() =>
+                                {
+                                    next.run(req).await
+                                }
+                                _ => (axum::http::StatusCode::UNAUTHORIZED, "unauthorized")
+                                    .into_response(),
+                            }
                         }
-                        _ => (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response()
-                    }
-                }
-            }))
+                    },
+                ))
         } else {
             // No bearer token configured — metrics endpoint is not exposed
             axum::Router::new()
@@ -117,7 +138,8 @@ async fn main() {
         let search_idx = search_index.clone();
         let pool_for_metrics = pool.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.metrics_interval_secs));
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(config.metrics_interval_secs));
             loop {
                 interval.tick().await;
                 let depth = fetch_depth.load(Ordering::Relaxed) as f64;
@@ -133,9 +155,7 @@ async fn main() {
         tracing::info!("Prometheus metrics enabled at /metrics");
         metrics_route
             .merge(app)
-            .layer(axum::middleware::from_fn(
-                lettura::metrics::track_metrics,
-            ))
+            .layer(axum::middleware::from_fn(lettura::metrics::track_metrics))
     } else {
         app
     };
@@ -146,19 +166,22 @@ async fn main() {
 
     tracing::info!("listening on {}", config.listen_addr);
     let shutdown_idx = search_index.clone();
-    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-        .with_graceful_shutdown(async move {
-            shutdown_signal().await;
-            // Final flush so writes buffered since the last periodic commit
-            // are not lost when the process exits.
-            if let Err(e) = shutdown_idx.commit().await {
-                tracing::warn!("final search index commit failed: {e}");
-            } else {
-                tracing::info!("search index flushed on shutdown");
-            }
-        })
-        .await
-        .expect("server error");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        shutdown_signal().await;
+        // Final flush so writes buffered since the last periodic commit
+        // are not lost when the process exits.
+        if let Err(e) = shutdown_idx.commit().await {
+            tracing::warn!("final search index commit failed: {e}");
+        } else {
+            tracing::info!("search index flushed on shutdown");
+        }
+    })
+    .await
+    .expect("server error");
 }
 
 async fn shutdown_signal() {

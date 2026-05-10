@@ -21,7 +21,9 @@ async fn list_hits_entries_endpoint_with_limit_and_filter_query() {
         limit: Some(5),
         fields: None,
     };
-    let code = commands::list::run(&client, &args, OutputFormat::Json, false).await.unwrap();
+    let code = commands::list::run(&client, &args, OutputFormat::Json, false)
+        .await
+        .unwrap();
     assert_eq!(code, 0);
     m.assert();
 }

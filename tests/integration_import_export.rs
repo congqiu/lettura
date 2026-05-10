@@ -2,9 +2,13 @@ mod common;
 use serde_json::json;
 
 async fn get_token(app: &common::TestApp) -> String {
-    let res = app.client.post(app.url("/api/v1/auth/register"))
+    let res = app
+        .client
+        .post(app.url("/api/v1/auth/register"))
         .json(&json!({"username":"testuser","email":"test@example.com","password":"password123"}))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
     let body: serde_json::Value = res.json().await.unwrap();
     body["access_token"].as_str().unwrap().to_string()
 }
@@ -42,11 +46,15 @@ async fn import_browser_bookmarks() {
 <DT><A HREF="https://example.com/bookmark2">Bookmark 2</A>
 </DL>"#;
 
-    let res = app.client.post(app.url("/api/v1/import/browser"))
+    let res = app
+        .client
+        .post(app.url("/api/v1/import/browser"))
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "text/html")
         .body(html.to_string())
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 200);
     let body: serde_json::Value = res.json().await.unwrap();
@@ -61,14 +69,21 @@ async fn export_all_entries() {
     let token = get_token(&app).await;
 
     // Create an entry first
-    app.client.post(app.url("/api/v1/entries"))
+    app.client
+        .post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/exported"}))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
-    let res = app.client.get(app.url("/api/v1/export"))
+    let res = app
+        .client
+        .get(app.url("/api/v1/export"))
         .header("Authorization", format!("Bearer {}", token))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 200);
     let body: serde_json::Value = res.json().await.unwrap();
@@ -85,17 +100,26 @@ async fn rss_feed_with_valid_token() {
     let token = get_token(&app).await;
 
     // Create an entry
-    app.client.post(app.url("/api/v1/entries"))
+    app.client
+        .post(app.url("/api/v1/entries"))
         .header("Authorization", format!("Bearer {}", token))
         .json(&json!({"url": "https://example.com/rss-test"}))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     // Get user's feed token from DB
     let feed_token: (String,) = sqlx::query_as("SELECT feed_token FROM users LIMIT 1")
-        .fetch_one(&app.pool).await.unwrap();
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
 
-    let res = app.client.get(app.url(&format!("/feed/{}/unread", feed_token.0)))
-        .send().await.unwrap();
+    let res = app
+        .client
+        .get(app.url(&format!("/feed/{}/unread", feed_token.0)))
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 200);
     let body = res.text().await.unwrap();
@@ -109,8 +133,12 @@ async fn rss_feed_with_valid_token() {
 async fn rss_feed_invalid_token_returns_404() {
     let app = common::TestApp::new().await;
 
-    let res = app.client.get(app.url("/feed/invalid-token/unread"))
-        .send().await.unwrap();
+    let res = app
+        .client
+        .get(app.url("/feed/invalid-token/unread"))
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 404);
 
@@ -122,9 +150,13 @@ async fn admin_list_users() {
     let app = common::TestApp::new().await;
     let token = get_token(&app).await; // First user = admin
 
-    let res = app.client.get(app.url("/api/v1/admin/users"))
+    let res = app
+        .client
+        .get(app.url("/api/v1/admin/users"))
         .header("Authorization", format!("Bearer {}", token))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 200);
     let users: Vec<serde_json::Value> = res.json().await.unwrap();
@@ -141,9 +173,13 @@ async fn admin_reindex() {
     let app = common::TestApp::new().await;
     let token = get_token(&app).await;
 
-    let res = app.client.post(app.url("/api/v1/admin/reindex"))
+    let res = app
+        .client
+        .post(app.url("/api/v1/admin/reindex"))
         .header("Authorization", format!("Bearer {}", token))
-        .send().await.unwrap();
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(res.status(), 200);
     let body: serde_json::Value = res.json().await.unwrap();

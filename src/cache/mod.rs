@@ -3,10 +3,10 @@
 //! Provides user-scoped caching for frequently accessed data like tags,
 //! tagging rules, and site rules. Uses TTL-based expiration and LRU eviction.
 
-use std::time::Duration;
-use std::sync::Arc;
-use uuid::Uuid;
 use moka::future::Cache;
+use std::sync::Arc;
+use std::time::Duration;
+use uuid::Uuid;
 
 /// A cache keyed by user ID, storing per-user data.
 ///
@@ -66,34 +66,26 @@ impl<T: Clone + Send + Sync + 'static> UserCache<T> {
 // Cache instances for various data types
 // ============================================================================
 
+use crate::models::site_rule::SiteRule;
 use crate::models::tag::{Tag, TagStats};
 use crate::models::tagging_rule::TaggingRule;
-use crate::models::site_rule::SiteRule;
 
 /// Cache for user tags (5 minute TTL, 1000 users max).
 pub static TAG_CACHE: once_cell::sync::Lazy<Arc<UserCache<Tag>>> =
-    once_cell::sync::Lazy::new(|| {
-        Arc::new(UserCache::new(1000, Duration::from_secs(300)))
-    });
+    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
 
 /// Cache for tag stats (5 minute TTL, 1000 users max).
 pub static TAG_STATS_CACHE: once_cell::sync::Lazy<Arc<UserCache<TagStats>>> =
-    once_cell::sync::Lazy::new(|| {
-        Arc::new(UserCache::new(1000, Duration::from_secs(300)))
-    });
+    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
 
 /// Cache for tagging rules (5 minute TTL, 1000 users max).
 /// This is the highest priority cache as it's queried on every fetch.
 pub static TAGGING_RULE_CACHE: once_cell::sync::Lazy<Arc<UserCache<TaggingRule>>> =
-    once_cell::sync::Lazy::new(|| {
-        Arc::new(UserCache::new(1000, Duration::from_secs(300)))
-    });
+    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
 
 /// Cache for site rules (5 minute TTL, 500 users max).
 pub static SITE_RULE_CACHE: once_cell::sync::Lazy<Arc<UserCache<SiteRule>>> =
-    once_cell::sync::Lazy::new(|| {
-        Arc::new(UserCache::new(500, Duration::from_secs(300)))
-    });
+    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(500, Duration::from_secs(300))));
 
 #[cfg(test)]
 mod tests {
@@ -176,7 +168,9 @@ mod tests {
         let user1 = Uuid::new_v4();
         let user2 = Uuid::new_v4();
 
-        cache.insert(user1, vec![TestData { value: 10 }, TestData { value: 20 }]).await;
+        cache
+            .insert(user1, vec![TestData { value: 10 }, TestData { value: 20 }])
+            .await;
         cache.insert(user2, vec![TestData { value: 30 }]).await;
 
         let result1 = cache.get(user1).await.unwrap();

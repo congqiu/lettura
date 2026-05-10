@@ -2,8 +2,8 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use governor::{clock::DefaultClock, middleware::NoOpMiddleware, Quota, RateLimiter};
 use governor::state::keyed::DefaultKeyedStateStore;
+use governor::{Quota, RateLimiter, clock::DefaultClock, middleware::NoOpMiddleware};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
@@ -16,9 +16,9 @@ pub struct GlobalRateLimit {
 impl GlobalRateLimit {
     pub fn new(requests_per_minute: u32) -> Self {
         Self {
-            limiter: Arc::new(RateLimiter::keyed(
-                Quota::per_minute(NonZeroU32::new(requests_per_minute).expect("requests_per_minute must be > 0")),
-            )),
+            limiter: Arc::new(RateLimiter::keyed(Quota::per_minute(
+                NonZeroU32::new(requests_per_minute).expect("requests_per_minute must be > 0"),
+            ))),
             trust_proxy: false,
         }
     }
@@ -35,20 +35,25 @@ pub fn extract_client_ip(request: &Request, trust_proxy: bool) -> String {
             if let Ok(val) = xff.to_str() {
                 if let Some(ip) = val.split(',').next() {
                     let trimmed = ip.trim();
-                    if !trimmed.is_empty() { return trimmed.to_string(); }
+                    if !trimmed.is_empty() {
+                        return trimmed.to_string();
+                    }
                 }
             }
         }
         if let Some(xri) = request.headers().get("x-real-ip") {
             if let Ok(val) = xri.to_str() {
                 let trimmed = val.trim();
-                if !trimmed.is_empty() { return trimmed.to_string(); }
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
             }
         }
     }
     // Fallback: use the direct connection IP from Axum's ConnectInfo if available,
     // otherwise "unknown"
-    request.extensions()
+    request
+        .extensions()
         .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
         .map(|ci| ci.0.ip().to_string())
         .unwrap_or_else(|| "unknown".to_string())
@@ -64,7 +69,12 @@ pub async fn rate_limit_middleware(
         Ok(_) => next.run(req).await,
         Err(_) => {
             tracing::warn!(ip = %ip, "rate limit exceeded");
-            (StatusCode::TOO_MANY_REQUESTS, [(axum::http::header::RETRY_AFTER, "60")], "rate limit exceeded").into_response()
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(axum::http::header::RETRY_AFTER, "60")],
+                "rate limit exceeded",
+            )
+                .into_response()
         }
     }
 }
@@ -103,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_extract_client_ip_ignores_proxy_headers_when_not_trusted() {
-        let mut req = Request::builder()
+        let req = Request::builder()
             .header("x-forwarded-for", "1.2.3.4")
             .header("x-real-ip", "5.6.7.8")
             .body(axum::body::Body::empty())

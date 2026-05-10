@@ -15,12 +15,11 @@ async fn register_user(app: &common::TestApp, suffix: &str) -> uuid::Uuid {
         .await
         .unwrap();
 
-    let (user_id,): (uuid::Uuid,) =
-        sqlx::query_as("SELECT id FROM users WHERE email = $1")
-            .bind(format!("user_{suffix}@example.com"))
-            .fetch_one(&app.pool)
-            .await
-            .unwrap();
+    let (user_id,): (uuid::Uuid,) = sqlx::query_as("SELECT id FROM users WHERE email = $1")
+        .bind(format!("user_{suffix}@example.com"))
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
     user_id
 }
 

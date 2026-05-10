@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode, Uri};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 use rust_embed::{Embed, EmbeddedFile};
 
@@ -54,11 +54,7 @@ fn etag_of(file: &EmbeddedFile) -> String {
     format!("\"{}\"", hex::encode(hash))
 }
 
-fn build_asset_response(
-    path: &str,
-    file: EmbeddedFile,
-    req_headers: &HeaderMap,
-) -> Response {
+fn build_asset_response(path: &str, file: EmbeddedFile, req_headers: &HeaderMap) -> Response {
     let etag = etag_of(&file);
     let cache_control = cache_control_for(path);
 
@@ -69,7 +65,10 @@ fn build_asset_response(
                 .body(Body::empty())
                 .expect("NOT_MODIFIED response is always valid");
             let h = resp.headers_mut();
-            h.insert(header::ETAG, HeaderValue::from_str(&etag).expect("ETag is valid ASCII"));
+            h.insert(
+                header::ETAG,
+                HeaderValue::from_str(&etag).expect("ETag is valid ASCII"),
+            );
             h.insert(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static(cache_control),
@@ -88,7 +87,10 @@ fn build_asset_response(
         header::CONTENT_TYPE,
         HeaderValue::from_str(mime.as_ref()).expect("MIME type is valid ASCII"),
     );
-    h.insert(header::ETAG, HeaderValue::from_str(&etag).expect("ETag is valid ASCII"));
+    h.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag).expect("ETag is valid ASCII"),
+    );
     h.insert(
         header::CACHE_CONTROL,
         HeaderValue::from_static(cache_control),

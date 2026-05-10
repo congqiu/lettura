@@ -33,7 +33,13 @@ pub fn slugify(label: &str) -> String {
     label
         .to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string()
@@ -63,15 +69,31 @@ pub async fn list_tags_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, 
     Ok(tags)
 }
 
-pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Result<Tag, ModelError> {
+pub async fn find_or_create_tag(
+    pool: &PgPool,
+    user_id: Uuid,
+    label: &str,
+) -> Result<Tag, ModelError> {
     let slug = slugify(label);
-    if let Some(tag) = sqlx::query_as::<_, Tag>("SELECT * FROM tags WHERE user_id = $1 AND slug = $2")
-        .bind(user_id).bind(&slug).fetch_optional(pool).await.map_err(|e| ModelError::Database(e.to_string()))? {
+    if let Some(tag) =
+        sqlx::query_as::<_, Tag>("SELECT * FROM tags WHERE user_id = $1 AND slug = $2")
+            .bind(user_id)
+            .bind(&slug)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ModelError::Database(e.to_string()))?
+    {
         return Ok(tag);
     }
-    let tag = sqlx::query_as::<_, Tag>("INSERT INTO tags (user_id, label, slug) VALUES ($1, $2, $3) RETURNING *")
-        .bind(user_id).bind(label).bind(&slug).fetch_one(pool).await
-        .map_err(|e| ModelError::Database(e.to_string()))?;
+    let tag = sqlx::query_as::<_, Tag>(
+        "INSERT INTO tags (user_id, label, slug) VALUES ($1, $2, $3) RETURNING *",
+    )
+    .bind(user_id)
+    .bind(label)
+    .bind(&slug)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache since we added a new tag
     crate::cache::TAG_CACHE.invalidate(user_id).await;
@@ -80,17 +102,33 @@ pub async fn find_or_create_tag(pool: &PgPool, user_id: Uuid, label: &str) -> Re
     Ok(tag)
 }
 
-pub async fn add_tag_to_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, tag_id: Uuid) -> Result<(), ModelError> {
+pub async fn add_tag_to_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    tag_id: Uuid,
+) -> Result<(), ModelError> {
     sqlx::query("INSERT INTO entry_tags (entry_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-        .bind(entry_id).bind(tag_id).execute(pool).await
+        .bind(entry_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
     Ok(())
 }
 
-pub async fn remove_tag_from_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
+pub async fn remove_tag_from_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    tag_id: Uuid,
+) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM entry_tags WHERE entry_id = $1 AND tag_id = $2")
-        .bind(entry_id).bind(tag_id).execute(pool).await
+        .bind(entry_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() > 0 {
         crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
@@ -100,7 +138,10 @@ pub async fn remove_tag_from_entry(pool: &PgPool, user_id: Uuid, entry_id: Uuid,
 
 pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM tags WHERE id = $1 AND user_id = $2")
-        .bind(tag_id).bind(user_id).execute(pool).await
+        .bind(tag_id)
+        .bind(user_id)
+        .execute(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
 
     if result.rows_affected() > 0 {
@@ -219,14 +260,13 @@ pub async fn ensure_and_link(
     .await
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
-    let tag_id_vec: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM tags WHERE user_id = $1 AND slug = ANY($2)",
-    )
-    .bind(user_id)
-    .bind(&unique_slugs)
-    .fetch_all(&mut *tx)
-    .await
-    .map_err(|e| ModelError::Database(e.to_string()))?;
+    let tag_id_vec: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM tags WHERE user_id = $1 AND slug = ANY($2)")
+            .bind(user_id)
+            .bind(&unique_slugs)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Cross-product link, single statement. CROSS JOIN UNNEST builds the
     // cartesian product; ON CONFLICT skips already-linked pairs.
@@ -322,7 +362,9 @@ impl TagStats {
         }
 
         let stats = Self::list(pool, user_id).await?;
-        crate::cache::TAG_STATS_CACHE.insert(user_id, stats.clone()).await;
+        crate::cache::TAG_STATS_CACHE
+            .insert(user_id, stats.clone())
+            .await;
         Ok(stats)
     }
 }

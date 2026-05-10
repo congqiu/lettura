@@ -15,7 +15,12 @@ pub enum StorageError {
 #[async_trait]
 pub trait ImageStorage: Send + Sync {
     /// Store image data, returns the public URL to access it
-    async fn store(&self, key: &str, data: &[u8], content_type: &str) -> Result<String, StorageError>;
+    async fn store(
+        &self,
+        key: &str,
+        data: &[u8],
+        content_type: &str,
+    ) -> Result<String, StorageError>;
     /// Delete a stored image
     async fn delete(&self, key: &str) -> Result<(), StorageError>;
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StorageError>;
@@ -71,7 +76,10 @@ pub async fn download_image(url: &str, max_size: usize) -> Result<(Vec<u8>, Stri
         .map_err(|e| StorageError::Io(e.to_string()))?;
 
     if data.len() > max_size {
-        return Err(StorageError::Io(format!("image too large: {} bytes", data.len())));
+        return Err(StorageError::Io(format!(
+            "image too large: {} bytes",
+            data.len()
+        )));
     }
 
     Ok((data.to_vec(), content_type))
@@ -318,12 +326,18 @@ mod tests {
 
     #[test]
     fn url_extension_strips_query() {
-        assert_eq!(url_extension("https://example.com/img.png?w=200"), Some("png"));
+        assert_eq!(
+            url_extension("https://example.com/img.png?w=200"),
+            Some("png")
+        );
     }
 
     #[test]
     fn url_extension_strips_fragment() {
-        assert_eq!(url_extension("https://example.com/img.png#anchor"), Some("png"));
+        assert_eq!(
+            url_extension("https://example.com/img.png#anchor"),
+            Some("png")
+        );
     }
 
     #[test]
@@ -355,24 +369,36 @@ mod tests {
     #[test]
     fn image_key_content_type_overrides_url_ext() {
         let key = image_key_from_url("https://x.com/img.png", Some("image/gif"));
-        assert!(key.ends_with(".gif"), "expected key ending with .gif, got: {key}");
+        assert!(
+            key.ends_with(".gif"),
+            "expected key ending with .gif, got: {key}"
+        );
     }
 
     #[test]
     fn image_key_no_content_type_uses_url_ext() {
         let key = image_key_from_url("https://x.com/img.png", None);
-        assert!(key.ends_with(".png"), "expected key ending with .png, got: {key}");
+        assert!(
+            key.ends_with(".png"),
+            "expected key ending with .png, got: {key}"
+        );
     }
 
     #[test]
     fn image_key_no_ext_defaults_to_jpg() {
         let key = image_key_from_url("https://x.com/img", None);
-        assert!(key.ends_with(".jpg"), "expected key ending with .jpg, got: {key}");
+        assert!(
+            key.ends_with(".jpg"),
+            "expected key ending with .jpg, got: {key}"
+        );
     }
 
     #[test]
     fn image_key_starts_with_images_prefix() {
         let key = image_key_from_url("https://x.com/img.png", None);
-        assert!(key.starts_with("images/"), "expected key starting with images/, got: {key}");
+        assert!(
+            key.starts_with("images/"),
+            "expected key starting with images/, got: {key}"
+        );
     }
 }

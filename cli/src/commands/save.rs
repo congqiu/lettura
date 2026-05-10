@@ -17,7 +17,8 @@ pub async fn run(client: &ApiClient, args: &SaveArgs) -> Result<i32, CliError> {
     }
 
     // --wait: poll GET /entries/{id} up to 30s until content is populated.
-    let id = resp["id"].as_str()
+    let id = resp["id"]
+        .as_str()
         .ok_or_else(|| CliError::ServerError("missing id in create response".into()))?
         .to_string();
 
@@ -29,10 +30,9 @@ pub async fn run(client: &ApiClient, args: &SaveArgs) -> Result<i32, CliError> {
                 "save queued but not ready after 30s; try `lettura-cli get {id}` later"
             )));
         }
-        let entry: serde_json::Value = client
-            .get(&format!("/api/v1/entries/{id}"), &[])
-            .await?;
-        let has_content = entry.get("content")
+        let entry: serde_json::Value = client.get(&format!("/api/v1/entries/{id}"), &[]).await?;
+        let has_content = entry
+            .get("content")
             .and_then(|c| c.as_str())
             .map(|s| !s.is_empty())
             .unwrap_or(false);

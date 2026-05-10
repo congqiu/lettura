@@ -290,12 +290,8 @@ async fn save(
     }
 
     // Queue async image processing job
-    if let Err(e) = crate::models::image_process_job::create(
-        &ctx.pool,
-        job.entry_id,
-        &result.content,
-    )
-    .await
+    if let Err(e) =
+        crate::models::image_process_job::create(&ctx.pool, job.entry_id, &result.content).await
     {
         tracing::warn!(
             entry_id = %job.entry_id,
@@ -365,7 +361,9 @@ async fn apply_tagging_rules(
                 if let Ok(tag) =
                     crate::models::tag::find_or_create_tag(pool, user_id, tag_label).await
                 {
-                    if let Err(e) = crate::models::tag::add_tag_to_entry(pool, user_id, entry_id, tag.id).await {
+                    if let Err(e) =
+                        crate::models::tag::add_tag_to_entry(pool, user_id, entry_id, tag.id).await
+                    {
                         tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
                     }
                 }
@@ -413,10 +411,7 @@ async fn try_render_then_extract(
         return false;
     };
     let wait_for = sc.render.wait_for.as_deref();
-    let timeout_override = sc
-        .render
-        .timeout_ms
-        .map(std::time::Duration::from_millis);
+    let timeout_override = sc.render.timeout_ms.map(std::time::Duration::from_millis);
     tracing::info!(entry_id = %job.entry_id, "invoking render fallback");
     match rs.render(&job.url, wait_for, timeout_override).await {
         Ok(html) => {

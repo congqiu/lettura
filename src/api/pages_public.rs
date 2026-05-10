@@ -2,12 +2,12 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use hmac::{Hmac, Mac};
-use sha2::Sha256;
 use serde::Deserialize;
+use sha2::Sha256;
 use sqlx;
 
-use crate::state::AppState;
 use crate::models::page;
+use crate::state::AppState;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -34,12 +34,16 @@ fn verify_cookie(jwt_secret: &str, slug: &str, value: &str) -> bool {
 
 fn get_cookie_value(headers: &HeaderMap, slug: &str) -> Option<String> {
     let cookie_name = format!("page_auth_{}", slug);
-    headers.get("cookie").and_then(|v| v.to_str().ok()).and_then(|cookies| {
-        cookies.split(';')
-            .map(|c| c.trim())
-            .find(|c| c.starts_with(&format!("{}=", cookie_name)))
-            .map(|c| c[cookie_name.len() + 1..].to_string())
-    })
+    headers
+        .get("cookie")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|cookies| {
+            cookies
+                .split(';')
+                .map(|c| c.trim())
+                .find(|c| c.starts_with(&format!("{}=", cookie_name)))
+                .map(|c| c[cookie_name.len() + 1..].to_string())
+        })
 }
 
 pub async fn serve_page(
@@ -57,7 +61,14 @@ pub async fn serve_page_file(
     Query(params): Query<ShareQueryParams>,
     headers: HeaderMap,
 ) -> Response {
-    serve_page_file_inner(&state, &slug, Some(&file), params.password.as_deref(), &headers).await
+    serve_page_file_inner(
+        &state,
+        &slug,
+        Some(&file),
+        params.password.as_deref(),
+        &headers,
+    )
+    .await
 }
 
 async fn serve_page_file_inner(
@@ -69,7 +80,13 @@ async fn serve_page_file_inner(
 ) -> Response {
     let page_record = match page::find_page_by_slug(&state.pool, slug).await {
         Ok(Some(p)) => p,
-        _ => return render_status_page(StatusCode::NOT_FOUND, "页面不存在", "该分享链接无效或已被删除"),
+        _ => {
+            return render_status_page(
+                StatusCode::NOT_FOUND,
+                "页面不存在",
+                "该分享链接无效或已被删除",
+            );
+        }
     };
 
     if let Some(expires) = page_record.expires_at {
@@ -80,14 +97,20 @@ async fn serve_page_file_inner(
 
     if page_record.password.is_some() {
         let (authenticated, needs_upgrade) = if let Some(pw) = query_password {
-            let stored = page_record.password.as_ref().expect("password is Some when is_some() is true");
+            let stored = page_record
+                .password
+                .as_ref()
+                .expect("password is Some when is_some() is true");
             let ok = crate::auth::password::verify_page_password(pw, stored).is_ok();
             // Lazy upgrade: mark if stored password is plaintext and auth succeeded
             (ok, ok && !stored.starts_with("$argon2"))
         } else {
-            (get_cookie_value(headers, slug)
-                .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
-                .unwrap_or(false), false)
+            (
+                get_cookie_value(headers, slug)
+                    .map(|v| verify_cookie(&state.config.jwt_secret, slug, &v))
+                    .unwrap_or(false),
+                false,
+            )
         };
         if !authenticated {
             return render_password_page(slug, false);
@@ -97,8 +120,10 @@ async fn serve_page_file_inner(
             if let Some(pw) = query_password {
                 if let Ok(hashed) = crate::auth::password::hash_page_password(pw) {
                     let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
-                        .bind(&hashed).bind(page_record.id)
-                        .execute(&state.pool).await;
+                        .bind(&hashed)
+                        .bind(page_record.id)
+                        .execute(&state.pool)
+                        .await;
                 }
             }
         }
@@ -164,36 +189,38 @@ pub async fn auth_page(
 
     match &page_record.password {
         Some(stored_password) => {
-            if crate::auth::password::verify_page_password(&form.password, stored_password).is_ok() {
+            if crate::auth::password::verify_page_password(&form.password, stored_password).is_ok()
+            {
                 // Lazy upgrade: if the stored password is plaintext, hash it now
                 if !stored_password.starts_with("$argon2") {
                     if let Ok(hashed) = crate::auth::password::hash_page_password(&form.password) {
                         let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
-                            .bind(&hashed).bind(page_record.id)
-                            .execute(&state.pool).await;
+                            .bind(&hashed)
+                            .bind(page_record.id)
+                            .execute(&state.pool)
+                            .await;
                     }
                 }
                 let sig = sign_cookie(&state.config.jwt_secret, &slug);
-                let secure_flag = if state.config.production { "; Secure" } else { "" };
+                let secure_flag = if state.config.production {
+                    "; Secure"
+                } else {
+                    ""
+                };
                 let cookie = format!(
                     "page_auth_{}={}; Path=/p/{}; Max-Age=86400; HttpOnly; SameSite=Lax{}",
                     slug, sig, slug, secure_flag
                 );
                 (
                     StatusCode::FOUND,
-                    [
-                        ("location", format!("/p/{}", slug)),
-                        ("set-cookie", cookie),
-                    ],
-                ).into_response()
+                    [("location", format!("/p/{}", slug)), ("set-cookie", cookie)],
+                )
+                    .into_response()
             } else {
                 render_password_page(&slug, true)
             }
         }
-        None => (
-            StatusCode::FOUND,
-            [("location", format!("/p/{}", slug))],
-        ).into_response(),
+        None => (StatusCode::FOUND, [("location", format!("/p/{}", slug))]).into_response(),
     }
 }
 
@@ -219,7 +246,11 @@ p{{font-size:14px;color:#6b7280;margin:0}}
 <p>{message}</p>
 <p class="code">{status_code}</p>
 </div></body></html>"#,
-        if status_code == 410 { "icon-expired" } else { "icon-missing" },
+        if status_code == 410 {
+            "icon-expired"
+        } else {
+            "icon-missing"
+        },
         if status_code == 410 {
             r##"<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>"##
         } else {
@@ -229,11 +260,7 @@ p{{font-size:14px;color:#6b7280;margin:0}}
         message = message,
         status_code = status_code,
     );
-    (
-        status,
-        [("content-type", "text/html; charset=utf-8")],
-        html,
-    ).into_response()
+    (status, [("content-type", "text/html; charset=utf-8")], html).into_response()
 }
 
 fn render_password_page(slug: &str, error: bool) -> Response {
@@ -266,7 +293,8 @@ button:hover{{background:#2563eb}}
         StatusCode::OK,
         [("content-type", "text/html; charset=utf-8")],
         html,
-    ).into_response()
+    )
+        .into_response()
 }
 
 fn mime_for_file(name: &str) -> &'static str {
@@ -346,15 +374,27 @@ mod tests {
     #[test]
     fn single_cookie_found() {
         let mut headers = HeaderMap::new();
-        headers.insert("cookie", HeaderValue::from_static("page_auth_abc=signature123"));
-        assert_eq!(get_cookie_value(&headers, "abc"), Some("signature123".to_string()));
+        headers.insert(
+            "cookie",
+            HeaderValue::from_static("page_auth_abc=signature123"),
+        );
+        assert_eq!(
+            get_cookie_value(&headers, "abc"),
+            Some("signature123".to_string())
+        );
     }
 
     #[test]
     fn cookie_in_middle_of_multiple() {
         let mut headers = HeaderMap::new();
-        headers.insert("cookie", HeaderValue::from_static("theme=dark; page_auth_abc=signature123; lang=en"));
-        assert_eq!(get_cookie_value(&headers, "abc"), Some("signature123".to_string()));
+        headers.insert(
+            "cookie",
+            HeaderValue::from_static("theme=dark; page_auth_abc=signature123; lang=en"),
+        );
+        assert_eq!(
+            get_cookie_value(&headers, "abc"),
+            Some("signature123".to_string())
+        );
     }
 
     #[test]
@@ -422,7 +462,10 @@ mod tests {
 
     #[test]
     fn mime_webmanifest() {
-        assert_eq!(mime_for_file("manifest.webmanifest"), "application/manifest+json");
+        assert_eq!(
+            mime_for_file("manifest.webmanifest"),
+            "application/manifest+json"
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use std::io::Write;
 use serde::Serialize;
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static QUIET: AtomicBool = AtomicBool::new(false);
@@ -26,7 +26,7 @@ pub fn emit_json<T: Serialize>(v: &T, pretty: bool) -> anyhow::Result<()> {
 }
 
 /// Emit IDs to stdout. Core command output — not affected by --quiet.
-pub fn emit_ids<I: IntoIterator<Item = uuid::Uuid>>(ids: I) -> anyhow::Result<()> {
+pub fn emit_ids<I: IntoIterator<Item: std::fmt::Display>>(ids: I) -> anyhow::Result<()> {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
     for id in ids {
@@ -64,13 +64,23 @@ pub fn emit_human_audit_logs(
 ) -> anyhow::Result<()> {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
-    writeln!(lock, "Showing {}-{} of {} audit logs", offset + 1, (offset + limit).min(total), total)?;
+    writeln!(
+        lock,
+        "Showing {}-{} of {} audit logs",
+        offset + 1,
+        (offset + limit).min(total),
+        total
+    )?;
     for log in logs {
-        let ts = log.created_at.map(|d| d.to_rfc3339()).unwrap_or_default();
+        let ts = log.created_at.as_deref().unwrap_or("-");
         let action = &log.action;
         let resource = log.resource_type.as_deref().unwrap_or("-");
         let status = &log.status;
-        writeln!(lock, "{} | {} | {} | {} | {}", log.id, ts, action, resource, status)?;
+        writeln!(
+            lock,
+            "{} | {} | {} | {} | {}",
+            log.id, ts, action, resource, status
+        )?;
     }
     Ok(())
 }
@@ -81,4 +91,3 @@ pub fn info(msg: &str) {
         let _ = writeln!(std::io::stdout().lock(), "{msg}");
     }
 }
-

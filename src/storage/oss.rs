@@ -52,7 +52,12 @@ impl OssStorage {
 
 #[async_trait]
 impl ImageStorage for OssStorage {
-    async fn store(&self, key: &str, data: &[u8], content_type: &str) -> Result<String, StorageError> {
+    async fn store(
+        &self,
+        key: &str,
+        data: &[u8],
+        content_type: &str,
+    ) -> Result<String, StorageError> {
         self.bucket
             .put_object_with_content_type(key, data, content_type)
             .await
@@ -84,12 +89,15 @@ impl ImageStorage for OssStorage {
     }
 
     async fn delete_prefix(&self, prefix: &str) -> Result<(), StorageError> {
-        let results = self.bucket.list(prefix.to_string(), Some("/".to_string()))
+        let results = self
+            .bucket
+            .list(prefix.to_string(), Some("/".to_string()))
             .await
             .map_err(|e| StorageError::Io(e.to_string()))?;
         for list_result in results {
             for obj in list_result.contents {
-                self.bucket.delete_object(&obj.key)
+                self.bucket
+                    .delete_object(&obj.key)
                     .await
                     .map_err(|e| StorageError::Upload(e.to_string()))?;
             }
@@ -106,7 +114,9 @@ mod tests {
 
     #[test]
     fn not_found_no_such_key() {
-        assert!(is_not_found_error("no such key: The specified key does not exist"));
+        assert!(is_not_found_error(
+            "no such key: The specified key does not exist"
+        ));
         assert!(is_not_found_error("No such key"));
         assert!(is_not_found_error("NO SUCH KEY"));
     }

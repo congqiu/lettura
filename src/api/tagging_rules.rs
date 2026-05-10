@@ -1,13 +1,13 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::tagging_rule::{self, CreateTaggingRule, UpdateTaggingRule};
+use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
@@ -33,7 +33,8 @@ pub async fn create_rule(
         Some(AuditResourceType::TaggingRule),
         Some(rule.id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(rule))
 }
 
@@ -52,7 +53,8 @@ pub async fn update_rule(
         Some(AuditResourceType::TaggingRule),
         Some(rule_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(updated))
 }
 
@@ -73,7 +75,8 @@ pub async fn delete_rule(
         Some(AuditResourceType::TaggingRule),
         Some(rule_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 

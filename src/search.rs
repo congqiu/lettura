@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, Occur, QueryParser, TermQuery};
 use tantivy::schema::*;
-use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy};
+use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy, doc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -140,9 +140,15 @@ impl SearchIndex {
 
     /// Search and return matching entry UUIDs.
     /// Uses fuzzy matching so partial terms match (e.g., "n" matches "n8n", "rus" matches "rust").
-    pub fn search(&self, query_str: &str, user_id: Option<Uuid>, limit: usize) -> Result<Vec<Uuid>, tantivy::TantivyError> {
+    pub fn search(
+        &self,
+        query_str: &str,
+        user_id: Option<Uuid>,
+        limit: usize,
+    ) -> Result<Vec<Uuid>, tantivy::TantivyError> {
         let searcher = self.reader.searcher();
-        let mut query_parser = QueryParser::for_index(&self.index, vec![self.f_title, self.f_content]);
+        let mut query_parser =
+            QueryParser::for_index(&self.index, vec![self.f_title, self.f_content]);
 
         // Enable fuzzy matching on both fields so partial terms match.
         // transposition_cost_one=true and prefix_length=0 mean the entire term is fuzzy.
@@ -211,8 +217,26 @@ mod tests {
         let id2 = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id1, uid, "Rust Ownership", "Learn about ownership and borrowing in Rust", "https://example.com/rust", "example.com").await.unwrap();
-        idx.upsert(id2, uid, "Python Guide", "A beginner guide to Python programming", "https://example.com/python", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid,
+            "Rust Ownership",
+            "Learn about ownership and borrowing in Rust",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid,
+            "Python Guide",
+            "A beginner guide to Python programming",
+            "https://example.com/python",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
@@ -232,8 +256,26 @@ mod tests {
         let id = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id, uid, "Old Title", "old content", "https://example.com", "example.com").await.unwrap();
-        idx.upsert(id, uid, "New Title", "new content about Rust", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "Old Title",
+            "old content",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "New Title",
+            "new content about Rust",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
@@ -252,7 +294,16 @@ mod tests {
         let id = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id, uid, "Title", "searchable content", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "Title",
+            "searchable content",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reader.reload().unwrap();
         assert_eq!(idx.search("searchable", Some(uid), 10).unwrap().len(), 1);
@@ -271,8 +322,26 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        idx.upsert(id1, uid1, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
-        idx.upsert(id2, uid2, "Rust Guide", "Another Rust tutorial", "https://example.com/rust2", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid1,
+            "Rust Guide",
+            "Learn Rust programming",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid2,
+            "Rust Guide",
+            "Another Rust tutorial",
+            "https://example.com/rust2",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
@@ -296,26 +365,60 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        idx.upsert(id1, uid, "n8n workflow automation", "Automate tasks with n8n", "https://n8n.io", "n8n.io").await.unwrap();
-        idx.upsert(id2, uid, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid,
+            "n8n workflow automation",
+            "Automate tasks with n8n",
+            "https://n8n.io",
+            "n8n.io",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid,
+            "Rust Guide",
+            "Learn Rust programming",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
 
         idx.reader.reload().unwrap();
 
         // "n" should match "n8n" via fuzzy matching (edit distance 1)
         let results = idx.search("n", Some(uid), 10).unwrap();
-        assert!(results.contains(&id1), "'n' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         // "n8" should also match "n8n"
         let results = idx.search("n8", Some(uid), 10).unwrap();
-        assert!(results.contains(&id1), "'n8' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n8' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         // Full term still works
         let results = idx.search("n8n", Some(uid), 10).unwrap();
-        assert!(results.contains(&id1), "'n8n' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n8n' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         // "Rus" should match "Rust" via fuzzy
         let results = idx.search("Rus", Some(uid), 10).unwrap();
-        assert!(results.contains(&id2), "'Rus' should match 'Rust' entry, got {:?}", results);
+        assert!(
+            results.contains(&id2),
+            "'Rus' should match 'Rust' entry, got {:?}",
+            results
+        );
     }
 }

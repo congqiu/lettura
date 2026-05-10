@@ -22,7 +22,10 @@ pub fn run_install(path: Option<&str>) -> Result<i32, CliError> {
         None => {
             let base = directories::BaseDirs::new()
                 .ok_or_else(|| CliError::BadArgs("no home directory available".into()))?;
-            base.home_dir().join(".claude").join("skills").join(SKILL_NAME)
+            base.home_dir()
+                .join(".claude")
+                .join("skills")
+                .join(SKILL_NAME)
         }
     };
     if let Some(parent) = target.parent() {

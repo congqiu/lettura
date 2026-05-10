@@ -11,8 +11,8 @@ use std::env;
 pub fn parse_config(domain: &str, content: &str) -> Result<SiteConfig, String> {
     let substituted = substitute_env(content);
 
-    let mut config: SiteConfig = serde_yaml::from_str(&substituted)
-        .map_err(|e| format!("invalid YAML: {}", e))?;
+    let mut config: SiteConfig =
+        serde_yaml::from_str(&substituted).map_err(|e| format!("invalid YAML: {}", e))?;
     config.domain = domain.to_string();
     Ok(config)
 }
@@ -135,7 +135,9 @@ render:
     #[test]
     fn env_placeholder_substituted_when_set() {
         // SAFETY: tests run with --test-threads=1 via .cargo/config.toml
-        unsafe { env::set_var("TEST_COOKIE_TOKEN", "secret-value"); }
+        unsafe {
+            env::set_var("TEST_COOKIE_TOKEN", "secret-value");
+        }
         let yaml = r#"
 request:
   cookies:
@@ -146,12 +148,16 @@ request:
             config.request.cookies.get("auth"),
             Some(&"secret-value".to_string())
         );
-        unsafe { env::remove_var("TEST_COOKIE_TOKEN"); }
+        unsafe {
+            env::remove_var("TEST_COOKIE_TOKEN");
+        }
     }
 
     #[test]
     fn env_placeholder_kept_verbatim_when_unset() {
-        unsafe { env::remove_var("DEFINITELY_UNSET_VAR_XYZ"); }
+        unsafe {
+            env::remove_var("DEFINITELY_UNSET_VAR_XYZ");
+        }
         let yaml = r#"
 request:
   cookies:

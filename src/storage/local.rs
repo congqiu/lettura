@@ -17,7 +17,12 @@ impl LocalStorage {
 
 #[async_trait]
 impl ImageStorage for LocalStorage {
-    async fn store(&self, key: &str, data: &[u8], _content_type: &str) -> Result<String, StorageError> {
+    async fn store(
+        &self,
+        key: &str,
+        data: &[u8],
+        _content_type: &str,
+    ) -> Result<String, StorageError> {
         let file_path = self.base_path.join(key);
 
         // Ensure parent directory exists
@@ -62,7 +67,10 @@ mod tests {
     async fn test_store_and_get() {
         let dir = TempDir::new().unwrap();
         let storage = LocalStorage::new(dir.path().to_str().unwrap());
-        storage.store("test/hello.txt", b"hello world", "text/plain").await.unwrap();
+        storage
+            .store("test/hello.txt", b"hello world", "text/plain")
+            .await
+            .unwrap();
         let data = storage.get("test/hello.txt").await.unwrap();
         assert_eq!(data, Some(b"hello world".to_vec()));
     }
@@ -81,7 +89,10 @@ mod tests {
         let storage = LocalStorage::new(dir.path().to_str().unwrap());
 
         // Store a file first
-        storage.store("delete_me.txt", b"to be deleted", "text/plain").await.unwrap();
+        storage
+            .store("delete_me.txt", b"to be deleted", "text/plain")
+            .await
+            .unwrap();
 
         // Verify it exists
         let data = storage.get("delete_me.txt").await.unwrap();
@@ -103,7 +114,10 @@ mod tests {
         // Deleting a non-existent key should return an error (file not found),
         // not panic or return Ok.
         let result = storage.delete("ghost.txt").await;
-        assert!(result.is_err(), "deleting a nonexistent file should return an error");
+        assert!(
+            result.is_err(),
+            "deleting a nonexistent file should return an error"
+        );
     }
 
     #[tokio::test]
@@ -112,14 +126,20 @@ mod tests {
         let storage = LocalStorage::new(dir.path().to_str().unwrap());
 
         // Store with a nested key that requires subdirectory creation
-        storage.store("subdir/nested/file.txt", b"deep content", "text/plain").await.unwrap();
+        storage
+            .store("subdir/nested/file.txt", b"deep content", "text/plain")
+            .await
+            .unwrap();
 
         // Verify retrieval works
         let data = storage.get("subdir/nested/file.txt").await.unwrap();
         assert_eq!(data, Some(b"deep content".to_vec()));
 
         // Verify the URL format
-        let url = storage.store("subdir/nested/file.txt", b"deep content", "text/plain").await.unwrap();
+        let url = storage
+            .store("subdir/nested/file.txt", b"deep content", "text/plain")
+            .await
+            .unwrap();
         assert_eq!(url, "/storage/subdir/nested/file.txt");
     }
 }

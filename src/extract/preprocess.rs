@@ -4,9 +4,18 @@ use scraper::{Html, Selector};
 
 static REMOVE_TAGS: Lazy<Vec<Selector>> = Lazy::new(|| {
     [
-        "script", "style", "noscript", "iframe", "object", "embed",
-        "applet", "nav", "footer", "aside",
-        "link[rel=stylesheet]", "meta[http-equiv=refresh]",
+        "script",
+        "style",
+        "noscript",
+        "iframe",
+        "object",
+        "embed",
+        "applet",
+        "nav",
+        "footer",
+        "aside",
+        "link[rel=stylesheet]",
+        "meta[http-equiv=refresh]",
     ]
     .iter()
     .filter_map(|s| Selector::parse(s).ok())
@@ -14,12 +23,13 @@ static REMOVE_TAGS: Lazy<Vec<Selector>> = Lazy::new(|| {
 });
 
 static HIDDEN_SELECTOR: Lazy<Selector> = Lazy::new(|| {
-    Selector::parse("[style*='display:none'], [style*='display: none'], [aria-hidden='true'], [hidden]").unwrap()
+    Selector::parse(
+        "[style*='display:none'], [style*='display: none'], [aria-hidden='true'], [hidden]",
+    )
+    .unwrap()
 });
 
-static COMMENT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"<!--[\s\S]*?-->").unwrap()
-});
+static COMMENT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<!--[\s\S]*?-->").unwrap());
 
 /// Preprocess HTML: remove script, style, hidden elements, comments, etc.
 pub fn preprocess(html: &str) -> String {
@@ -160,7 +170,10 @@ mod tests {
         let html = r#"<html><body><p>Visible</p><div style="display:none">Hidden</div><div aria-hidden="true">Also hidden</div></body></html>"#;
         let result = preprocess(html);
         assert!(result.contains("Visible"));
-        assert!(!result.contains("Hidden"), "hidden elements should be removed");
+        assert!(
+            !result.contains("Hidden"),
+            "hidden elements should be removed"
+        );
     }
 
     #[test]
@@ -176,7 +189,10 @@ mod tests {
     fn removes_html_comments() {
         let html = r#"<html><body><!-- comment --><p>Text</p></body></html>"#;
         let result = preprocess(html);
-        assert!(!result.contains("comment"), "HTML comments should be removed");
+        assert!(
+            !result.contains("comment"),
+            "HTML comments should be removed"
+        );
         assert!(result.contains("Text"));
     }
 }

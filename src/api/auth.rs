@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::{ConnectInfo, State};
 use axum::http::HeaderMap;
-use axum::Json;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -10,16 +10,20 @@ use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::jwt;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::auth::password;
 use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceType};
 use crate::models::user;
+use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
 /// Extract client IP from headers (X-Forwarded-For / X-Real-IP) or
 /// fall back to ConnectInfo. Truncates to 45 chars for storage safety.
-fn extract_ip(headers: &HeaderMap, trust_proxy: bool, peer_addr: Option<&SocketAddr>) -> Option<String> {
+fn extract_ip(
+    headers: &HeaderMap,
+    trust_proxy: bool,
+    peer_addr: Option<&SocketAddr>,
+) -> Option<String> {
     if trust_proxy {
         if let Some(xff) = headers.get("x-forwarded-for") {
             if let Ok(val) = xff.to_str() {
@@ -45,7 +49,8 @@ fn extract_ip(headers: &HeaderMap, trust_proxy: bool, peer_addr: Option<&SocketA
 
 /// Extract User-Agent header, truncated to 255 chars.
 fn extract_ua(headers: &HeaderMap) -> Option<String> {
-    headers.get("user-agent")
+    headers
+        .get("user-agent")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.chars().take(255).collect())
 }
@@ -99,8 +104,14 @@ pub async fn register(
     let user_count = user::count_users(&state.pool).await?;
     let is_admin = user_count == 0;
 
-    let new_user =
-        user::create_user(&state.pool, &req.username, &req.email, &req.password, is_admin).await?;
+    let new_user = user::create_user(
+        &state.pool,
+        &req.username,
+        &req.email,
+        &req.password,
+        is_admin,
+    )
+    .await?;
 
     tracing::info!(user_id = %new_user.id, "user registered");
 
@@ -114,11 +125,16 @@ pub async fn register(
         Some(AuditResourceType::User),
         Some(new_user.id),
         serde_json::to_value(AuditDetails {
-            after: Some(serde_json::json!({"username": new_user.username, "email": new_user.email})),
+            after: Some(
+                serde_json::json!({"username": new_user.username, "email": new_user.email}),
+            ),
             ..Default::default()
-        }).unwrap_or_default(),
-        ip, ua,
-    ).await;
+        })
+        .unwrap_or_default(),
+        ip,
+        ua,
+    )
+    .await;
 
     issue_tokens(&state, new_user.id, new_user.is_admin, None).await
 }
@@ -139,32 +155,43 @@ pub async fn login(
             let ip = extract_ip(&headers, state.config.trust_proxy, Some(&addr));
             let ua = extract_ua(&headers);
             audit_log::log_success_with_context(
-                &state.pool, None, "jwt".to_string(),
-                AuditAction::Login, None, None,
+                &state.pool,
+                None,
+                "jwt".to_string(),
+                AuditAction::Login,
+                None,
+                None,
                 serde_json::json!({"email": req.email, "reason": "user_not_found"}),
-                ip, ua,
-            ).await;
+                ip,
+                ua,
+            )
+            .await;
             return Err(ApiError::Unauthorized("邮箱或密码错误".to_string()));
         }
     };
 
     let ci = Some(addr);
-    password::verify_password(&req.password, &found.password_hash)
-        .map_err(|_| {
-            let ip = extract_ip(&headers, state.config.trust_proxy, ci.as_ref());
-            let ua = extract_ua(&headers);
-            let pool = state.pool.clone();
-            let email = req.email.clone();
-            tokio::spawn(async move {
-                audit_log::log_success_with_context(
-                    &pool, None, "jwt".to_string(),
-                    AuditAction::Login, None, None,
-                    serde_json::json!({"email": email, "reason": "wrong_password"}),
-                    ip, ua,
-                ).await;
-            });
-            ApiError::Unauthorized("邮箱或密码错误".to_string())
-        })?;
+    password::verify_password(&req.password, &found.password_hash).map_err(|_| {
+        let ip = extract_ip(&headers, state.config.trust_proxy, ci.as_ref());
+        let ua = extract_ua(&headers);
+        let pool = state.pool.clone();
+        let email = req.email.clone();
+        tokio::spawn(async move {
+            audit_log::log_success_with_context(
+                &pool,
+                None,
+                "jwt".to_string(),
+                AuditAction::Login,
+                None,
+                None,
+                serde_json::json!({"email": email, "reason": "wrong_password"}),
+                ip,
+                ua,
+            )
+            .await;
+        });
+        ApiError::Unauthorized("邮箱或密码错误".to_string())
+    })?;
 
     tracing::info!(user_id = %found.id, "user logged in");
 
@@ -178,8 +205,10 @@ pub async fn login(
         Some(AuditResourceType::User),
         Some(found.id),
         serde_json::json!({}),
-        ip, ua,
-    ).await;
+        ip,
+        ua,
+    )
+    .await;
 
     issue_tokens(&state, found.id, found.is_admin, None).await
 }
@@ -237,7 +266,8 @@ pub async fn logout(
         Some(AuditResourceType::User),
         Some(auth.user_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(MessageResponse {
         message: "logged out".to_string(),
@@ -258,7 +288,14 @@ async fn issue_tokens(
     let expires_at = Utc::now() + Duration::days(30);
     let family = existing_family.unwrap_or_else(uuid::Uuid::new_v4);
 
-    user::store_refresh_token(&state.pool, user_id, &refresh_token_hash, expires_at, family).await?;
+    user::store_refresh_token(
+        &state.pool,
+        user_id,
+        &refresh_token_hash,
+        expires_at,
+        family,
+    )
+    .await?;
 
     Ok(Json(AuthResponse {
         access_token,
@@ -287,9 +324,12 @@ pub async fn regenerate_feed_token(
         Some(AuditResourceType::User),
         Some(auth.user_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(FeedTokenResponse { feed_token: new_token }))
+    Ok(Json(FeedTokenResponse {
+        feed_token: new_token,
+    }))
 }
 
 #[derive(Serialize)]
@@ -305,13 +345,12 @@ pub async fn me(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<MeResponse>, ApiError> {
-    let (username, email): (String, String) = sqlx::query_as(
-        "SELECT username, email FROM users WHERE id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let (username, email): (String, String) =
+        sqlx::query_as("SELECT username, email FROM users WHERE id = $1")
+            .bind(auth.user_id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let auth_source = match auth.source {
         crate::auth::middleware::AuthSource::Jwt => "jwt",
@@ -367,7 +406,8 @@ pub async fn change_password(
         Some(AuditResourceType::User),
         Some(auth.user_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(MessageResponse {
         message: "password changed".to_string(),
@@ -397,7 +437,10 @@ mod tests {
     #[test]
     fn extract_ip_trust_proxy_xff_multiple() {
         let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-for", HeaderValue::from_static("  1.2.3.4 , 5.6.7.8 , 9.10.11.12 "));
+        headers.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("  1.2.3.4 , 5.6.7.8 , 9.10.11.12 "),
+        );
         let result = extract_ip(&headers, true, Some(&peer()));
         assert_eq!(result, Some("1.2.3.4".to_string()));
     }

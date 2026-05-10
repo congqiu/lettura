@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
 use serde::Serialize;
 
 use crate::state::AppState;
@@ -12,9 +12,7 @@ pub struct HealthResponse {
     pub search: String,
 }
 
-pub async fn health_check(
-    State(state): State<AppState>,
-) -> (StatusCode, Json<HealthResponse>) {
+pub async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
     let db_result = sqlx::query_scalar::<_, i32>("SELECT 1")
         .fetch_one(&state.pool)
         .await;

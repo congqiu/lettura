@@ -11,20 +11,23 @@ pub struct Metadata {
 pub fn extract_metadata(document: &Html, _url: Option<&str>) -> Metadata {
     Metadata {
         title: extract_title(document),
-        author: extract_meta_content(document, &[
-            ("name", "author"),
-            ("property", "article:author"),
-        ]),
+        author: extract_meta_content(
+            document,
+            &[("name", "author"), ("property", "article:author")],
+        ),
         language: extract_language(document),
-        preview_image: extract_meta_content(document, &[
-            ("property", "og:image"),
-            ("name", "twitter:image"),
-        ]),
-        excerpt: extract_meta_content(document, &[
-            ("property", "og:description"),
-            ("name", "description"),
-            ("name", "twitter:description"),
-        ]),
+        preview_image: extract_meta_content(
+            document,
+            &[("property", "og:image"), ("name", "twitter:image")],
+        ),
+        excerpt: extract_meta_content(
+            document,
+            &[
+                ("property", "og:description"),
+                ("name", "description"),
+                ("name", "twitter:description"),
+            ],
+        ),
     }
 }
 
@@ -83,7 +86,11 @@ fn extract_meta_content(document: &Html, attrs: &[(&str, &str)]) -> Option<Strin
     for meta in document.select(&meta_sel) {
         let el = meta.value();
         for (attr_name, attr_value) in attrs {
-            if el.attr(attr_name).map(|v| v.eq_ignore_ascii_case(attr_value)) == Some(true) {
+            if el
+                .attr(attr_name)
+                .map(|v| v.eq_ignore_ascii_case(attr_value))
+                == Some(true)
+            {
                 if let Some(content) = el.attr("content") {
                     let trimmed = content.trim().to_string();
                     if !trimmed.is_empty() {
@@ -118,7 +125,8 @@ mod tests {
 
     #[test]
     fn extracts_author() {
-        let html = r#"<html><head><meta name="author" content="John Doe"></head><body></body></html>"#;
+        let html =
+            r#"<html><head><meta name="author" content="John Doe"></head><body></body></html>"#;
         let doc = Html::parse_document(html);
         let meta = extract_metadata(&doc, None);
         assert_eq!(meta.author.as_deref(), Some("John Doe"));
@@ -153,7 +161,8 @@ mod tests {
 
     #[test]
     fn cleans_title_site_suffix() {
-        let html = r#"<html><head><title>Article Title | My Site</title></head><body></body></html>"#;
+        let html =
+            r#"<html><head><title>Article Title | My Site</title></head><body></body></html>"#;
         let doc = Html::parse_document(html);
         let meta = extract_metadata(&doc, None);
         assert_eq!(meta.title.as_deref(), Some("Article Title"));

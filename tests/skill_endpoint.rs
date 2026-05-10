@@ -17,10 +17,7 @@ async fn skill_endpoint_returns_markdown() {
         .unwrap()
         .to_str()
         .unwrap();
-    assert!(
-        ct.starts_with("text/markdown"),
-        "content-type was: {ct}"
-    );
+    assert!(ct.starts_with("text/markdown"), "content-type was: {ct}");
     let body = resp.text().await.unwrap();
     assert!(body.contains("# Lettura CLI"));
     app.cleanup().await;

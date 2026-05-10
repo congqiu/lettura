@@ -12,10 +12,10 @@ importers:
         specifier: ^0.0.268
         version: 0.0.268
       typescript:
-        specifier: ^5.4.0
+        specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: ^5.2.0
+        specifier: ^5.4.21
         version: 5.4.21
 
 packages:

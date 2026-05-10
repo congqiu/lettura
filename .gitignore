@@ -13,6 +13,7 @@ docker-compose.local.yml
 .syncthing.*
 *.sync-conflict-*
 web/node_modules
+node_modules
 web/dist/*
 !web/dist/.gitkeep
 extension/node_modules

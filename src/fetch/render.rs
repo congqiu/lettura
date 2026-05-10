@@ -13,8 +13,8 @@
 
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use futures_util::StreamExt;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
@@ -82,13 +82,10 @@ impl RenderService {
         let browser = self.ensure_browser().await?;
 
         let timeout = timeout_override.unwrap_or(self.timeout);
-        let result = tokio::time::timeout(
-            timeout,
-            fetch_page_content(&browser, url, wait_for),
-        )
-        .await
-        .map_err(|_| "render timeout".to_string())
-        .and_then(|r| r);
+        let result = tokio::time::timeout(timeout, fetch_page_content(&browser, url, wait_for))
+            .await
+            .map_err(|_| "render timeout".to_string())
+            .and_then(|r| r);
 
         match result {
             Ok(html) => {
@@ -126,7 +123,10 @@ impl RenderService {
             let browser = launch_browser(self.chromium_path.as_deref()).await?;
             *guard = Some(Arc::new(browser));
         }
-        Ok(guard.as_ref().expect("browser initialized in double-checked lock").clone())
+        Ok(guard
+            .as_ref()
+            .expect("browser initialized in double-checked lock")
+            .clone())
     }
 
     async fn record_failure(&self) {
@@ -172,7 +172,9 @@ async fn launch_browser(chromium_path: Option<&str>) -> Result<Browser, String> 
     if let Some(path) = chromium_path {
         builder = builder.chrome_executable(path);
     }
-    let config = builder.build().map_err(|e| format!("browser config: {}", e))?;
+    let config = builder
+        .build()
+        .map_err(|e| format!("browser config: {}", e))?;
 
     let (browser, mut handler) = Browser::launch(config)
         .await

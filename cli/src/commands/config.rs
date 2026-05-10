@@ -16,7 +16,8 @@ pub fn run(cmd: &ConfigCmd) -> Result<i32, CliError> {
         }
         ConfigCmd::Set { key, value } => {
             set_by_key(&mut cfg, key, value)?;
-            cfg.save_to(&path).map_err(|e| CliError::ServerError(e.to_string()))?;
+            cfg.save_to(&path)
+                .map_err(|e| CliError::ServerError(e.to_string()))?;
         }
     }
     Ok(0)
@@ -64,12 +65,19 @@ fn set_by_key(cfg: &mut Config, key: &str, value: &str) -> Result<(), CliError> 
                     t.insert(seg.to_string(), toml::Value::String(value.to_string()));
                     break;
                 }
-                current = t.entry(seg.to_string()).or_insert_with(|| toml::Value::Table(toml::Table::new()));
+                current = t
+                    .entry(seg.to_string())
+                    .or_insert_with(|| toml::Value::Table(toml::Table::new()));
             }
-            _ => return Err(CliError::BadArgs(format!("invalid path at segment '{seg}'"))),
+            _ => {
+                return Err(CliError::BadArgs(format!(
+                    "invalid path at segment '{seg}'"
+                )));
+            }
         }
     }
-    *cfg = doc.try_into()
+    *cfg = doc
+        .try_into()
         .map_err(|e| CliError::BadArgs(format!("invalid value for {key}: {e}")))?;
     Ok(())
 }

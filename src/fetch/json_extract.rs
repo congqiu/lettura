@@ -15,8 +15,8 @@ use crate::site_config::JsonExtract;
 /// `content_is_html` is true; otherwise it is treated as plain text and wrapped
 /// in a single `<p>` element so downstream rendering stays consistent.
 pub fn extract(body: &str, rules: &JsonExtract) -> Result<ExtractResult, String> {
-    let root: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| format!("invalid JSON: {}", e))?;
+    let root: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| format!("invalid JSON: {}", e))?;
 
     let title = rules
         .title
@@ -123,11 +123,7 @@ mod tests {
     #[test]
     fn plain_text_is_wrapped_and_escaped() {
         let body = r#"{"content": "a < b & c"}"#;
-        let r = extract(
-            body,
-            &rules("/missing", "/content", false),
-        )
-        .unwrap();
+        let r = extract(body, &rules("/missing", "/content", false)).unwrap();
         assert_eq!(r.content, "<p>a &lt; b &amp; c</p>");
         assert_eq!(r.text_content, "a < b & c");
     }

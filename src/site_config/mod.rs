@@ -129,7 +129,12 @@ impl SiteConfig {
             let matched = self
                 .url_match
                 .iter()
-                .filter_map(|p| regex::RegexBuilder::new(p).size_limit(REGEX_SIZE_LIMIT).build().ok())
+                .filter_map(|p| {
+                    regex::RegexBuilder::new(p)
+                        .size_limit(REGEX_SIZE_LIMIT)
+                        .build()
+                        .ok()
+                })
                 .any(|re| re.is_match(path));
             if !matched {
                 return false;
@@ -140,7 +145,12 @@ impl SiteConfig {
             let excluded = self
                 .exclude
                 .iter()
-                .filter_map(|p| regex::RegexBuilder::new(p).size_limit(REGEX_SIZE_LIMIT).build().ok())
+                .filter_map(|p| {
+                    regex::RegexBuilder::new(p)
+                        .size_limit(REGEX_SIZE_LIMIT)
+                        .build()
+                        .ok()
+                })
                 .any(|re| re.is_match(path));
             if excluded {
                 return false;

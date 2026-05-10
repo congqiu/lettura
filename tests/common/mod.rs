@@ -62,6 +62,18 @@ impl TestApp {
             render_concurrency: 1,
             render_timeout_ms: 15000,
             public_base_url: None,
+            production: false,
+            trust_proxy: false,
+            disable_registration: false,
+            metrics_bearer_token: None,
+            import_max_body_bytes: 50 * 1024 * 1024,
+            pages_max_upload_bytes: 10 * 1024 * 1024,
+            max_image_size: 10 * 1024 * 1024,
+            auth_rate_limit: 10,
+            global_rate_limit: 100,
+            search_commit_interval_secs: 3,
+            token_cleanup_interval_secs: 3600,
+            metrics_interval_secs: 15,
         };
 
         let (app, _, _, _) = lettura::api::router_with_search(
@@ -73,7 +85,12 @@ impl TestApp {
         let addr = format!("http://{}", listener.local_addr().unwrap());
 
         tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await
+            .unwrap();
         });
 
         TestApp {

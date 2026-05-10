@@ -69,9 +69,7 @@ pub fn extract_with_fallback(
         if let Some(ref strip_selectors) = rule.strip_selectors {
             for sel_str in strip_selectors {
                 if let Ok(sel) = scraper::Selector::parse(sel_str) {
-                    let ids: Vec<_> = document.select(&sel)
-                        .map(|el| el.id())
-                        .collect();
+                    let ids: Vec<_> = document.select(&sel).map(|el| el.id()).collect();
                     for id in ids {
                         if let Some(mut node) = document.tree.get_mut(id) {
                             node.detach();
@@ -97,7 +95,9 @@ pub fn extract_with_fallback(
     // Layer 1: Site-specific content selector
     if let Some(rule) = site_rule {
         if let Some(ref content_selector) = rule.content_selector {
-            if let Ok(content) = readability::extract_content_with_selector(&document, content_selector) {
+            if let Ok(content) =
+                readability::extract_content_with_selector(&document, content_selector)
+            {
                 let clean_html = sanitize::sanitize(&content);
                 if !is_content_too_short(&clean_html) {
                     return Ok(FallbackExtractResult {
@@ -147,12 +147,20 @@ pub fn extract_with_fallback(
 }
 
 /// Original extract function kept for backward compatibility.
-pub fn extract(html: &str, url: Option<&str>, site_rule: Option<&SiteRuleConfig>) -> Result<ExtractResult, ExtractError> {
+pub fn extract(
+    html: &str,
+    url: Option<&str>,
+    site_rule: Option<&SiteRuleConfig>,
+) -> Result<ExtractResult, ExtractError> {
     let result = extract_with_fallback(html, url, site_rule)?;
     Ok(result.inner)
 }
 
-fn build_result(title: Option<String>, clean_html: String, meta: metadata::Metadata) -> ExtractResult {
+fn build_result(
+    title: Option<String>,
+    clean_html: String,
+    meta: metadata::Metadata,
+) -> ExtractResult {
     let text_content = html_to_text(&clean_html);
     let reading_time = estimate_reading_time(&text_content);
     ExtractResult {
@@ -175,9 +183,11 @@ fn is_content_too_short(html: &str) -> bool {
 
 /// Extract content from the `<body>` tag as a fallback.
 fn extract_body_content(document: &scraper::Html) -> Result<String, ExtractError> {
-    let selector = scraper::Selector::parse("body")
-        .map_err(|_| ExtractError::ParseError)?;
-    let body = document.select(&selector).next().ok_or(ExtractError::NoContent)?;
+    let selector = scraper::Selector::parse("body").map_err(|_| ExtractError::ParseError)?;
+    let body = document
+        .select(&selector)
+        .next()
+        .ok_or(ExtractError::NoContent)?;
     let content = body.inner_html();
     if content.trim().is_empty() {
         return Err(ExtractError::NoContent);

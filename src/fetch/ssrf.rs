@@ -32,7 +32,7 @@ fn is_private_ip(ip: &IpAddr) -> bool {
             || (o[0] == 198 && o[1] >= 18 && o[1] <= 19)   // 198.18.0.0/15 benchmarking
             || (o[0] == 198 && o[1] == 51 && o[2] == 100)  // 198.51.100.0/24 documentation
             || (o[0] == 203 && o[1] == 0 && o[2] == 113)   // 203.0.113.0/24 documentation
-            || o[0] >= 224     // 224.0.0.0/4 multicast + reserved
+            || o[0] >= 224 // 224.0.0.0/4 multicast + reserved
         }
         IpAddr::V6(v6) => {
             let s = v6.segments();
@@ -41,7 +41,7 @@ fn is_private_ip(ip: &IpAddr) -> bool {
             || (s[0] & 0xffc0) == 0xfe80  // fe80::/10 link-local
             || s[0] == 0x2001 && s[1] == 0xdb8  // 2001:db8::/32 documentation
             || s[0] == 0x2002              // 2002::/16 6to4 (can reach private IPv4)
-            || s[0] >= 0xff00              // ff00::/8 multicast
+            || s[0] >= 0xff00 // ff00::/8 multicast
         }
     }
 }
@@ -54,7 +54,9 @@ pub fn validate_url(raw_url: &str) -> Result<(), String> {
     if scheme != "http" && scheme != "https" {
         return Err(format!("blocked non-HTTP scheme: {scheme}://"));
     }
-    let host = parsed.host_str().ok_or_else(|| "URL has no host".to_string())?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "URL has no host".to_string())?;
     if is_private_host(host) {
         return Err(format!("blocked private/reserved host: {host}"));
     }

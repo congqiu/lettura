@@ -1,14 +1,14 @@
+use axum::Json;
 use axum::body::Body;
 use axum::extract::State;
-use axum::Json;
 use serde::Deserialize;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::entry;
+use crate::state::AppState;
 use crate::tasks::fetcher::FetchJob;
 
 // --- Wallabag JSON Import ---
@@ -28,7 +28,8 @@ pub async fn import_wallabag(
     auth: AuthUser,
     body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes).await
+    let bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes)
+        .await
         .map_err(|_| ApiError::BadRequest("request body too large".to_string()))?;
     let entries: Vec<WallabagEntry> = serde_json::from_slice(&bytes)
         .map_err(|e| ApiError::BadRequest(format!("invalid JSON: {e}")))?;
@@ -38,7 +39,10 @@ pub async fn import_wallabag(
     for wb_entry in &entries {
         let url = match wb_entry.url.as_deref() {
             Some(u) if !u.is_empty() => u,
-            _ => { skipped += 1; continue; }
+            _ => {
+                skipped += 1;
+                continue;
+            }
         };
 
         match entry::create_entry(&state.pool, auth.user_id, url).await {
@@ -50,30 +54,48 @@ pub async fn import_wallabag(
                         new_entry.id,
                         wb_entry.title.as_deref(),
                         Some(content),
-                        None, None, None, None, None, 0, "manual",
-                    ).await {
-                        tracing::warn!("import: failed to update content for entry {}: {e}", new_entry.id);
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        0,
+                        "manual",
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            "import: failed to update content for entry {}: {e}",
+                            new_entry.id
+                        );
                     }
 
                     // Index imported content so it's immediately searchable
                     let domain = entry::extract_domain(&new_entry.url).unwrap_or_default();
-                    if let Err(e) = state.search_index.upsert(
-                        new_entry.id,
-                        auth.user_id,
-                        wb_entry.title.as_deref().unwrap_or(""),
-                        content,
-                        &new_entry.url,
-                        &domain,
-                    ).await {
+                    if let Err(e) = state
+                        .search_index
+                        .upsert(
+                            new_entry.id,
+                            auth.user_id,
+                            wb_entry.title.as_deref().unwrap_or(""),
+                            content,
+                            &new_entry.url,
+                            &domain,
+                        )
+                        .await
+                    {
                         tracing::warn!(entry_id = %new_entry.id, "failed to index imported entry: {e}");
                     }
                 } else {
                     // Queue for fetching
-                    let _ = state.fetch_queue.send(FetchJob {
-                        entry_id: new_entry.id,
-                        user_id: auth.user_id,
-                        url: new_entry.url.clone(),
-                    }).await;
+                    let _ = state
+                        .fetch_queue
+                        .send(FetchJob {
+                            entry_id: new_entry.id,
+                            user_id: auth.user_id,
+                            url: new_entry.url.clone(),
+                        })
+                        .await;
                 }
 
                 // Apply archived/starred status
@@ -81,11 +103,24 @@ pub async fn import_wallabag(
                     let params = entry::UpdateEntryParams {
                         title: None,
                         content: None,
-                        is_archived: if wb_entry.is_archived == Some(1) { Some(true) } else { None },
-                        is_starred: if wb_entry.is_starred == Some(1) { Some(true) } else { None },
+                        is_archived: if wb_entry.is_archived == Some(1) {
+                            Some(true)
+                        } else {
+                            None
+                        },
+                        is_starred: if wb_entry.is_starred == Some(1) {
+                            Some(true)
+                        } else {
+                            None
+                        },
                     };
-                    if let Err(e) = entry::update_entry(&state.pool, auth.user_id, new_entry.id, &params).await {
-                        tracing::warn!("import: failed to update status for entry {}: {e}", new_entry.id);
+                    if let Err(e) =
+                        entry::update_entry(&state.pool, auth.user_id, new_entry.id, &params).await
+                    {
+                        tracing::warn!(
+                            "import: failed to update status for entry {}: {e}",
+                            new_entry.id
+                        );
                     }
                 }
 
@@ -93,8 +128,13 @@ pub async fn import_wallabag(
                 if let Some(ref tag_labels) = wb_entry.tags {
                     if !tag_labels.is_empty() {
                         if let Err(e) = crate::models::tag::ensure_and_link(
-                            &state.pool, auth.user_id, &[new_entry.id], tag_labels,
-                        ).await {
+                            &state.pool,
+                            auth.user_id,
+                            &[new_entry.id],
+                            tag_labels,
+                        )
+                        .await
+                        {
                             tracing::warn!(entry_id = %new_entry.id, "failed to import tags: {e}");
                         }
                     }
@@ -103,13 +143,21 @@ pub async fn import_wallabag(
                 imported += 1;
             }
             Err(e) => {
-                if matches!(e, crate::models::error::ModelError::Conflict(_)) { skipped += 1; }
-                else { skipped += 1; }
+                if matches!(e, crate::models::error::ModelError::Conflict(_)) {
+                    skipped += 1;
+                } else {
+                    skipped += 1;
+                }
             }
         }
     }
 
-    tracing::info!(imported = imported, skipped = skipped, total = entries.len(), "wallabag import completed");
+    tracing::info!(
+        imported = imported,
+        skipped = skipped,
+        total = entries.len(),
+        "wallabag import completed"
+    );
 
     audit_log::log_success(
         &state.pool,
@@ -119,7 +167,8 @@ pub async fn import_wallabag(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"imported": imported, "skipped": skipped, "total": entries.len()}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({
         "imported": imported,
@@ -135,7 +184,8 @@ pub async fn import_browser(
     auth: AuthUser,
     body: Body,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let body_bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes).await
+    let body_bytes = axum::body::to_bytes(body, state.config.import_max_body_bytes)
+        .await
         .map_err(|_| ApiError::BadRequest("request body too large".to_string()))?;
     let body_str = std::str::from_utf8(&body_bytes)
         .map_err(|e| ApiError::BadRequest(format!("invalid UTF-8: {e}")))?;
@@ -165,38 +215,65 @@ pub async fn import_browser(
             Ok(new_entry) => {
                 if !title.is_empty() {
                     if let Err(e) = entry::update_entry_content(
-                        &state.pool, new_entry.id,
-                        Some(title), None, None, None, None, None, None, 0, "pending",
-                    ).await {
-                        tracing::warn!("import: failed to update content for entry {}: {e}", new_entry.id);
+                        &state.pool,
+                        new_entry.id,
+                        Some(title),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        0,
+                        "pending",
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            "import: failed to update content for entry {}: {e}",
+                            new_entry.id
+                        );
                     }
 
                     // Index the title so the entry is at least partially searchable
                     // before the fetch job completes
                     let domain = entry::extract_domain(&new_entry.url).unwrap_or_default();
-                    if let Err(e) = state.search_index.upsert(
-                        new_entry.id,
-                        auth.user_id,
-                        title,
-                        "",
-                        &new_entry.url,
-                        &domain,
-                    ).await {
+                    if let Err(e) = state
+                        .search_index
+                        .upsert(
+                            new_entry.id,
+                            auth.user_id,
+                            title,
+                            "",
+                            &new_entry.url,
+                            &domain,
+                        )
+                        .await
+                    {
                         tracing::warn!(entry_id = %new_entry.id, "failed to index imported entry: {e}");
                     }
                 }
-                let _ = state.fetch_queue.send(FetchJob {
-                    entry_id: new_entry.id,
-                    user_id: auth.user_id,
-                    url: new_entry.url.clone(),
-                }).await;
+                let _ = state
+                    .fetch_queue
+                    .send(FetchJob {
+                        entry_id: new_entry.id,
+                        user_id: auth.user_id,
+                        url: new_entry.url.clone(),
+                    })
+                    .await;
                 imported += 1;
             }
-            Err(_) => { skipped += 1; }
+            Err(_) => {
+                skipped += 1;
+            }
         }
     }
 
-    tracing::info!(imported = imported, skipped = skipped, "browser import completed");
+    tracing::info!(
+        imported = imported,
+        skipped = skipped,
+        "browser import completed"
+    );
 
     audit_log::log_success(
         &state.pool,
@@ -206,7 +283,8 @@ pub async fn import_browser(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"imported": imported, "skipped": skipped}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({
         "imported": imported,
@@ -228,19 +306,24 @@ mod tests {
             "is_starred": 0,
             "tags": ["rust", "programming"]
         }"#;
-        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        let entry: WallabagEntry =
+            serde_json::from_str(json).expect("deserialization should succeed");
         assert_eq!(entry.url.as_deref(), Some("https://example.com/article"));
         assert_eq!(entry.title.as_deref(), Some("Example Article"));
         assert_eq!(entry.content.as_deref(), Some("<p>Hello</p>"));
         assert_eq!(entry.is_archived, Some(1));
         assert_eq!(entry.is_starred, Some(0));
-        assert_eq!(entry.tags, Some(vec!["rust".to_string(), "programming".to_string()]));
+        assert_eq!(
+            entry.tags,
+            Some(vec!["rust".to_string(), "programming".to_string()])
+        );
     }
 
     #[test]
     fn wallabag_entry_with_null_url() {
         let json = r#"{"url": null, "title": "No URL"}"#;
-        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        let entry: WallabagEntry =
+            serde_json::from_str(json).expect("deserialization should succeed");
         assert!(entry.url.is_none());
         assert_eq!(entry.title.as_deref(), Some("No URL"));
     }
@@ -248,7 +331,8 @@ mod tests {
     #[test]
     fn wallabag_entry_with_empty_url() {
         let json = r#"{"url": "", "title": "Empty URL"}"#;
-        let entry: WallabagEntry = serde_json::from_str(json).expect("deserialization should succeed");
+        let entry: WallabagEntry =
+            serde_json::from_str(json).expect("deserialization should succeed");
         assert_eq!(entry.url, Some("".to_string()));
         assert_eq!(entry.title.as_deref(), Some("Empty URL"));
     }

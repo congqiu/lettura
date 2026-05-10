@@ -1,13 +1,15 @@
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::models::audit_log::{self, AuditAction, AuditLog, AuditResourceType, ListAuditLogsFilter};
+use crate::models::audit_log::{
+    self, AuditAction, AuditLog, AuditResourceType, ListAuditLogsFilter,
+};
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]

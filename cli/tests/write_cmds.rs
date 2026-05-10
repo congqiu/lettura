@@ -1,6 +1,6 @@
-use httpmock::prelude::*;
 use httpmock::Method::PATCH;
 use httpmock::Method::POST;
+use httpmock::prelude::*;
 use lettura_cli::cli::{StateChangeArgs, TagArgs, UntagArgs};
 use lettura_cli::client::ApiClient;
 use lettura_cli::commands;
@@ -32,7 +32,8 @@ async fn tag_add_posts_to_entry_tags() {
 async fn untag_deletes_by_label() {
     let server = MockServer::start();
     let m = server.mock(|when, then| {
-        when.method(DELETE).path("/api/v1/entries/abc/tags/by-label/rust");
+        when.method(DELETE)
+            .path("/api/v1/entries/abc/tags/by-label/rust");
         then.status(204);
     });
     let client = ApiClient::new(server.base_url(), "lta_x").unwrap();
@@ -125,9 +126,11 @@ async fn bulk_tag_requires_dry_run_or_yes() {
 async fn bulk_tag_dry_run_posts_to_bulk_endpoint() {
     let server = MockServer::start();
     let m = server.mock(|when, then| {
-        when.method(POST).path("/api/v1/entries/bulk/tag")
+        when.method(POST)
+            .path("/api/v1/entries/bulk/tag")
             .json_body_partial(r#"{"dry_run":true}"#);
-        then.status(200).body(r#"{"matched":5,"updated":0,"ids":[]}"#);
+        then.status(200)
+            .body(r#"{"matched":5,"updated":0,"ids":[]}"#);
     });
     let client = ApiClient::new(server.base_url(), "lta_x").unwrap();
     let args = TagArgs {
@@ -159,7 +162,9 @@ async fn unarchive_patches_is_archived_false() {
         dry_run: false,
         yes: false,
     };
-    let code = commands::state::run_unarchive(&client, &args).await.unwrap();
+    let code = commands::state::run_unarchive(&client, &args)
+        .await
+        .unwrap();
     assert_eq!(code, 0);
     m.assert();
 }
@@ -194,6 +199,8 @@ async fn bulk_archive_requires_safety_flag() {
         dry_run: false,
         yes: false,
     };
-    let err = commands::state::run_archive(&client, &args).await.unwrap_err();
+    let err = commands::state::run_archive(&client, &args)
+        .await
+        .unwrap_err();
     assert!(matches!(err, lettura_cli::error::CliError::BadArgs(_)));
 }

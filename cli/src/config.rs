@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -36,13 +36,17 @@ impl Config {
     }
 
     pub fn load_from(path: &Path) -> anyhow::Result<Self> {
-        if !path.exists() { return Ok(Self::default()); }
+        if !path.exists() {
+            return Ok(Self::default());
+        }
         let s = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&s)?)
     }
 
     pub fn save_to(&self, path: &Path) -> anyhow::Result<()> {
-        if let Some(p) = path.parent() { std::fs::create_dir_all(p)?; }
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
         let s = toml::to_string_pretty(self)?;
         std::fs::write(path, s)?;
         #[cfg(unix)]
@@ -58,10 +62,14 @@ pub fn resolve(cfg: &Config, over: &Override) -> anyhow::Result<Resolved> {
     let profile_name = over.profile.clone().or_else(|| cfg.default_profile.clone());
     let profile = profile_name.as_ref().and_then(|n| cfg.profiles.get(n));
 
-    let url = over.url.clone()
+    let url = over
+        .url
+        .clone()
         .or_else(|| profile.map(|p| p.url.clone()))
         .ok_or_else(|| anyhow::anyhow!("no server URL configured. Run `lettura-cli login`."))?;
-    let token = over.token.clone()
+    let token = over
+        .token
+        .clone()
         .or_else(|| profile.map(|p| p.token.clone()))
         .ok_or_else(|| anyhow::anyhow!("no token configured. Run `lettura-cli login`."))?;
     Ok(Resolved { url, token })

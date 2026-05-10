@@ -1,17 +1,17 @@
 use axum::{
+    Router,
     http::{HeaderValue, Method},
     routing::{delete, get, patch, post},
-    Router,
 };
 use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
-use crate::state::AppState;
 use crate::config::Config;
-use crate::rate_limit::{rate_limit_middleware, GlobalRateLimit};
+use crate::rate_limit::{GlobalRateLimit, rate_limit_middleware};
 use crate::search::SearchIndex;
+use crate::state::AppState;
 use crate::tasks::fetcher;
 
 /// Derive the auth source string from the authenticated user.
@@ -36,13 +36,13 @@ pub mod feed;
 pub mod health;
 pub mod import;
 pub mod memos;
+pub mod pages;
+pub mod pages_public;
 pub mod site_rules;
 pub mod skills;
 pub mod tagging_rules;
 pub mod tags;
 pub mod tokens;
-pub mod pages;
-pub mod pages_public;
 pub mod validate;
 
 pub fn router(pool: PgPool, config: Config) -> Router {
@@ -50,7 +50,15 @@ pub fn router(pool: PgPool, config: Config) -> Router {
 }
 
 /// Build router and return handles to internal components for metrics/monitoring.
-pub fn router_with_handles(pool: PgPool, config: Config) -> (Router, SearchIndex, fetcher::FetchQueue, std::sync::Arc<dyn crate::storage::ImageStorage>) {
+pub fn router_with_handles(
+    pool: PgPool,
+    config: Config,
+) -> (
+    Router,
+    SearchIndex,
+    fetcher::FetchQueue,
+    std::sync::Arc<dyn crate::storage::ImageStorage>,
+) {
     let (router, search, fq, storage) = router_with_search(pool, config, None);
     (router, search, fq, storage)
 }
@@ -61,7 +69,11 @@ async fn api_redirect(
     axum::extract::Path(path): axum::extract::Path<String>,
     req: axum::extract::Request,
 ) -> impl axum::response::IntoResponse {
-    let query = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+    let query = req
+        .uri()
+        .query()
+        .map(|q| format!("?{q}"))
+        .unwrap_or_default();
     let location = format!("/api/v1/{path}{query}");
     (
         axum::http::StatusCode::MOVED_PERMANENTLY,
@@ -69,14 +81,30 @@ async fn api_redirect(
     )
 }
 
-pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchIndex>) -> (Router, SearchIndex, fetcher::FetchQueue, std::sync::Arc<dyn crate::storage::ImageStorage>) {
+pub fn router_with_search(
+    pool: PgPool,
+    config: Config,
+    search: Option<SearchIndex>,
+) -> (
+    Router,
+    SearchIndex,
+    fetcher::FetchQueue,
+    std::sync::Arc<dyn crate::storage::ImageStorage>,
+) {
     let search_index = search.unwrap_or_else(|| {
         SearchIndex::open(std::path::Path::new(&config.index_path))
             .expect("failed to open search index")
     });
-    let storage: std::sync::Arc<dyn crate::storage::ImageStorage> = std::sync::Arc::from(crate::storage::create_storage(&config));
+    let storage: std::sync::Arc<dyn crate::storage::ImageStorage> =
+        std::sync::Arc::from(crate::storage::create_storage(&config));
     crate::site_config::store::init_store(config.site_configs_path.clone());
-    let fetch_queue = fetcher::start_fetch_worker(pool.clone(), 5, storage.clone(), search_index.clone(), &config);
+    let fetch_queue = fetcher::start_fetch_worker(
+        pool.clone(),
+        5,
+        storage.clone(),
+        search_index.clone(),
+        &config,
+    );
 
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();
@@ -298,10 +326,10 @@ pub fn router_with_search(pool: PgPool, config: Config, search: Option<SearchInd
         // Request tracing: adds request_id to spans and logs.
         // Headers are intentionally excluded to avoid logging sensitive
         // values (Authorization, Cookie, etc.).
-        .layer(TraceLayer::new_for_http().make_span_with(
-            DefaultMakeSpan::new()
-                .level(tracing::Level::INFO),
-        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(tracing::Level::INFO)),
+        )
         // Request ID middleware: propagates or generates X-Request-Id
         .layer(axum::middleware::from_fn(
             crate::middleware::request_id_layer,
@@ -339,11 +367,20 @@ async fn serve_storage(
             };
             (
                 axum::http::StatusCode::OK,
-                [(axum::http::header::CONTENT_TYPE, mime_str.to_string()),
-                 (axum::http::header::CACHE_CONTROL, "public, max-age=31536000".to_string()),
-                 (axum::http::header::CONTENT_DISPOSITION, content_disposition.to_string())],
+                [
+                    (axum::http::header::CONTENT_TYPE, mime_str.to_string()),
+                    (
+                        axum::http::header::CACHE_CONTROL,
+                        "public, max-age=31536000".to_string(),
+                    ),
+                    (
+                        axum::http::header::CONTENT_DISPOSITION,
+                        content_disposition.to_string(),
+                    ),
+                ],
                 data,
-            ).into_response()
+            )
+                .into_response()
         }
         Err(_) => (axum::http::StatusCode::NOT_FOUND, "not found").into_response(),
     }
@@ -357,7 +394,9 @@ use axum::response::IntoResponse;
 /// Extracted as a pure function for testability.
 fn is_safe_storage_path(path: &str) -> bool {
     let candidate = std::path::Path::new(path);
-    candidate.components().all(|c| matches!(c, std::path::Component::Normal(_)))
+    candidate
+        .components()
+        .all(|c| matches!(c, std::path::Component::Normal(_)))
 }
 
 /// Determine whether a MIME type is dangerous (should be served as attachment).

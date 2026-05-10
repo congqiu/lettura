@@ -1,17 +1,20 @@
+use httpmock::prelude::*;
 use lettura_cli::client::ApiClient;
 use lettura_cli::error::CliError;
-use httpmock::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct Hello { msg: String }
+struct Hello {
+    msg: String,
+}
 
 #[tokio::test]
 async fn get_returns_json_on_200() {
     let server = MockServer::start();
     let _m = server.mock(|when, then| {
         when.method(GET).path("/api/v1/thing");
-        then.status(200).header("content-type", "application/json")
+        then.status(200)
+            .header("content-type", "application/json")
             .body(r#"{"msg":"hi"}"#);
     });
     let client = ApiClient::new(server.base_url(), "lta_x").unwrap();
@@ -59,7 +62,8 @@ async fn get_maps_500_to_server_error() {
 async fn post_sends_json_body() {
     let server = MockServer::start();
     let _m = server.mock(|when, then| {
-        when.method(POST).path("/save")
+        when.method(POST)
+            .path("/save")
             .header("content-type", "application/json")
             .body(r#"{"url":"https://x"}"#);
         then.status(201).body(r#"{"msg":"ok"}"#);
@@ -96,7 +100,8 @@ async fn network_error_maps_to_network_variant() {
 async fn bearer_token_header_is_set() {
     let server = MockServer::start();
     let _m = server.mock(|when, then| {
-        when.method(GET).path("/echo")
+        when.method(GET)
+            .path("/echo")
             .header("authorization", "Bearer lta_secret123");
         then.status(200).body(r#"{"msg":"ok"}"#);
     });
@@ -110,7 +115,8 @@ async fn get_text_returns_raw_body_for_success() {
     let server = MockServer::start();
     let _m = server.mock(|when, then| {
         when.method(GET).path("/skill");
-        then.status(200).header("content-type", "text/markdown")
+        then.status(200)
+            .header("content-type", "text/markdown")
             .body("# Skill\n\nhello");
     });
     let client = ApiClient::new(server.base_url(), "lta_x").unwrap();

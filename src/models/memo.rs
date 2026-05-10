@@ -25,31 +25,61 @@ pub struct CreateMemo {
 
 pub async fn list_memos(pool: &PgPool, user_id: Uuid) -> Result<Vec<Memo>, ModelError> {
     sqlx::query_as::<_, Memo>("SELECT * FROM memos WHERE user_id = $1 ORDER BY created_at DESC")
-        .bind(user_id).fetch_all(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+        .bind(user_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn create_memo(pool: &PgPool, user_id: Uuid, params: &CreateMemo) -> Result<Memo, ModelError> {
-    sqlx::query_as::<_, Memo>("INSERT INTO memos (user_id, content, source_url) VALUES ($1, $2, $3) RETURNING *")
-        .bind(user_id).bind(&params.content).bind(params.source_url.as_deref())
-        .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+pub async fn create_memo(
+    pool: &PgPool,
+    user_id: Uuid,
+    params: &CreateMemo,
+) -> Result<Memo, ModelError> {
+    sqlx::query_as::<_, Memo>(
+        "INSERT INTO memos (user_id, content, source_url) VALUES ($1, $2, $3) RETURNING *",
+    )
+    .bind(user_id)
+    .bind(&params.content)
+    .bind(params.source_url.as_deref())
+    .fetch_one(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))
 }
 
 pub async fn delete_memo(pool: &PgPool, user_id: Uuid, memo_id: Uuid) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM memos WHERE id = $1 AND user_id = $2")
-        .bind(memo_id).bind(user_id).execute(pool).await
+        .bind(memo_id)
+        .bind(user_id)
+        .execute(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn find_memo_by_id(pool: &PgPool, user_id: Uuid, memo_id: Uuid) -> Result<Option<Memo>, ModelError> {
+pub async fn find_memo_by_id(
+    pool: &PgPool,
+    user_id: Uuid,
+    memo_id: Uuid,
+) -> Result<Option<Memo>, ModelError> {
     sqlx::query_as::<_, Memo>("SELECT * FROM memos WHERE id = $1 AND user_id = $2")
-        .bind(memo_id).bind(user_id).fetch_optional(pool).await
+        .bind(memo_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn set_promoted_entry(pool: &PgPool, memo_id: Uuid, entry_id: Uuid) -> Result<(), ModelError> {
+pub async fn set_promoted_entry(
+    pool: &PgPool,
+    memo_id: Uuid,
+    entry_id: Uuid,
+) -> Result<(), ModelError> {
     sqlx::query("UPDATE memos SET promoted_entry_id = $2 WHERE id = $1")
-        .bind(memo_id).bind(entry_id).execute(pool).await
+        .bind(memo_id)
+        .bind(entry_id)
+        .execute(pool)
+        .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }

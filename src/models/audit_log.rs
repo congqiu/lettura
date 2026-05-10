@@ -158,7 +158,19 @@ pub async fn log_success(
     resource_id: Option<Uuid>,
     details: serde_json::Value,
 ) {
-    if let Err(e) = insert(pool, new_entry(user_id, auth_source, action, resource_type, resource_id, details)).await {
+    if let Err(e) = insert(
+        pool,
+        new_entry(
+            user_id,
+            auth_source,
+            action,
+            resource_type,
+            resource_id,
+            details,
+        ),
+    )
+    .await
+    {
         tracing::warn!("audit log insert failed: {e}");
     }
 }
@@ -175,7 +187,14 @@ pub async fn log_success_with_context(
     ip_address: Option<String>,
     user_agent: Option<String>,
 ) {
-    let mut entry = new_entry(user_id, auth_source, action, resource_type, resource_id, details);
+    let mut entry = new_entry(
+        user_id,
+        auth_source,
+        action,
+        resource_type,
+        resource_id,
+        details,
+    );
     entry.ip_address = ip_address;
     entry.user_agent = user_agent;
     if let Err(e) = insert(pool, entry).await {
@@ -269,30 +288,26 @@ impl Default for ListAuditLogsFilter {
     }
 }
 
-pub async fn list(pool: &PgPool, filter: &ListAuditLogsFilter) -> Result<Vec<AuditLog>, ModelError> {
-    let mut qb = QueryBuilder::new(
-        "SELECT * FROM audit_logs WHERE 1=1"
-    );
+pub async fn list(
+    pool: &PgPool,
+    filter: &ListAuditLogsFilter,
+) -> Result<Vec<AuditLog>, ModelError> {
+    let mut qb = QueryBuilder::new("SELECT * FROM audit_logs WHERE 1=1");
 
     if let Some(user_id) = filter.user_id {
-        qb.push(" AND user_id = ")
-            .push_bind(user_id);
+        qb.push(" AND user_id = ").push_bind(user_id);
     }
     if let Some(ref action) = filter.action {
-        qb.push(" AND action = ")
-            .push_bind(action);
+        qb.push(" AND action = ").push_bind(action);
     }
     if let Some(ref resource_type) = filter.resource_type {
-        qb.push(" AND resource_type = ")
-            .push_bind(resource_type);
+        qb.push(" AND resource_type = ").push_bind(resource_type);
     }
     if let Some(resource_id) = filter.resource_id {
-        qb.push(" AND resource_id = ")
-            .push_bind(resource_id);
+        qb.push(" AND resource_id = ").push_bind(resource_id);
     }
     if let Some(ref status) = filter.status {
-        qb.push(" AND status = ")
-            .push_bind(status);
+        qb.push(" AND status = ").push_bind(status);
     }
 
     qb.push(" ORDER BY created_at DESC LIMIT ")
@@ -307,32 +322,26 @@ pub async fn list(pool: &PgPool, filter: &ListAuditLogsFilter) -> Result<Vec<Aud
 }
 
 pub async fn count(pool: &PgPool, filter: &ListAuditLogsFilter) -> Result<i64, ModelError> {
-    let mut qb = QueryBuilder::new(
-        "SELECT COUNT(*) FROM audit_logs WHERE 1=1"
-    );
+    let mut qb = QueryBuilder::new("SELECT COUNT(*) FROM audit_logs WHERE 1=1");
 
     if let Some(user_id) = filter.user_id {
-        qb.push(" AND user_id = ")
-            .push_bind(user_id);
+        qb.push(" AND user_id = ").push_bind(user_id);
     }
     if let Some(ref action) = filter.action {
-        qb.push(" AND action = ")
-            .push_bind(action);
+        qb.push(" AND action = ").push_bind(action);
     }
     if let Some(ref resource_type) = filter.resource_type {
-        qb.push(" AND resource_type = ")
-            .push_bind(resource_type);
+        qb.push(" AND resource_type = ").push_bind(resource_type);
     }
     if let Some(resource_id) = filter.resource_id {
-        qb.push(" AND resource_id = ")
-            .push_bind(resource_id);
+        qb.push(" AND resource_id = ").push_bind(resource_id);
     }
     if let Some(ref status) = filter.status {
-        qb.push(" AND status = ")
-            .push_bind(status);
+        qb.push(" AND status = ").push_bind(status);
     }
 
-    let row = qb.build()
+    let row = qb
+        .build()
         .fetch_one(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
@@ -426,6 +435,9 @@ mod tests {
         };
         let json = serde_json::to_string(&details).unwrap();
         let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&json).unwrap();
-        assert!(!map.contains_key("after"), "after key should be absent when None");
+        assert!(
+            !map.contains_key("after"),
+            "after key should be absent when None"
+        );
     }
 }

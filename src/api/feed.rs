@@ -66,14 +66,12 @@ async fn find_user_by_feed_token(
     state: &AppState,
     token: &str,
 ) -> Result<crate::models::user::User, ApiError> {
-    sqlx::query_as::<_, crate::models::user::User>(
-        "SELECT * FROM users WHERE feed_token = $1",
-    )
-    .bind(token)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?
-    .ok_or_else(|| ApiError::NotFound("invalid feed token".to_string()))
+    sqlx::query_as::<_, crate::models::user::User>("SELECT * FROM users WHERE feed_token = $1")
+        .bind(token)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound("invalid feed token".to_string()))
 }
 
 fn xml_escape(s: &str) -> String {
@@ -186,9 +184,7 @@ mod tests {
     #[tokio::test]
     async fn build_rss_empty_entries() {
         let response = build_rss("Lettura - Unread", &[]);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let xml = String::from_utf8(body.to_vec()).unwrap();
         assert!(xml.contains("<title>Lettura - Unread</title>"));
         assert!(xml.contains("<rss version=\"2.0\">"));
@@ -206,9 +202,7 @@ mod tests {
             now,
         );
         let response = build_rss("Lettura - Unread", &[entry]);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let xml = String::from_utf8(body.to_vec()).unwrap();
         assert!(xml.contains("<item>"));
         assert!(xml.contains("<title><![CDATA[Test Article]]></title>"));
@@ -229,9 +223,7 @@ mod tests {
             now,
         );
         let response = build_rss("Feed", &[entry]);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let xml = String::from_utf8(body.to_vec()).unwrap();
         assert!(xml.contains("Evil ]]&gt; Title"));
         assert!(!xml.contains("Evil ]]> Title"));
@@ -248,9 +240,7 @@ mod tests {
             now,
         );
         let response = build_rss("Feed", &[entry]);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let xml = String::from_utf8(body.to_vec()).unwrap();
         assert!(xml.contains("Evil ]]&gt; Content"));
         assert!(!xml.contains("Evil ]]> Content"));
@@ -267,9 +257,7 @@ mod tests {
             now,
         );
         let response = build_rss("Feed", &[entry]);
-        let body = to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let xml = String::from_utf8(body.to_vec()).unwrap();
         // Extract pubDate content and verify it parses as RFC2822
         let start = xml.find("<pubDate>").unwrap() + "<pubDate>".len();
@@ -277,6 +265,10 @@ mod tests {
         let date_str = &xml[start..end];
         // chrono's to_rfc2822 produces parseable RFC2822 dates
         let parsed = chrono::DateTime::parse_from_rfc2822(date_str);
-        assert!(parsed.is_ok(), "pubDate '{}' is not valid RFC2822", date_str);
+        assert!(
+            parsed.is_ok(),
+            "pubDate '{}' is not valid RFC2822",
+            date_str
+        );
     }
 }

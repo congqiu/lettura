@@ -66,13 +66,22 @@ pub fn build_client(config: &Config) -> reqwest::Client {
     );
     headers.insert(
         reqwest::header::ACCEPT_LANGUAGE,
-        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7".parse().expect("valid Accept-Language header value"),
+        "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
+            .parse()
+            .expect("valid Accept-Language header value"),
     );
     headers.insert(
         reqwest::header::HeaderName::from_static("sec-fetch-mode"),
-        "navigate".parse().expect("valid sec-fetch-mode header value"),
+        "navigate"
+            .parse()
+            .expect("valid sec-fetch-mode header value"),
     );
-    headers.insert(reqwest::header::CACHE_CONTROL, "max-age=0".parse().expect("valid Cache-Control header value"));
+    headers.insert(
+        reqwest::header::CACHE_CONTROL,
+        "max-age=0"
+            .parse()
+            .expect("valid Cache-Control header value"),
+    );
 
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(config.fetch_timeout_secs))
@@ -160,7 +169,8 @@ pub async fn fetch_with_retry(
         // Pre-flight: resolve DNS and check that no resolved IP is private.
         dns_check(&current_url).await?;
 
-        let response = send_with_retry_inner(&current_url, client, max_retries, request_config).await?;
+        let response =
+            send_with_retry_inner(&current_url, client, max_retries, request_config).await?;
 
         let status = response.status();
         if status.is_redirection() {
@@ -206,8 +216,11 @@ fn resolve_redirect_url(current_url: &str, location: &str) -> String {
 
 /// Pre-flight DNS check: resolve the host and reject private/reserved IPs.
 async fn dns_check(url_str: &str) -> Result<(), FetchError> {
-    let parsed = url::Url::parse(url_str).map_err(|e| FetchError::Ssrf(format!("invalid URL: {e}")))?;
-    let host = parsed.host_str().ok_or_else(|| FetchError::Ssrf("URL has no host".to_string()))?;
+    let parsed =
+        url::Url::parse(url_str).map_err(|e| FetchError::Ssrf(format!("invalid URL: {e}")))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| FetchError::Ssrf("URL has no host".to_string()))?;
     // Skip if already a raw IP — validate_url already handles that.
     if host.parse::<std::net::IpAddr>().is_ok() {
         return Ok(());
@@ -469,13 +482,19 @@ mod tests {
     #[test]
     fn parse_retry_after_seconds_form() {
         let v = reqwest::header::HeaderValue::from_static("30");
-        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(30)));
+        assert_eq!(
+            parse_retry_after_header(Some(&v)),
+            Some(Duration::from_secs(30))
+        );
     }
 
     #[test]
     fn parse_retry_after_zero_is_valid() {
         let v = reqwest::header::HeaderValue::from_static("0");
-        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(0)));
+        assert_eq!(
+            parse_retry_after_header(Some(&v)),
+            Some(Duration::from_secs(0))
+        );
     }
 
     #[test]
@@ -513,7 +532,10 @@ mod tests {
     #[test]
     fn parse_retry_after_trims_whitespace() {
         let v = reqwest::header::HeaderValue::from_static("  42  ");
-        assert_eq!(parse_retry_after_header(Some(&v)), Some(Duration::from_secs(42)));
+        assert_eq!(
+            parse_retry_after_header(Some(&v)),
+            Some(Duration::from_secs(42))
+        );
     }
 
     #[test]

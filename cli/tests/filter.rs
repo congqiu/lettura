@@ -29,8 +29,11 @@ fn parses_multi_and() {
 #[test]
 fn parses_absolute_since() {
     let f = parse("since:2026-01-01").unwrap();
-    let expect = chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()
-        .and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let expect = chrono::NaiveDate::from_ymd_opt(2026, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
     assert_eq!(f.since.unwrap(), expect);
 }
 

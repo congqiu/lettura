@@ -71,10 +71,7 @@ mod tests {
     fn preserves_query_string() {
         let rules = vec![rule(r"^/p/(\d+)", "/api/articles/$1")];
         let out = apply("https://zhuanlan.zhihu.com/p/123?utm=x", &rules);
-        assert_eq!(
-            out,
-            "https://zhuanlan.zhihu.com/api/articles/123?utm=x"
-        );
+        assert_eq!(out, "https://zhuanlan.zhihu.com/api/articles/123?utm=x");
     }
 
     #[test]

@@ -1,25 +1,31 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct TagLabel {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EntrySummary {
-    pub id: uuid::Uuid,
+    pub id: String,
     pub url: String,
     pub title: Option<String>,
     pub domain_name: Option<String>,
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: Vec<TagLabel>,
     #[serde(default)]
     pub is_starred: bool,
     #[serde(default)]
     pub is_archived: bool,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: Option<String>,
     pub reading_time: Option<i32>,
     pub language: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryFull {
-    pub id: uuid::Uuid,
+    pub id: String,
     pub url: String,
     pub title: Option<String>,
     pub domain_name: Option<String>,
@@ -31,31 +37,33 @@ pub struct EntryFull {
     pub is_starred: bool,
     #[serde(default)]
     pub is_archived: bool,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: Option<String>,
     #[serde(default)]
-    pub tags: Vec<String>,
+    pub tags: Vec<TagLabel>,
     pub status: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Tag {
-    pub id: uuid::Uuid,
+    pub id: String,
     pub label: String,
     pub slug: Option<String>,
+    pub user_id: Option<String>,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AuditLog {
-    pub id: uuid::Uuid,
-    pub user_id: Option<uuid::Uuid>,
+    pub id: String,
+    pub user_id: Option<String>,
     pub auth_source: String,
     pub action: String,
     pub resource_type: Option<String>,
-    pub resource_id: Option<uuid::Uuid>,
+    pub resource_id: Option<String>,
     pub status: String,
     pub details: serde_json::Value,
     pub error_message: Option<String>,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

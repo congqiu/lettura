@@ -1,18 +1,18 @@
-use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
+use axum::extract::multipart::MultipartError;
+use axum::extract::{Multipart, Path, Query, State};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
 use validator::Validate;
-use axum::extract::multipart::MultipartError;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::page;
+use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
@@ -71,7 +71,9 @@ pub async fn upload_files(
 ) -> Result<Json<UploadResponse>, ApiError> {
     let upload_id = Uuid::new_v4().to_string();
     let temp_base = tmp_dir(&state).join(&upload_id);
-    tokio::fs::create_dir_all(&temp_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    tokio::fs::create_dir_all(&temp_base)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let mut html_files: Vec<String> = Vec::new();
     let mut file_count: usize = 0;
@@ -79,9 +81,16 @@ pub async fn upload_files(
     let mut saved_files: HashMap<String, Vec<u8>> = HashMap::new();
 
     let mut multipart = multipart;
-    while let Some(field) = multipart.next_field().await.map_err(|e: MultipartError| ApiError::BadRequest(e.to_string()))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e: MultipartError| ApiError::BadRequest(e.to_string()))?
+    {
         let filename = field.file_name().unwrap_or("unknown").to_string();
-        let data = field.bytes().await.map_err(|e: MultipartError| ApiError::BadRequest(e.to_string()))?;
+        let data = field
+            .bytes()
+            .await
+            .map_err(|e: MultipartError| ApiError::BadRequest(e.to_string()))?;
         total_size += data.len();
         if total_size > state.config.pages_max_upload_bytes {
             tokio::fs::remove_dir_all(&temp_base).await.ok();
@@ -93,9 +102,13 @@ pub async fn upload_files(
             for (name, content) in extracted {
                 let path = temp_base.join(&name);
                 if let Some(parent) = path.parent() {
-                    tokio::fs::create_dir_all(parent).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                    tokio::fs::create_dir_all(parent)
+                        .await
+                        .map_err(|e| ApiError::Internal(e.to_string()))?;
                 }
-                tokio::fs::write(&path, &content).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                tokio::fs::write(&path, &content)
+                    .await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
                 if name.ends_with(".html") {
                     html_files.push(name.clone());
                 }
@@ -106,9 +119,13 @@ pub async fn upload_files(
             let safe_name = sanitize_filename(&filename);
             let path = temp_base.join(&safe_name);
             if let Some(parent) = path.parent() {
-                tokio::fs::create_dir_all(parent).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
-            tokio::fs::write(&path, &data).await.map_err(|e: std::io::Error| ApiError::Internal(e.to_string()))?;
+            tokio::fs::write(&path, &data)
+                .await
+                .map_err(|e: std::io::Error| ApiError::Internal(e.to_string()))?;
             if safe_name.ends_with(".html") {
                 html_files.push(safe_name.clone());
             }
@@ -127,13 +144,19 @@ pub async fn upload_files(
         return Err(ApiError::BadRequest("no HTML files found".to_string()));
     }
 
-    let default_entry = html_files.iter()
+    let default_entry = html_files
+        .iter()
         .find(|f| **f == "index.html" || f.ends_with("/index.html"))
         .or_else(|| html_files.first())
         .expect("html_files is non-empty (checked above)")
         .clone();
 
-    let suggested_title = extract_title(saved_files.get(&default_entry).expect("default_entry was saved"), &default_entry);
+    let suggested_title = extract_title(
+        saved_files
+            .get(&default_entry)
+            .expect("default_entry was saved"),
+        &default_entry,
+    );
 
     let cleanup_path = temp_base.clone();
     tokio::spawn(async move {
@@ -149,7 +172,8 @@ pub async fn upload_files(
         Some(AuditResourceType::Page),
         None,
         serde_json::json!({"upload_id": upload_id, "file_count": file_count}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(UploadResponse {
         upload_id,
@@ -178,7 +202,9 @@ fn is_safe_relative_path(name: &str) -> bool {
     }
     // Every component must be Normal (no Prefix, RootDir, ParentDir, CurDir).
     use std::path::Component;
-    std::path::Path::new(name).components().all(|c| matches!(c, Component::Normal(_)))
+    std::path::Path::new(name)
+        .components()
+        .all(|c| matches!(c, Component::Normal(_)))
 }
 
 fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
@@ -186,22 +212,29 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
     const MAX_NAME_LEN: usize = 255;
 
     let reader = std::io::Cursor::new(data);
-    let mut archive = zip::ZipArchive::new(reader).map_err(|e| ApiError::BadRequest(format!("invalid zip: {e}")))?;
+    let mut archive = zip::ZipArchive::new(reader)
+        .map_err(|e| ApiError::BadRequest(format!("invalid zip: {e}")))?;
     let mut files = Vec::new();
     let mut total_extracted_size: usize = 0;
 
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| ApiError::Internal(e.to_string()))?;
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         let name = entry.name().to_string();
 
         if name.is_empty() {
             continue;
         }
         if name.len() > MAX_NAME_LEN {
-            return Err(ApiError::BadRequest(format!("zip entry name too long (max {MAX_NAME_LEN} chars): {name}")));
+            return Err(ApiError::BadRequest(format!(
+                "zip entry name too long (max {MAX_NAME_LEN} chars): {name}"
+            )));
         }
         if files.len() >= MAX_ENTRIES {
-            return Err(ApiError::BadRequest(format!("too many zip entries (max {MAX_ENTRIES})")));
+            return Err(ApiError::BadRequest(format!(
+                "too many zip entries (max {MAX_ENTRIES})"
+            )));
         }
         // Reject any path component that isn't a normal relative segment.
         // This blocks absolute paths, ".." traversal, drive letters, and
@@ -212,10 +245,13 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
         }
 
         let mut content = Vec::new();
-        std::io::Read::read_to_end(&mut entry, &mut content).map_err(|e| ApiError::Internal(e.to_string()))?;
+        std::io::Read::read_to_end(&mut entry, &mut content)
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         total_extracted_size += content.len();
         if total_extracted_size > 50 * 1024 * 1024 {
-            return Err(ApiError::BadRequest("zip too large (max 50MB uncompressed)".to_string()));
+            return Err(ApiError::BadRequest(
+                "zip too large (max 50MB uncompressed)".to_string(),
+            ));
         }
 
         files.push((name, content));
@@ -227,7 +263,9 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
 }
 
 fn strip_common_prefix(files: &mut Vec<(String, Vec<u8>)>) {
-    if files.is_empty() { return; }
+    if files.is_empty() {
+        return;
+    }
     let prefix = {
         let first = &files[0].0;
         let slash_pos = match first.find('/') {
@@ -278,46 +316,74 @@ pub async fn create_page_handler(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let temp_base = tmp_dir(&state).join(&req.upload_id);
 
-    let exists = tokio::fs::try_exists(&temp_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let exists = tokio::fs::try_exists(&temp_base)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     if !exists {
         return Err(ApiError::NotFound("upload session expired".to_string()));
     }
 
-    let file_count = count_files_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let file_count = count_files_recursive(temp_base.clone())
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let password = match &req.password {
-        Some(pw) if !pw.is_empty() => Some(crate::auth::password::hash_page_password(pw)
-            .map_err(|_| ApiError::BadRequest("password too long (max 128 chars)".to_string()))?),
+        Some(pw) if !pw.is_empty() => {
+            Some(crate::auth::password::hash_page_password(pw).map_err(|_| {
+                ApiError::BadRequest("password too long (max 128 chars)".to_string())
+            })?)
+        }
         _ => None,
     };
 
-    let expires_at = req.expires_at.as_deref()
+    let expires_at = req
+        .expires_at
+        .as_deref()
         .map(|s| chrono::DateTime::parse_from_rfc3339(s))
         .transpose()
-        .map_err(|_| ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string()))?
+        .map_err(|_| {
+            ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string())
+        })?
         .map(|dt| dt.to_utc());
 
     let new_page = page::create_page_with_retry(
-        &state.pool, auth.user_id, &req.title,
-        req.description.as_deref(), &req.entry_file,
-        password.as_deref(), file_count as i32,
+        &state.pool,
+        auth.user_id,
+        &req.title,
+        req.description.as_deref(),
+        &req.entry_file,
+        password.as_deref(),
+        file_count as i32,
         expires_at,
-    ).await?;
+    )
+    .await?;
 
     let slug = new_page.slug.clone();
     let has_password = password.is_some();
 
     if state.config.storage_type == "local" {
         let pages_base = pages_storage_path(&state).join(&slug);
-        tokio::fs::create_dir_all(&pages_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
-        copy_dir_recursive(temp_base.clone(), pages_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+        tokio::fs::create_dir_all(&pages_base)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
+        copy_dir_recursive(temp_base.clone(), pages_base)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
     } else {
-        let files = read_dir_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+        let files = read_dir_recursive(temp_base.clone())
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         for (relative_path, absolute_path) in &files {
             let key = format!("pages/{}/{}", slug, relative_path);
-            let data = tokio::fs::read(absolute_path).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            let data = tokio::fs::read(absolute_path)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             let mime = mime_for_path(relative_path);
-            state.storage.store(&key, &data, mime).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            state
+                .storage
+                .store(&key, &data, mime)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
         }
     }
 
@@ -335,7 +401,8 @@ pub async fn create_page_handler(
         Some(AuditResourceType::Page),
         Some(new_page.id),
         serde_json::json!({"slug": new_page.slug, "title": new_page.title}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({
         "id": new_page.id,
@@ -347,7 +414,9 @@ pub async fn create_page_handler(
     })))
 }
 
-fn count_files_recursive(dir: std::path::PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize, std::io::Error>> + Send>> {
+fn count_files_recursive(
+    dir: std::path::PathBuf,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize, std::io::Error>> + Send>> {
     Box::pin(async move {
         let mut count = 0;
         let mut entries = tokio::fs::read_dir(&dir).await?;
@@ -363,7 +432,10 @@ fn count_files_recursive(dir: std::path::PathBuf) -> std::pin::Pin<Box<dyn std::
     })
 }
 
-fn copy_dir_recursive(src: std::path::PathBuf, dst: std::path::PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>> {
+fn copy_dir_recursive(
+    src: std::path::PathBuf,
+    dst: std::path::PathBuf,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>> {
     Box::pin(async move {
         tokio::fs::create_dir_all(&dst).await?;
         let mut entries = tokio::fs::read_dir(&src).await?;
@@ -380,7 +452,14 @@ fn copy_dir_recursive(src: std::path::PathBuf, dst: std::path::PathBuf) -> std::
     })
 }
 
-fn read_dir_recursive(dir: std::path::PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<(String, std::path::PathBuf)>, std::io::Error>> + Send>> {
+fn read_dir_recursive(
+    dir: std::path::PathBuf,
+) -> std::pin::Pin<
+    Box<
+        dyn std::future::Future<Output = Result<Vec<(String, std::path::PathBuf)>, std::io::Error>>
+            + Send,
+    >,
+> {
     Box::pin(async move {
         let mut files = Vec::new();
         let mut entries = tokio::fs::read_dir(&dir).await?;
@@ -390,11 +469,23 @@ fn read_dir_recursive(dir: std::path::PathBuf) -> std::pin::Pin<Box<dyn std::fut
                 let sub = read_dir_recursive(path.clone()).await?;
                 for (_rel, abs) in sub {
                     let prefix = dir.to_str().unwrap_or("");
-                    let relative = abs.strip_prefix(prefix).unwrap_or(&abs).to_str().unwrap_or("").trim_start_matches('/').to_string();
+                    let relative = abs
+                        .strip_prefix(prefix)
+                        .unwrap_or(&abs)
+                        .to_str()
+                        .unwrap_or("")
+                        .trim_start_matches('/')
+                        .to_string();
                     files.push((relative, abs));
                 }
             } else {
-                let relative = path.strip_prefix(&dir).unwrap_or(&path).to_str().unwrap_or("").trim_start_matches('/').to_string();
+                let relative = path
+                    .strip_prefix(&dir)
+                    .unwrap_or(&path)
+                    .to_str()
+                    .unwrap_or("")
+                    .trim_start_matches('/')
+                    .to_string();
                 files.push((relative, path));
             }
         }
@@ -430,9 +521,13 @@ pub async fn list_pages_handler(
     let page_num = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20);
     let (items, total) = page::list_pages(
-        &state.pool, auth.user_id,
-        params.status.as_deref(), page_num, limit,
-    ).await?;
+        &state.pool,
+        auth.user_id,
+        params.status.as_deref(),
+        page_num,
+        limit,
+    )
+    .await?;
     Ok(Json(serde_json::json!({
         "items": items,
         "total": total,
@@ -450,29 +545,35 @@ pub async fn update_page_handler(
 ) -> Result<Json<page::Page>, ApiError> {
     if let Some(ref status) = req.status {
         if status != "active" && status != "disabled" {
-            return Err(ApiError::BadRequest("status must be 'active' or 'disabled'".to_string()));
+            return Err(ApiError::BadRequest(
+                "status must be 'active' or 'disabled'".to_string(),
+            ));
         }
     }
     let expires_at = match req.expires_at {
         Some(Some(s)) => {
-            let dt = chrono::DateTime::parse_from_rfc3339(&s)
-                .map_err(|_| ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string()))?;
+            let dt = chrono::DateTime::parse_from_rfc3339(&s).map_err(|_| {
+                ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string())
+            })?;
             Some(Some(dt.to_utc()))
         }
         Some(None) => Some(None), // explicitly clear expiration
-        None => None, // don't change
+        None => None,             // don't change
     };
 
     // Handle file replacement if upload_id is provided
     let (entry_file, file_count) = if let Some(ref upload_id) = req.upload_id {
         let temp_base = tmp_dir(&state).join(upload_id);
-        let exists = tokio::fs::try_exists(&temp_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+        let exists = tokio::fs::try_exists(&temp_base)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         if !exists {
             return Err(ApiError::NotFound("upload session expired".to_string()));
         }
 
         // Find existing page to get slug
-        let existing = page::find_page_by_id(&state.pool, auth.user_id, page_id).await?
+        let existing = page::find_page_by_id(&state.pool, auth.user_id, page_id)
+            .await?
             .ok_or_else(|| ApiError::NotFound("page not found".to_string()))?;
         let slug = existing.slug.clone();
 
@@ -481,24 +582,42 @@ pub async fn update_page_handler(
             let pages_base = pages_storage_path(&state).join(&slug);
             // Remove old files (ignore if directory doesn't exist)
             tokio::fs::remove_dir_all(&pages_base).await.ok();
-            tokio::fs::create_dir_all(&pages_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            tokio::fs::create_dir_all(&pages_base)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             // Copy new files
-            copy_dir_recursive(temp_base.clone(), pages_base).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            copy_dir_recursive(temp_base.clone(), pages_base)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
         } else {
             // Delete old S3 objects
             let prefix = format!("pages/{}/", slug);
-            state.storage.delete_prefix(&prefix).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            state
+                .storage
+                .delete_prefix(&prefix)
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             // Upload new files
-            let files = read_dir_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+            let files = read_dir_recursive(temp_base.clone())
+                .await
+                .map_err(|e| ApiError::Internal(e.to_string()))?;
             for (relative_path, absolute_path) in &files {
                 let key = format!("pages/{}/{}", slug, relative_path);
-                let data = tokio::fs::read(absolute_path).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                let data = tokio::fs::read(absolute_path)
+                    .await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
                 let mime = mime_for_path(relative_path);
-                state.storage.store(&key, &data, mime).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+                state
+                    .storage
+                    .store(&key, &data, mime)
+                    .await
+                    .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
         }
 
-        let count = count_files_recursive(temp_base.clone()).await.map_err(|e| ApiError::Internal(e.to_string()))?;
+        let count = count_files_recursive(temp_base.clone())
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
         // Cleanup temp dir
         tokio::fs::remove_dir_all(&temp_base).await.ok();
 
@@ -509,14 +628,19 @@ pub async fn update_page_handler(
 
     // Hash password before storing if a new password is provided
     let password = match req.password {
-        Some(ref pw) if !pw.is_empty() => Some(crate::auth::password::hash_page_password(pw)
-            .map_err(|_| ApiError::BadRequest("password too long (max 128 chars)".to_string()))?),
+        Some(ref pw) if !pw.is_empty() => {
+            Some(crate::auth::password::hash_page_password(pw).map_err(|_| {
+                ApiError::BadRequest("password too long (max 128 chars)".to_string())
+            })?)
+        }
         Some(ref pw) if pw.is_empty() => Some(String::new()), // empty string signals "clear password"
         _ => None,
     };
 
     let updated = page::update_page(
-        &state.pool, auth.user_id, page_id,
+        &state.pool,
+        auth.user_id,
+        page_id,
         &page::UpdatePageParams {
             title: req.title,
             description: req.description,
@@ -526,7 +650,8 @@ pub async fn update_page_handler(
             entry_file,
             file_count,
         },
-    ).await?;
+    )
+    .await?;
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),
@@ -535,7 +660,8 @@ pub async fn update_page_handler(
         Some(AuditResourceType::Page),
         Some(page_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(updated))
 }
 
@@ -557,7 +683,8 @@ pub async fn delete_page_handler(
         Some(AuditResourceType::Page),
         Some(page_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(serde_json::json!({"success": true})))
 }
 
@@ -576,7 +703,8 @@ pub async fn restore_page_handler(
         Some(AuditResourceType::Page),
         Some(page_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(serde_json::json!({"success": true})))
 }
 
@@ -592,12 +720,13 @@ pub async fn get_share_url_handler(
     auth: AuthUser,
     Path(page_id): Path<Uuid>,
 ) -> Result<Json<ShareUrlResponse>, ApiError> {
-    let page = page::find_page_by_id(&state.pool, auth.user_id, page_id).await?
+    let page = page::find_page_by_id(&state.pool, auth.user_id, page_id)
+        .await?
         .ok_or_else(|| ApiError::NotFound("page not found".to_string()))?;
-    
+
     let base_url = format!("/p/{}", page.slug);
     let has_password = page.password.is_some();
-    
+
     Ok(Json(ShareUrlResponse {
         url: base_url,
         has_password,
@@ -747,9 +876,7 @@ mod tests {
 
     #[test]
     fn strip_common_prefix_single_file_no_slash() {
-        let mut files = vec![
-            ("index.html".to_string(), vec![1u8]),
-        ];
+        let mut files = vec![("index.html".to_string(), vec![1u8])];
         strip_common_prefix(&mut files);
         assert_eq!(files[0].0, "index.html");
     }
@@ -876,7 +1003,10 @@ mod tests {
         let result = extract_zip(&data);
         match result {
             Err(ApiError::BadRequest(msg)) => {
-                assert!(msg.contains("too many zip entries"), "unexpected msg: {msg}");
+                assert!(
+                    msg.contains("too many zip entries"),
+                    "unexpected msg: {msg}"
+                );
             }
             other => panic!("expected BadRequest, got: {other:?}"),
         }

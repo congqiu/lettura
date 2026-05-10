@@ -1,12 +1,20 @@
-use super::scoring::score_nodes;
 use super::ExtractError;
+use super::scoring::score_nodes;
 use scraper::{ElementRef, Html};
 
-pub fn extract_content_with_selector(document: &Html, selector: &str) -> Result<String, ExtractError> {
+pub fn extract_content_with_selector(
+    document: &Html,
+    selector: &str,
+) -> Result<String, ExtractError> {
     let sel = scraper::Selector::parse(selector).map_err(|_| ExtractError::NoContent)?;
-    let element = document.select(&sel).next().ok_or(ExtractError::NoContent)?;
+    let element = document
+        .select(&sel)
+        .next()
+        .ok_or(ExtractError::NoContent)?;
     let content = element.inner_html();
-    if content.trim().is_empty() { return Err(ExtractError::NoContent); }
+    if content.trim().is_empty() {
+        return Err(ExtractError::NoContent);
+    }
     Ok(content)
 }
 

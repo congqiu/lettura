@@ -15,7 +15,7 @@ pub async fn run(
     let entries: Vec<EntrySummary> = client.get("/api/v1/entries", &q).await?;
     match output {
         OutputFormat::Ids => {
-            emit_ids(entries.iter().map(|e| e.id)).map_err(CliError::from)?;
+            emit_ids(entries.iter().map(|e| e.id.clone())).map_err(CliError::from)?;
         }
         OutputFormat::Json => {
             emit_json(&entries, pretty).map_err(CliError::from)?;

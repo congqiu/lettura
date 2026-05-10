@@ -221,9 +221,11 @@ mod tests {
         let result = Config::from_env();
         cleanup_env();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("must not be the default value"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("must not be the default value")
+        );
     }
 
     #[test]
@@ -241,7 +243,9 @@ mod tests {
     #[test]
     fn render_concurrency_parses() {
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
-        unsafe { env::set_var("LETTURA_RENDER_CONCURRENCY", "4"); }
+        unsafe {
+            env::set_var("LETTURA_RENDER_CONCURRENCY", "4");
+        }
         let cfg = Config::from_env().unwrap();
         assert_eq!(cfg.render_concurrency, 4);
         cleanup_env();
@@ -250,7 +254,9 @@ mod tests {
     #[test]
     fn rendering_enabled_disabled_via_env() {
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
-        unsafe { env::set_var("LETTURA_RENDERING_ENABLED", "false"); }
+        unsafe {
+            env::set_var("LETTURA_RENDERING_ENABLED", "false");
+        }
         let cfg = Config::from_env().unwrap();
         assert!(!cfg.rendering_runtime_enabled());
         cleanup_env();
@@ -259,10 +265,16 @@ mod tests {
     #[test]
     fn rejects_wildcard_cors_in_production_mode() {
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
-        unsafe { env::set_var("LETTURA_PRODUCTION", "true"); }
-        unsafe { env::set_var("CORS_ORIGINS", "*"); }
+        unsafe {
+            env::set_var("LETTURA_PRODUCTION", "true");
+        }
+        unsafe {
+            env::set_var("CORS_ORIGINS", "*");
+        }
         let result = Config::from_env();
-        unsafe { env::remove_var("LETTURA_PRODUCTION"); }
+        unsafe {
+            env::remove_var("LETTURA_PRODUCTION");
+        }
         cleanup_env();
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("CORS_ORIGINS"));

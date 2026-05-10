@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
+use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
 // Backup data structures
@@ -135,10 +135,7 @@ pub struct BackupSiteRule {
 // GET /api/v1/admin/backup
 // ---------------------------------------------------------------------------
 
-pub async fn backup(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> Result<Response, ApiError> {
+pub async fn backup(State(state): State<AppState>, auth: AuthUser) -> Result<Response, ApiError> {
     if !auth.is_admin {
         return Err(ApiError::Forbidden("admin required".to_string()));
     }
@@ -151,55 +148,45 @@ pub async fn backup(
     .map_err(|e| ApiError::Internal(e.to_string()))?;
     let user_count = users.len();
 
-    let entries = sqlx::query_as::<_, BackupEntry>(
-        "SELECT * FROM entries ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let entries = sqlx::query_as::<_, BackupEntry>("SELECT * FROM entries ORDER BY created_at")
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
     let entry_count = entries.len();
 
-    let tags = sqlx::query_as::<_, BackupTag>(
-        "SELECT * FROM tags ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let tags = sqlx::query_as::<_, BackupTag>("SELECT * FROM tags ORDER BY created_at")
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let entry_tags = sqlx::query_as::<_, BackupEntryTag>(
-        "SELECT * FROM entry_tags ORDER BY entry_id, tag_id",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let entry_tags =
+        sqlx::query_as::<_, BackupEntryTag>("SELECT * FROM entry_tags ORDER BY entry_id, tag_id")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let annotations = sqlx::query_as::<_, BackupAnnotation>(
-        "SELECT * FROM annotations ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let annotations =
+        sqlx::query_as::<_, BackupAnnotation>("SELECT * FROM annotations ORDER BY created_at")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let memos = sqlx::query_as::<_, BackupMemo>(
-        "SELECT * FROM memos ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let memos = sqlx::query_as::<_, BackupMemo>("SELECT * FROM memos ORDER BY created_at")
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let tagging_rules = sqlx::query_as::<_, BackupTaggingRule>(
-        "SELECT * FROM tagging_rules ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let tagging_rules =
+        sqlx::query_as::<_, BackupTaggingRule>("SELECT * FROM tagging_rules ORDER BY created_at")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let site_rules = sqlx::query_as::<_, BackupSiteRule>(
-        "SELECT * FROM site_rules ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let site_rules =
+        sqlx::query_as::<_, BackupSiteRule>("SELECT * FROM site_rules ORDER BY created_at")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let backup_data = BackupData {
         version: "1.0".to_string(),
@@ -227,12 +214,10 @@ pub async fn backup(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"users": user_count, "entries": entry_count}),
-    ).await;
+    )
+    .await;
 
-    let filename = format!(
-        "lettura-backup-{}.json",
-        Utc::now().format("%Y-%m-%d")
-    );
+    let filename = format!("lettura-backup-{}.json", Utc::now().format("%Y-%m-%d"));
 
     Ok((
         [
@@ -253,7 +238,10 @@ pub async fn backup(
 
 #[derive(Deserialize)]
 pub struct RestoreParams {
-    #[serde(default, deserialize_with = "crate::api::validate::deserialize_bool_from_string")]
+    #[serde(
+        default,
+        deserialize_with = "crate::api::validate::deserialize_bool_from_string"
+    )]
     pub confirm: Option<bool>,
 }
 
@@ -278,7 +266,11 @@ pub async fn restore(
         )));
     }
 
-    let mut tx = state.pool.begin().await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     // Clear all tables in reverse dependency order
     sqlx::query("DELETE FROM entry_tags")
@@ -495,20 +487,20 @@ pub async fn restore(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     for (id, user_id, title, text_content, url, domain) in &entries_for_index {
-            if let Err(e) = state
-                .search_index
-                .upsert(
-                    *id,
-                    *user_id,
-                    title.as_deref().unwrap_or(""),
-                    text_content.as_deref().unwrap_or(""),
-                    url,
-                    domain.as_deref().unwrap_or(""),
-                )
-                .await
-            {
-                tracing::warn!(entry_id = %id, "failed to re-index entry after restore: {e}");
-            }
+        if let Err(e) = state
+            .search_index
+            .upsert(
+                *id,
+                *user_id,
+                title.as_deref().unwrap_or(""),
+                text_content.as_deref().unwrap_or(""),
+                url,
+                domain.as_deref().unwrap_or(""),
+            )
+            .await
+        {
+            tracing::warn!(entry_id = %id, "failed to re-index entry after restore: {e}");
+        }
     }
 
     tracing::info!("admin restore completed");
@@ -521,7 +513,8 @@ pub async fn restore(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"users": data.users.len(), "entries": data.entries.len()}),
-    ).await;
+    )
+    .await;
 
     Ok(axum::Json(serde_json::json!({
         "message": "restore complete",
@@ -633,10 +626,7 @@ mod tests {
                 slug: "rust".to_string(),
                 created_at: now,
             }],
-            entry_tags: vec![BackupEntryTag {
-                entry_id,
-                tag_id,
-            }],
+            entry_tags: vec![BackupEntryTag { entry_id, tag_id }],
             annotations: vec![],
             memos: vec![],
             tagging_rules: vec![],

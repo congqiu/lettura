@@ -24,7 +24,10 @@ pub enum CliError {
     #[error("server_error: {0}")]
     ServerError(String),
     #[error("rate_limited: {message}")]
-    RateLimited { retry_after_sec: Option<u64>, message: String },
+    RateLimited {
+        retry_after_sec: Option<u64>,
+        message: String,
+    },
     #[error("conflict: {0}")]
     Conflict(String),
     #[error("network: {0}")]
@@ -58,8 +61,13 @@ impl CliError {
 
     pub fn hint(&self) -> Option<String> {
         match self {
-            Self::Unauthorized(_) => Some("Run `lettura-cli login` to refresh your credentials.".into()),
-            Self::RateLimited { retry_after_sec: Some(s), .. } => Some(format!("Retry after {s} seconds.")),
+            Self::Unauthorized(_) => {
+                Some("Run `lettura-cli login` to refresh your credentials.".into())
+            }
+            Self::RateLimited {
+                retry_after_sec: Some(s),
+                ..
+            } => Some(format!("Retry after {s} seconds.")),
             Self::NotFound(_) => Some("Use `lettura-cli list` to find entry ids.".into()),
             _ => None,
         }

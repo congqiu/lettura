@@ -16,7 +16,10 @@ pub struct AuthUser {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthSource {
     Jwt,
-    Pat { scope: PatScope, token_id: uuid::Uuid },
+    Pat {
+        scope: PatScope,
+        token_id: uuid::Uuid,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,8 +32,14 @@ impl AuthSource {
     pub fn allows_write(&self) -> bool {
         match self {
             AuthSource::Jwt => true,
-            AuthSource::Pat { scope: PatScope::Write, .. } => true,
-            AuthSource::Pat { scope: PatScope::Read, .. } => false,
+            AuthSource::Pat {
+                scope: PatScope::Write,
+                ..
+            } => true,
+            AuthSource::Pat {
+                scope: PatScope::Read,
+                ..
+            } => false,
         }
     }
 }
@@ -38,7 +47,10 @@ impl AuthSource {
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = ApiError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         let token = parts
             .headers
             .get("Authorization")
@@ -104,16 +116,28 @@ mod tests {
     #[test]
     fn auth_source_pat_read_equality() {
         let id = uuid::Uuid::new_v4();
-        let a = AuthSource::Pat { scope: PatScope::Read, token_id: id };
-        let b = AuthSource::Pat { scope: PatScope::Read, token_id: id };
+        let a = AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: id,
+        };
+        let b = AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: id,
+        };
         assert_eq!(a, b);
     }
 
     #[test]
     fn auth_source_pat_write_equality() {
         let id = uuid::Uuid::new_v4();
-        let a = AuthSource::Pat { scope: PatScope::Write, token_id: id };
-        let b = AuthSource::Pat { scope: PatScope::Write, token_id: id };
+        let a = AuthSource::Pat {
+            scope: PatScope::Write,
+            token_id: id,
+        };
+        let b = AuthSource::Pat {
+            scope: PatScope::Write,
+            token_id: id,
+        };
         assert_eq!(a, b);
     }
 
@@ -121,15 +145,24 @@ mod tests {
     fn auth_source_jwt_and_pat_are_not_equal() {
         let id = uuid::Uuid::new_v4();
         let jwt = AuthSource::Jwt;
-        let pat = AuthSource::Pat { scope: PatScope::Read, token_id: id };
+        let pat = AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: id,
+        };
         assert_ne!(jwt, pat);
     }
 
     #[test]
     fn auth_source_pat_different_scopes_not_equal() {
         let id = uuid::Uuid::new_v4();
-        let read = AuthSource::Pat { scope: PatScope::Read, token_id: id };
-        let write = AuthSource::Pat { scope: PatScope::Write, token_id: id };
+        let read = AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: id,
+        };
+        let write = AuthSource::Pat {
+            scope: PatScope::Write,
+            token_id: id,
+        };
         assert_ne!(read, write);
     }
 
@@ -143,14 +176,20 @@ mod tests {
     #[test]
     fn pat_write_allows_write() {
         let id = uuid::Uuid::new_v4();
-        let source = AuthSource::Pat { scope: PatScope::Write, token_id: id };
+        let source = AuthSource::Pat {
+            scope: PatScope::Write,
+            token_id: id,
+        };
         assert!(source.allows_write());
     }
 
     #[test]
     fn pat_read_denies_write() {
         let id = uuid::Uuid::new_v4();
-        let source = AuthSource::Pat { scope: PatScope::Read, token_id: id };
+        let source = AuthSource::Pat {
+            scope: PatScope::Read,
+            token_id: id,
+        };
         assert!(!source.allows_write());
     }
 
@@ -159,25 +198,37 @@ mod tests {
     #[test]
     fn lta_prefix_identifies_pat() {
         let token = "lta_abc123xyz";
-        assert!(token.starts_with("lta_"), "token with lta_ prefix should be identified as PAT");
+        assert!(
+            token.starts_with("lta_"),
+            "token with lta_ prefix should be identified as PAT"
+        );
     }
 
     #[test]
     fn non_lta_prefix_identified_as_jwt() {
         let token = "eyJhbGciOiJIUzI1NiJ9.payload.signature";
-        assert!(!token.starts_with("lta_"), "JWT token should not match lta_ prefix");
+        assert!(
+            !token.starts_with("lta_"),
+            "JWT token should not match lta_ prefix"
+        );
     }
 
     #[test]
     fn empty_token_identified_as_jwt() {
         let token = "";
-        assert!(!token.starts_with("lta_"), "empty token should not match lta_ prefix");
+        assert!(
+            !token.starts_with("lta_"),
+            "empty token should not match lta_ prefix"
+        );
     }
 
     #[test]
     fn lta_without_underscore_not_pat() {
         let token = "ltaabc123";
-        assert!(!token.starts_with("lta_"), "token starting with 'lta' but without underscore should not be PAT");
+        assert!(
+            !token.starts_with("lta_"),
+            "token starting with 'lta' but without underscore should not be PAT"
+        );
     }
 
     // --- PatScope tests ---

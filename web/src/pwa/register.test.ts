@@ -1,10 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-const registerSW = vi.fn()
-
-vi.mock('virtual:pwa-register', () => ({
-  registerSW: (options?: unknown) => registerSW(options),
-}))
+import { registerSW } from './__mocks__/pwa-register'
 
 describe('registerServiceWorker', () => {
   beforeEach(() => {
@@ -15,7 +10,6 @@ describe('registerServiceWorker', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllEnvs()
-    vi.resetModules()
   })
 
   it('does not register SW in DEV mode', async () => {

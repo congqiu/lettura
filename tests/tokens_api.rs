@@ -196,7 +196,10 @@ async fn delete_token_removes_it() {
 
     assert_eq!(list_res.status(), 200);
     let arr: serde_json::Value = list_res.json().await.unwrap();
-    assert!(arr.as_array().unwrap().is_empty(), "list should be empty after delete");
+    assert!(
+        arr.as_array().unwrap().is_empty(),
+        "list should be empty after delete"
+    );
 
     app.cleanup().await;
 }
@@ -271,7 +274,10 @@ async fn create_token_with_expires_in_days_stores_future_timestamp() {
 
     assert_eq!(list_res.status(), 200);
     let arr: Vec<serde_json::Value> = list_res.json().await.unwrap();
-    let row = arr.iter().find(|t| t["id"].as_str() == Some(id)).expect("token not found in list");
+    let row = arr
+        .iter()
+        .find(|t| t["id"].as_str() == Some(id))
+        .expect("token not found in list");
 
     let expires_at_str = row["expires_at"]
         .as_str()

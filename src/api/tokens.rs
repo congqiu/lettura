@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -59,7 +59,11 @@ pub async fn create_token(
         "read" => pat::Scope::Read,
         "write" => pat::Scope::Write,
         // unreachable after validation, but fail-safe:
-        _ => return Err(ApiError::BadRequest("scope must be 'read' or 'write'".into())),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "scope must be 'read' or 'write'".into(),
+            ));
+        }
     };
 
     let expires_at = req
@@ -91,7 +95,8 @@ pub async fn create_token(
         Some(AuditResourceType::Pat),
         Some(id),
         serde_json::json!({"name": req.name, "scope": scope_str}),
-    ).await;
+    )
+    .await;
 
     Ok((
         StatusCode::CREATED,
@@ -136,7 +141,8 @@ pub async fn delete_token(
             Some(AuditResourceType::Pat),
             Some(id),
             serde_json::json!({}),
-        ).await;
+        )
+        .await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound("token".into()))

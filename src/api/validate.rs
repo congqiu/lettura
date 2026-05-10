@@ -1,7 +1,7 @@
-use axum::extract::rejection::JsonRejection;
-use axum::extract::FromRequest;
-use axum::http::Request;
 use axum::Json;
+use axum::extract::FromRequest;
+use axum::extract::rejection::JsonRejection;
+use axum::http::Request;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use validator::Validate;

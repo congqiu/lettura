@@ -140,7 +140,8 @@ mod tests {
         assert!(
             content_score > sidebar_score,
             "content ({}) should score higher than sidebar ({})",
-            content_score, sidebar_score
+            content_score,
+            sidebar_score
         );
     }
 
@@ -157,7 +158,8 @@ mod tests {
         assert!(
             art_score > div_score,
             "article ({}) should score higher than div ({})",
-            art_score, div_score
+            art_score,
+            div_score
         );
     }
 
@@ -174,15 +176,12 @@ mod tests {
         assert!(
             article_score > nav_score,
             "article ({}) should score higher than nav ({})",
-            article_score, nav_score
+            article_score,
+            nav_score
         );
     }
 
-    fn find_score_by_id(
-        doc: &Html,
-        scores: &HashMap<ego_tree::NodeId, f64>,
-        id: &str,
-    ) -> f64 {
+    fn find_score_by_id(doc: &Html, scores: &HashMap<ego_tree::NodeId, f64>, id: &str) -> f64 {
         let sel = Selector::parse(&format!("#{}", id)).unwrap();
         doc.select(&sel)
             .next()
@@ -217,14 +216,24 @@ mod tests {
         let sel = Selector::parse("div").unwrap();
         let el = doc.select(&sel).next().unwrap();
         let density = compute_link_density(el);
-        assert_eq!(density, 0.0, "empty element must return 0 (no division by zero)");
+        assert_eq!(
+            density, 0.0,
+            "empty element must return 0 (no division by zero)"
+        );
     }
 
     #[test]
     fn compute_content_score_rewards_punctuation() {
-        let bare = compute_content_score("just some words without any punctuation in the middle here");
-        let with_commas = compute_content_score("words, with, several, commas, scattered, throughout, here");
-        assert!(with_commas > bare, "comma-rich text should outscore plain ({} vs {})", with_commas, bare);
+        let bare =
+            compute_content_score("just some words without any punctuation in the middle here");
+        let with_commas =
+            compute_content_score("words, with, several, commas, scattered, throughout, here");
+        assert!(
+            with_commas > bare,
+            "comma-rich text should outscore plain ({} vs {})",
+            with_commas,
+            bare
+        );
     }
 
     #[test]

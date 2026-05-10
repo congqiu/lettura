@@ -3,7 +3,7 @@ use lettura_cli::cli::{Cli, Command};
 use lettura_cli::client::ApiClient;
 use lettura_cli::commands;
 use lettura_cli::config::{Config, Override, resolve};
-use lettura_cli::error::{emit_error_to_stderr, CliError};
+use lettura_cli::error::{CliError, emit_error_to_stderr};
 
 #[tokio::main]
 async fn main() {
@@ -41,11 +41,19 @@ async fn run(args: Cli) -> i32 {
             commands::audit_logs::run(c, audit_args, args.output, args.pretty)
         }),
         Command::Tag(tag_args) => with_client!(&args, |c| commands::tag::run_tag(c, tag_args)),
-        Command::Untag(untag_args) => with_client!(&args, |c| commands::tag::run_untag(c, untag_args)),
-        Command::Archive(sc_args) => with_client!(&args, |c| commands::state::run_archive(c, sc_args)),
-        Command::Unarchive(sc_args) => with_client!(&args, |c| commands::state::run_unarchive(c, sc_args)),
+        Command::Untag(untag_args) => {
+            with_client!(&args, |c| commands::tag::run_untag(c, untag_args))
+        }
+        Command::Archive(sc_args) => {
+            with_client!(&args, |c| commands::state::run_archive(c, sc_args))
+        }
+        Command::Unarchive(sc_args) => {
+            with_client!(&args, |c| commands::state::run_unarchive(c, sc_args))
+        }
         Command::Star(sc_args) => with_client!(&args, |c| commands::state::run_star(c, sc_args)),
-        Command::Unstar(sc_args) => with_client!(&args, |c| commands::state::run_unstar(c, sc_args)),
+        Command::Unstar(sc_args) => {
+            with_client!(&args, |c| commands::state::run_unstar(c, sc_args))
+        }
 
         Command::Skill { cmd } => match cmd {
             lettura_cli::cli::SkillCmd::Print => commands::skill::run_print(),

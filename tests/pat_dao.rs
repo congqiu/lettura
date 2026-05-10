@@ -4,11 +4,7 @@ use chrono::{Duration, Utc};
 use lettura::models::pat;
 
 /// Register a user and return the user_id from DB.
-async fn register_user(
-    app: &common::TestApp,
-    username: &str,
-    email: &str,
-) -> uuid::Uuid {
+async fn register_user(app: &common::TestApp, username: &str, email: &str) -> uuid::Uuid {
     app.client
         .post(app.url("/api/v1/auth/register"))
         .json(&serde_json::json!({
@@ -19,12 +15,11 @@ async fn register_user(
         .send()
         .await
         .unwrap();
-    let (user_id,): (uuid::Uuid,) =
-        sqlx::query_as("SELECT id FROM users WHERE email = $1")
-            .bind(email)
-            .fetch_one(&app.pool)
-            .await
-            .unwrap();
+    let (user_id,): (uuid::Uuid,) = sqlx::query_as("SELECT id FROM users WHERE email = $1")
+        .bind(email)
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
     user_id
 }
 
@@ -154,11 +149,17 @@ async fn find_valid_by_hash_skips_expired() {
 
     // find_valid_by_hash must return None for expired token
     let valid = pat::find_valid_by_hash(&app.pool, &hash).await.unwrap();
-    assert!(valid.is_none(), "find_valid_by_hash must skip expired tokens");
+    assert!(
+        valid.is_none(),
+        "find_valid_by_hash must skip expired tokens"
+    );
 
     // find_by_hash still returns the row
     let raw = pat::find_by_hash(&app.pool, &hash).await.unwrap();
-    assert!(raw.is_some(), "find_by_hash must still return expired token");
+    assert!(
+        raw.is_some(),
+        "find_by_hash must still return expired token"
+    );
 
     app.cleanup().await;
 }
@@ -185,12 +186,18 @@ async fn touch_last_used_sets_timestamp_when_null() {
 
     // Before touch: last_used_at is NULL
     let before = pat::find_by_hash(&app.pool, &hash).await.unwrap().unwrap();
-    assert!(before.last_used_at.is_none(), "last_used_at should start as None");
+    assert!(
+        before.last_used_at.is_none(),
+        "last_used_at should start as None"
+    );
 
     pat::touch_last_used(&app.pool, id).await;
 
     let after = pat::find_by_hash(&app.pool, &hash).await.unwrap().unwrap();
-    assert!(after.last_used_at.is_some(), "last_used_at should be set after touch");
+    assert!(
+        after.last_used_at.is_some(),
+        "last_used_at should be set after touch"
+    );
 
     app.cleanup().await;
 }
@@ -241,7 +248,10 @@ async fn touch_last_used_debounces_within_60s() {
         .last_used_at
         .unwrap();
 
-    assert_eq!(t1, t2, "last_used_at must not change within debounce window");
+    assert_eq!(
+        t1, t2,
+        "last_used_at must not change within debounce window"
+    );
 
     app.cleanup().await;
 }

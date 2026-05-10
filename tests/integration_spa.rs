@@ -24,7 +24,13 @@ async fn sw_js_served_with_no_cache_and_etag() {
 async fn sw_js_returns_304_on_if_none_match() {
     let app = common::TestApp::new().await;
     let first = app.client.get(app.url("/sw.js")).send().await.unwrap();
-    let etag = first.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let etag = first
+        .headers()
+        .get("etag")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let second = app
         .client
@@ -35,7 +41,12 @@ async fn sw_js_returns_304_on_if_none_match() {
         .unwrap();
     assert_eq!(second.status(), 304);
     assert_eq!(
-        second.headers().get("cache-control").unwrap().to_str().unwrap(),
+        second
+            .headers()
+            .get("cache-control")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "no-cache"
     );
     app.cleanup().await;

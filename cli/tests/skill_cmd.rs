@@ -14,8 +14,14 @@ fn skill_install_writes_file() {
     let code = commands::skill::run_install(Some(path.to_str().unwrap())).unwrap();
     assert_eq!(code, 0);
     let content = std::fs::read_to_string(&path).unwrap();
-    assert!(content.contains("# Lettura CLI"), "expected skill body in installed file");
-    assert!(content.contains("{{BASE_URL}}"), "placeholders should be preserved verbatim");
+    assert!(
+        content.contains("# Lettura CLI"),
+        "expected skill body in installed file"
+    );
+    assert!(
+        content.contains("{{BASE_URL}}"),
+        "placeholders should be preserved verbatim"
+    );
 }
 
 #[test]

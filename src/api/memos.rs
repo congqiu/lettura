@@ -1,13 +1,13 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry, memo};
+use crate::state::AppState;
 use crate::tasks::fetcher::FetchJob;
 
 use super::validate::ValidatedJson;
@@ -34,7 +34,8 @@ pub async fn create_memo(
         Some(AuditResourceType::Memo),
         Some(m.id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(m))
 }
 
@@ -55,7 +56,8 @@ pub async fn delete_memo(
         Some(AuditResourceType::Memo),
         Some(memo_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 
@@ -93,8 +95,11 @@ pub async fn promote_memo(
             Some(AuditResourceType::Memo),
             Some(memo_id),
             serde_json::json!({"entry_id": new_entry.id}),
-        ).await;
-        Ok(Json(serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id})))
+        )
+        .await;
+        Ok(Json(
+            serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id}),
+        ))
     } else {
         let new_entry =
             entry::create_entry(&state.pool, auth.user_id, &format!("memo:{}", memo_id)).await?;
@@ -104,7 +109,12 @@ pub async fn promote_memo(
             Some(&m.content),
             Some(&format!("<p>{}</p>", m.content)),
             Some(&m.content),
-            None, None, None, Some(1), 0, "manual",
+            None,
+            None,
+            None,
+            Some(1),
+            0,
+            "manual",
         )
         .await?;
         memo::set_promoted_entry(&state.pool, memo_id, new_entry.id).await?;
@@ -116,8 +126,11 @@ pub async fn promote_memo(
             Some(AuditResourceType::Memo),
             Some(memo_id),
             serde_json::json!({"entry_id": new_entry.id}),
-        ).await;
-        Ok(Json(serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id})))
+        )
+        .await;
+        Ok(Json(
+            serde_json::json!({"message": "promoted to entry", "entry_id": new_entry.id}),
+        ))
     }
 }
 

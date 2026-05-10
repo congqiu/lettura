@@ -126,32 +126,50 @@ mod tests {
 
     #[test]
     fn display_bad_request() {
-        assert_eq!(ApiError::BadRequest("msg".to_string()).to_string(), "bad request: msg");
+        assert_eq!(
+            ApiError::BadRequest("msg".to_string()).to_string(),
+            "bad request: msg"
+        );
     }
 
     #[test]
     fn display_unauthorized() {
-        assert_eq!(ApiError::Unauthorized("msg".to_string()).to_string(), "unauthorized: msg");
+        assert_eq!(
+            ApiError::Unauthorized("msg".to_string()).to_string(),
+            "unauthorized: msg"
+        );
     }
 
     #[test]
     fn display_forbidden() {
-        assert_eq!(ApiError::Forbidden("msg".to_string()).to_string(), "forbidden: msg");
+        assert_eq!(
+            ApiError::Forbidden("msg".to_string()).to_string(),
+            "forbidden: msg"
+        );
     }
 
     #[test]
     fn display_not_found() {
-        assert_eq!(ApiError::NotFound("msg".to_string()).to_string(), "not found: msg");
+        assert_eq!(
+            ApiError::NotFound("msg".to_string()).to_string(),
+            "not found: msg"
+        );
     }
 
     #[test]
     fn display_conflict() {
-        assert_eq!(ApiError::Conflict("msg".to_string()).to_string(), "conflict: msg");
+        assert_eq!(
+            ApiError::Conflict("msg".to_string()).to_string(),
+            "conflict: msg"
+        );
     }
 
     #[test]
     fn display_internal() {
-        assert_eq!(ApiError::Internal("msg".to_string()).to_string(), "internal: msg");
+        assert_eq!(
+            ApiError::Internal("msg".to_string()).to_string(),
+            "internal: msg"
+        );
     }
 
     #[test]

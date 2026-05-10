@@ -2,4 +2,4 @@
 
 pub mod request_id;
 
-pub use request_id::{request_id_layer, RequestId, REQUEST_ID_HEADER};
+pub use request_id::{REQUEST_ID_HEADER, RequestId, request_id_layer};

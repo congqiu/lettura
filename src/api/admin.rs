@@ -1,12 +1,12 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::user::User;
+use crate::state::AppState;
 
 pub async fn list_users(
     State(state): State<AppState>,
@@ -40,7 +40,8 @@ pub async fn list_users(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"count": summaries.len()}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(summaries))
 }
@@ -102,7 +103,11 @@ pub async fn reindex(
     }
 
     // Flush the bulk changes immediately so they are searchable.
-    state.search_index.commit().await.map_err(|e| ApiError::Internal(e.to_string()))?;
+    state
+        .search_index
+        .commit()
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     audit_log::log_success(
         &state.pool,
@@ -112,7 +117,8 @@ pub async fn reindex(
         Some(AuditResourceType::System),
         None,
         serde_json::json!({"indexed": count}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({
         "message": "reindex complete",
@@ -134,7 +140,8 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
         let json = serde_json::to_value(&summary).expect("serialization should succeed");
-        let json_str = serde_json::to_string(&summary).expect("serialization to string should succeed");
+        let json_str =
+            serde_json::to_string(&summary).expect("serialization to string should succeed");
 
         assert!(!json_str.contains("password"));
         assert!(!json_str.contains("password_hash"));

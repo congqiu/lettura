@@ -14,21 +14,31 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: lettura
-          POSTGRES_PASSWORD: lettura
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: lettura
         ports:
-          - 5436:5436
+          - 5436:5432
         options: >-
-          --health-cmd "pg_isready -U lettura"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://lettura:lettura@localhost:5436/lettura
+      DATABASE_URL: postgres://postgres:postgres@localhost:5436/lettura
       JWT_SECRET: ci-test-secret-at-least-32-characters-long
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Build frontend assets
+        run: cd web && pnpm install --frozen-lockfile && pnpm run build
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
@@ -48,20 +58,23 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - name: Type check
         run: npx tsc -b
       - name: Unit tests
         run: npx vitest run
       - name: Build
-        run: npm run build
+        run: pnpm run build
       - name: Security audit
-        run: npx npm-audit-report --output markdown || npm audit --audit-level=moderate
+        run: pnpm audit --audit-level=moderate || true
 
   docker-build:
     name: Docker Build

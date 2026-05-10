@@ -29,13 +29,14 @@ async fn old_api_path_redirects_to_v1() {
         .unwrap();
     let res = client.get(app.url("/api/entries")).send().await.unwrap();
     assert_eq!(res.status(), 301);
-    assert!(res
-        .headers()
-        .get("location")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .contains("/api/v1/entries"));
+    assert!(
+        res.headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("/api/v1/entries")
+    );
     app.cleanup().await;
 }
 

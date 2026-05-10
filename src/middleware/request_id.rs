@@ -3,11 +3,7 @@
 //! Generates or propagates a unique request ID for each HTTP request,
 //! enabling correlation of logs across services and requests.
 
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, middleware::Next, response::Response};
 use uuid::Uuid;
 
 /// Header name for the request ID.
@@ -57,10 +53,7 @@ impl std::fmt::Display for RequestId {
 /// - Added to the request extensions for use in handlers
 /// - Set in the tracing span for structured logging
 /// - Returned in the response header for client correlation
-pub async fn request_id_layer(
-    mut request: Request,
-    next: Next,
-) -> Response {
+pub async fn request_id_layer(mut request: Request, next: Next) -> Response {
     // Extract or generate request ID
     let request_id = request
         .headers()

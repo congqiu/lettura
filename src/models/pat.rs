@@ -144,18 +144,12 @@ pub async fn list_for_user(
 }
 
 /// Delete a PAT by id and user_id.  Returns true if a row was deleted.
-pub async fn delete(
-    pool: &sqlx::PgPool,
-    user_id: Uuid,
-    id: Uuid,
-) -> Result<bool, ModelError> {
-    let result = sqlx::query(
-        "DELETE FROM personal_access_tokens WHERE id = $1 AND user_id = $2",
-    )
-    .bind(id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+pub async fn delete(pool: &sqlx::PgPool, user_id: Uuid, id: Uuid) -> Result<bool, ModelError> {
+    let result = sqlx::query("DELETE FROM personal_access_tokens WHERE id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -223,10 +217,14 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
         let json = serde_json::to_string(&pat).unwrap();
-        assert!(!json.contains("SECRET_HASH_SHOULD_NEVER_LEAK"),
-            "token_hash leaked in JSON: {json}");
-        assert!(!json.contains("token_hash"),
-            "token_hash key appeared in JSON: {json}");
+        assert!(
+            !json.contains("SECRET_HASH_SHOULD_NEVER_LEAK"),
+            "token_hash leaked in JSON: {json}"
+        );
+        assert!(
+            !json.contains("token_hash"),
+            "token_hash key appeared in JSON: {json}"
+        );
     }
 
     #[test]

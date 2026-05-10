@@ -1,5 +1,5 @@
-use super::parser;
 use super::SiteConfig;
+use super::parser;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::Path;
@@ -87,14 +87,18 @@ impl SiteConfigStore {
 /// If `local_path` is `Some`, all YAML files under it are scanned and parsed
 /// into the store; parse errors are logged but non-fatal.
 pub fn init_store(local_path: Option<String>) {
-    let mut store = STORE.write().expect("site config store lock is not poisoned");
+    let mut store = STORE
+        .write()
+        .expect("site config store lock is not poisoned");
     store.local_path = local_path;
     store.load_local();
 }
 
 /// Look up a site config from the global store.
 pub fn find_config(domain: &str, url: &str) -> Option<SiteConfig> {
-    let store = STORE.read().expect("site config store lock is not poisoned");
+    let store = STORE
+        .read()
+        .expect("site config store lock is not poisoned");
     store.find(domain, url)
 }
 
@@ -138,11 +142,7 @@ response:
     fn skips_non_yaml_files() {
         let dir = tempdir().unwrap();
         write_yaml(dir.path(), "notes.txt", "some note");
-        write_yaml(
-            dir.path(),
-            "real.com.yaml",
-            "response:\n  type: html\n",
-        );
+        write_yaml(dir.path(), "real.com.yaml", "response:\n  type: html\n");
 
         let mut store = SiteConfigStore::new();
         store.local_path = Some(dir.path().to_string_lossy().to_string());
@@ -167,7 +167,11 @@ match:
         store.local_path = Some(dir.path().to_string_lossy().to_string());
         store.load_local();
 
-        assert!(store.find("site.com", "https://site.com/article/1").is_some());
+        assert!(
+            store
+                .find("site.com", "https://site.com/article/1")
+                .is_some()
+        );
         assert!(store.find("site.com", "https://site.com/video/1").is_none());
     }
 
@@ -175,11 +179,7 @@ match:
     fn broken_yaml_is_logged_and_skipped() {
         let dir = tempdir().unwrap();
         write_yaml(dir.path(), "broken.com.yaml", "not: valid: yaml:");
-        write_yaml(
-            dir.path(),
-            "good.com.yaml",
-            "response:\n  type: html\n",
-        );
+        write_yaml(dir.path(), "good.com.yaml", "response:\n  type: html\n");
 
         let mut store = SiteConfigStore::new();
         store.local_path = Some(dir.path().to_string_lossy().to_string());

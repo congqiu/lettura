@@ -21,9 +21,16 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
     stdout.flush().map_err(CliError::from)?;
 
     let mut line = String::new();
-    std::io::stdin().lock().read_line(&mut line).map_err(CliError::from)?;
+    std::io::stdin()
+        .lock()
+        .read_line(&mut line)
+        .map_err(CliError::from)?;
     let entered = line.trim();
-    let url = if entered.is_empty() { default_url.to_string() } else { entered.to_string() };
+    let url = if entered.is_empty() {
+        default_url.to_string()
+    } else {
+        entered.to_string()
+    };
     if url.is_empty() {
         return Err(CliError::BadArgs("URL required".into()));
     }
@@ -39,7 +46,10 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
         .await
         .map_err(|e| CliError::Network(format!("cannot reach {url}: {e}")))?;
     if !probe.status().is_success() {
-        return Err(CliError::Network(format!("health check failed: HTTP {}", probe.status())));
+        return Err(CliError::Network(format!(
+            "health check failed: HTTP {}",
+            probe.status()
+        )));
     }
 
     output::info(&format!(
@@ -50,7 +60,10 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
     stdout.flush().map_err(CliError::from)?;
 
     let mut token_line = String::new();
-    std::io::stdin().lock().read_line(&mut token_line).map_err(CliError::from)?;
+    std::io::stdin()
+        .lock()
+        .read_line(&mut token_line)
+        .map_err(CliError::from)?;
     let token = token_line.trim().to_string();
     if !token.starts_with("lta_") {
         return Err(CliError::BadArgs("token must start with lta_".into()));
@@ -66,8 +79,10 @@ pub async fn run(profile_name: Option<&str>) -> Result<i32, CliError> {
     if cfg.default_profile.is_none() {
         cfg.default_profile = Some(profile_name.clone());
     }
-    cfg.profiles.insert(profile_name.clone(), Profile { url, token });
-    cfg.save_to(&path).map_err(|e| CliError::ServerError(e.to_string()))?;
+    cfg.profiles
+        .insert(profile_name.clone(), Profile { url, token });
+    cfg.save_to(&path)
+        .map_err(|e| CliError::ServerError(e.to_string()))?;
 
     output::info(&format!("Saved profile '{profile_name}'."));
     Ok(0)

@@ -43,7 +43,10 @@ pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>
 
 /// List rules with caching. This is the highest priority cache as it's queried
 /// on every fetch operation.
-pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>, ModelError> {
+pub async fn list_rules_cached(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<TaggingRule>, ModelError> {
     // Try cache first
     if let Some(cached) = crate::cache::TAGGING_RULE_CACHE.get(user_id).await {
         return Ok(cached);
@@ -53,7 +56,9 @@ pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<Taggi
     let rules = list_rules(pool, user_id).await?;
 
     // Update cache
-    crate::cache::TAGGING_RULE_CACHE.insert(user_id, rules.clone()).await;
+    crate::cache::TAGGING_RULE_CACHE
+        .insert(user_id, rules.clone())
+        .await;
 
     Ok(rules)
 }

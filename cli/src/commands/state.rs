@@ -11,11 +11,14 @@ async fn toggle(
     if args.filter.is_some() {
         return toggle_batch(client, args, field, value).await;
     }
-    let id = args.id.as_ref()
+    let id = args
+        .id
+        .as_ref()
         .ok_or_else(|| CliError::BadArgs("id or --filter required".into()))?;
     let body = serde_json::json!({ field: value });
     let resp: serde_json::Value = client
-        .http_patch(&format!("/api/v1/entries/{id}"), &body).await?;
+        .http_patch(&format!("/api/v1/entries/{id}"), &body)
+        .await?;
     crate::output::emit_json(&resp, true).map_err(CliError::from)?;
     Ok(0)
 }
@@ -32,8 +35,7 @@ async fn toggle_batch(
         ));
     }
     let filter_expr = args.filter.as_deref().unwrap();
-    let filter = crate::filter::parse(filter_expr)
-        .map_err(|e| CliError::BadArgs(e.to_string()))?;
+    let filter = crate::filter::parse(filter_expr).map_err(|e| CliError::BadArgs(e.to_string()))?;
     let filter_json = crate::commands::tag::filter_to_server_shape(&filter);
     let endpoint = match field {
         "is_archived" if value => "archive",
@@ -47,7 +49,8 @@ async fn toggle_batch(
         "dry_run": args.dry_run,
     });
     let resp: serde_json::Value = client
-        .post(&format!("/api/v1/entries/bulk/{endpoint}"), &body).await?;
+        .post(&format!("/api/v1/entries/bulk/{endpoint}"), &body)
+        .await?;
     crate::output::emit_json(&resp, true).map_err(CliError::from)?;
     Ok(0)
 }

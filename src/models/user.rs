@@ -109,7 +109,10 @@ pub async fn find_refresh_token(
     .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-pub async fn delete_refresh_token(pool: &PgPool, token_hash: &str) -> Result<sqlx::postgres::PgQueryResult, ModelError> {
+pub async fn delete_refresh_token(
+    pool: &PgPool,
+    token_hash: &str,
+) -> Result<sqlx::postgres::PgQueryResult, ModelError> {
     sqlx::query("DELETE FROM refresh_tokens WHERE token_hash = $1")
         .bind(token_hash)
         .execute(pool)
@@ -139,14 +142,13 @@ pub async fn revoke_token_family(pool: &PgPool, family: Uuid) -> Result<(), Mode
 
 pub async fn regenerate_feed_token(pool: &PgPool, user_id: Uuid) -> Result<String, ModelError> {
     let new_token = generate_feed_token();
-    let row: (String,) = sqlx::query_as(
-        "UPDATE users SET feed_token = $1 WHERE id = $2 RETURNING feed_token",
-    )
-    .bind(&new_token)
-    .bind(user_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| ModelError::Database(e.to_string()))?;
+    let row: (String,) =
+        sqlx::query_as("UPDATE users SET feed_token = $1 WHERE id = $2 RETURNING feed_token")
+            .bind(&new_token)
+            .bind(user_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(row.0)
 }
 
@@ -158,7 +160,11 @@ pub async fn cleanup_expired_refresh_tokens(pool: &PgPool) -> Result<u64, ModelE
     Ok(result.rows_affected())
 }
 
-pub async fn update_password(pool: &PgPool, user_id: Uuid, password_hash: &str) -> Result<(), ModelError> {
+pub async fn update_password(
+    pool: &PgPool,
+    user_id: Uuid,
+    password_hash: &str,
+) -> Result<(), ModelError> {
     sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
         .bind(password_hash)
         .bind(user_id)
@@ -188,7 +194,11 @@ mod tests {
     #[test]
     fn generate_feed_token_is_hex() {
         let token = generate_feed_token();
-        assert!(token.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(
+            token
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
     }
 
     #[test]

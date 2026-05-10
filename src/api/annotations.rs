@@ -1,13 +1,13 @@
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use uuid::Uuid;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{annotation, entry};
+use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
@@ -41,7 +41,8 @@ pub async fn create_annotation(
         Some(AuditResourceType::Annotation),
         Some(ann.id),
         serde_json::json!({"entry_id": entry_id}),
-    ).await;
+    )
+    .await;
     Ok(Json(ann))
 }
 
@@ -60,7 +61,8 @@ pub async fn update_annotation(
         Some(AuditResourceType::Annotation),
         Some(annotation_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(updated))
 }
 
@@ -81,7 +83,8 @@ pub async fn delete_annotation(
         Some(AuditResourceType::Annotation),
         Some(annotation_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 

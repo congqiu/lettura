@@ -1,19 +1,19 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
-use axum::Json;
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::auth_source_str;
 use crate::api::error::ApiError;
 use crate::auth::middleware::AuthUser;
-use crate::state::AppState;
 use crate::models::audit_log::{self, AuditAction, AuditDetails, AuditResourceType};
 use crate::models::entry::{self, ListParams, UpdateEntryParams};
 use crate::models::tag;
+use crate::state::AppState;
 use crate::tasks::fetcher::FetchJob;
 
-use super::validate::{deserialize_bool_from_string, ValidatedJson};
+use super::validate::{ValidatedJson, deserialize_bool_from_string};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct ListQueryParams {
@@ -76,11 +76,14 @@ pub async fn create_entry(
     let status = if r.already_existed {
         "existing".to_string()
     } else {
-        let _ = state.fetch_queue.send(FetchJob {
-            entry_id: r.entry.id,
-            user_id: auth.user_id,
-            url: r.entry.url.clone(),
-        }).await;
+        let _ = state
+            .fetch_queue
+            .send(FetchJob {
+                entry_id: r.entry.id,
+                user_id: auth.user_id,
+                url: r.entry.url.clone(),
+            })
+            .await;
         "queued".to_string()
     };
 
@@ -93,7 +96,8 @@ pub async fn create_entry(
             "already_existed": r.already_existed,
         })),
         ..Default::default()
-    }).unwrap_or_default();
+    })
+    .unwrap_or_default();
 
     audit_log::log_success(
         &state.pool,
@@ -103,7 +107,8 @@ pub async fn create_entry(
         Some(AuditResourceType::Entry),
         Some(r.entry.id),
         details,
-    ).await;
+    )
+    .await;
 
     Ok(Json(CreateEntryResponse {
         entry: r.entry,
@@ -215,8 +220,10 @@ pub async fn update_entry(
                 "is_starred": updated.is_starred,
             })),
             ..Default::default()
-        }).unwrap_or_default(),
-    ).await;
+        })
+        .unwrap_or_default(),
+    )
+    .await;
 
     Ok(Json(updated))
 }
@@ -244,7 +251,8 @@ pub async fn delete_entry(
         Some(AuditResourceType::Entry),
         Some(entry_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
@@ -257,14 +265,18 @@ pub async fn restore_entry(
     entry::restore_entry(&state.pool, entry_id, auth.user_id).await?;
     // Re-index restored entry
     if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await {
-        if let Err(e) = state.search_index.upsert(
-            restored.id,
-            auth.user_id,
-            restored.title.as_deref().unwrap_or(""),
-            restored.text_content.as_deref().unwrap_or(""),
-            &restored.url,
-            restored.domain_name.as_deref().unwrap_or(""),
-        ).await {
+        if let Err(e) = state
+            .search_index
+            .upsert(
+                restored.id,
+                auth.user_id,
+                restored.title.as_deref().unwrap_or(""),
+                restored.text_content.as_deref().unwrap_or(""),
+                &restored.url,
+                restored.domain_name.as_deref().unwrap_or(""),
+            )
+            .await
+        {
             tracing::warn!("search index upsert failed for entry {entry_id}: {e}");
         }
     }
@@ -278,7 +290,8 @@ pub async fn restore_entry(
         Some(AuditResourceType::Entry),
         Some(entry_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({"message": "restored"})))
 }
@@ -307,7 +320,8 @@ pub async fn permanently_delete_entry(
         Some(AuditResourceType::Entry),
         Some(entry_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({"message": "permanently deleted"})))
 }
@@ -321,9 +335,18 @@ pub async fn refetch_entry(
         .await?
         .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
     if found.is_content_edited {
-        return Err(ApiError::BadRequest("cannot refetch edited content".to_string()));
+        return Err(ApiError::BadRequest(
+            "cannot refetch edited content".to_string(),
+        ));
     }
-    let _ = state.fetch_queue.send(FetchJob { entry_id: found.id, user_id: auth.user_id, url: found.url.clone() }).await;
+    let _ = state
+        .fetch_queue
+        .send(FetchJob {
+            entry_id: found.id,
+            user_id: auth.user_id,
+            url: found.url.clone(),
+        })
+        .await;
 
     audit_log::log_success(
         &state.pool,
@@ -333,7 +356,8 @@ pub async fn refetch_entry(
         Some(AuditResourceType::Entry),
         Some(entry_id),
         serde_json::json!({}),
-    ).await;
+    )
+    .await;
 
     Ok(Json(serde_json::json!({"message": "refetch queued"})))
 }

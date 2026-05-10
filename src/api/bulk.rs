@@ -3,11 +3,14 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::api::auth_source_str;
-use crate::auth::middleware::AuthUser;
 use crate::api::error::ApiError;
 use crate::api::validate::ValidatedJson;
+use crate::auth::middleware::AuthUser;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
-use crate::models::{entry::{self, ListParams}, tag};
+use crate::models::{
+    entry::{self, ListParams},
+    tag,
+};
 use crate::state::AppState;
 
 #[derive(Deserialize)]
@@ -50,7 +53,9 @@ fn check_max(ids: &[uuid::Uuid], max: Option<i64>) -> Result<(), ApiError> {
     if let Some(m) = max {
         if ids.len() as i64 > m {
             return Err(ApiError::BadRequest(format!(
-                "matched {} exceeds max {}", ids.len(), m
+                "matched {} exceeds max {}",
+                ids.len(),
+                m
             )));
         }
     }
@@ -68,7 +73,11 @@ pub async fn bulk_tag_add(
     let ids = entry::find_ids_matching(&state.pool, auth.user_id, &req.filter).await?;
     check_max(&ids, req.max)?;
     if req.dry_run {
-        return Ok(Json(BulkResult { matched: ids.len(), updated: 0, ids }));
+        return Ok(Json(BulkResult {
+            matched: ids.len(),
+            updated: 0,
+            ids,
+        }));
     }
     tag::ensure_and_link(&state.pool, auth.user_id, &ids, &req.add).await?;
     let count = ids.len();
@@ -81,9 +90,14 @@ pub async fn bulk_tag_add(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"tags": req.add, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids,
+    }))
 }
 
 pub async fn bulk_untag(
@@ -97,17 +111,25 @@ pub async fn bulk_untag(
     let ids = entry::find_ids_matching(&state.pool, auth.user_id, &req.filter).await?;
     check_max(&ids, req.max)?;
     if req.dry_run {
-        return Ok(Json(BulkResult { matched: ids.len(), updated: 0, ids }));
+        return Ok(Json(BulkResult {
+            matched: ids.len(),
+            updated: 0,
+            ids,
+        }));
     }
     for id in &ids {
         for label in &req.remove {
             if let Some(t) = sqlx::query_as::<_, (uuid::Uuid,)>(
-                "SELECT id FROM tags WHERE user_id = $1 AND label = $2"
+                "SELECT id FROM tags WHERE user_id = $1 AND label = $2",
             )
-            .bind(auth.user_id).bind(label)
-            .fetch_optional(&state.pool).await
-            .map_err(|e| ApiError::Internal(e.to_string()))? {
-                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0).await
+            .bind(auth.user_id)
+            .bind(label)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            {
+                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0)
+                    .await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
         }
@@ -122,9 +144,14 @@ pub async fn bulk_untag(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"tags": req.remove, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids,
+    }))
 }
 
 pub async fn bulk_archive(
@@ -135,17 +162,24 @@ pub async fn bulk_archive(
     let ids = entry::find_ids_matching(&state.pool, auth.user_id, &req.filter).await?;
     check_max(&ids, req.max)?;
     if req.dry_run {
-        return Ok(Json(BulkResult { matched: ids.len(), updated: 0, ids }));
+        return Ok(Json(BulkResult {
+            matched: ids.len(),
+            updated: 0,
+            ids,
+        }));
     }
     if !ids.is_empty() {
         sqlx::query(
             "UPDATE entries SET is_archived = $1, \
              archived_at = CASE WHEN $1 THEN now() ELSE NULL END, \
              updated_at = now() \
-             WHERE user_id = $2 AND id = ANY($3)"
+             WHERE user_id = $2 AND id = ANY($3)",
         )
-        .bind(req.value).bind(auth.user_id).bind(&ids)
-        .execute(&state.pool).await
+        .bind(req.value)
+        .bind(auth.user_id)
+        .bind(&ids)
+        .execute(&state.pool)
+        .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     }
     let count = ids.len();
@@ -158,9 +192,14 @@ pub async fn bulk_archive(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"value": req.value, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids,
+    }))
 }
 
 pub async fn bulk_star(
@@ -171,17 +210,24 @@ pub async fn bulk_star(
     let ids = entry::find_ids_matching(&state.pool, auth.user_id, &req.filter).await?;
     check_max(&ids, req.max)?;
     if req.dry_run {
-        return Ok(Json(BulkResult { matched: ids.len(), updated: 0, ids }));
+        return Ok(Json(BulkResult {
+            matched: ids.len(),
+            updated: 0,
+            ids,
+        }));
     }
     if !ids.is_empty() {
         sqlx::query(
             "UPDATE entries SET is_starred = $1, \
              starred_at = CASE WHEN $1 THEN now() ELSE NULL END, \
              updated_at = now() \
-             WHERE user_id = $2 AND id = ANY($3)"
+             WHERE user_id = $2 AND id = ANY($3)",
         )
-        .bind(req.value).bind(auth.user_id).bind(&ids)
-        .execute(&state.pool).await
+        .bind(req.value)
+        .bind(auth.user_id)
+        .bind(&ids)
+        .execute(&state.pool)
+        .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
     }
     let count = ids.len();
@@ -194,9 +240,14 @@ pub async fn bulk_star(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"value": req.value, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids,
+    }))
 }
 
 // --- Bulk-by-IDs endpoints ---
@@ -254,9 +305,14 @@ pub async fn bulk_tag_by_ids(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"tags": req.tags, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids: req.entry_ids,
+    }))
 }
 
 pub async fn bulk_untag_by_ids(
@@ -273,12 +329,16 @@ pub async fn bulk_untag_by_ids(
     for id in &req.entry_ids {
         for label in &req.tags {
             if let Some(t) = sqlx::query_as::<_, (uuid::Uuid,)>(
-                "SELECT id FROM tags WHERE user_id = $1 AND label = $2"
+                "SELECT id FROM tags WHERE user_id = $1 AND label = $2",
             )
-            .bind(auth.user_id).bind(label)
-            .fetch_optional(&state.pool).await
-            .map_err(|e| ApiError::Internal(e.to_string()))? {
-                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0).await
+            .bind(auth.user_id)
+            .bind(label)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?
+            {
+                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0)
+                    .await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
         }
@@ -296,9 +356,14 @@ pub async fn bulk_untag_by_ids(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"tags": req.tags, "count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: count, updated: count, ids: req.entry_ids }))
+    Ok(Json(BulkResult {
+        matched: count,
+        updated: count,
+        ids: req.entry_ids,
+    }))
 }
 
 pub async fn bulk_delete_by_ids(
@@ -309,14 +374,13 @@ pub async fn bulk_delete_by_ids(
     if req.entry_ids.is_empty() {
         return Err(ApiError::BadRequest("entry_ids cannot be empty".into()));
     }
-    let result = sqlx::query(
-        "UPDATE entries SET deleted_at = NOW() WHERE id = ANY($1) AND user_id = $2"
-    )
-    .bind(&req.entry_ids)
-    .bind(auth.user_id)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let result =
+        sqlx::query("UPDATE entries SET deleted_at = NOW() WHERE id = ANY($1) AND user_id = $2")
+            .bind(&req.entry_ids)
+            .bind(auth.user_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let count = result.rows_affected() as usize;
 
@@ -328,9 +392,14 @@ pub async fn bulk_delete_by_ids(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
+    Ok(Json(BulkResult {
+        matched: req.entry_ids.len(),
+        updated: count,
+        ids: req.entry_ids,
+    }))
 }
 
 pub async fn bulk_archive_by_ids(
@@ -360,9 +429,14 @@ pub async fn bulk_archive_by_ids(
         Some(AuditResourceType::Entry),
         None,
         serde_json::json!({"count": count}),
-    ).await;
+    )
+    .await;
 
-    Ok(Json(BulkResult { matched: req.entry_ids.len(), updated: count, ids: req.entry_ids }))
+    Ok(Json(BulkResult {
+        matched: req.entry_ids.len(),
+        updated: count,
+        ids: req.entry_ids,
+    }))
 }
 
 #[cfg(test)]

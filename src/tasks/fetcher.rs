@@ -8,9 +8,9 @@
 //!   the channel and invoke `fetch::pipeline::process`.
 
 use sqlx::PgPool;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio::sync::{Mutex, mpsc};
 use uuid::Uuid;
 
 use crate::config::Config;

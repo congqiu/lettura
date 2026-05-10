@@ -42,7 +42,12 @@ impl ImageProcessor {
             match image_process_job::claim_pending(&self.pool).await {
                 Ok(Some(job)) => {
                     let processor = self.clone();
-                    let permit = self.semaphore.clone().acquire_owned().await.expect("semaphore is never closed");
+                    let permit = self
+                        .semaphore
+                        .clone()
+                        .acquire_owned()
+                        .await
+                        .expect("semaphore is never closed");
 
                     tokio::spawn(async move {
                         processor.process_job(&job).await;
@@ -69,7 +74,12 @@ impl ImageProcessor {
             "processing image job"
         );
 
-        let processed_html = crate::storage::process_images(&job.original_html, self.storage.clone(), self.max_image_size).await;
+        let processed_html = crate::storage::process_images(
+            &job.original_html,
+            self.storage.clone(),
+            self.max_image_size,
+        )
+        .await;
 
         // Update entry content with processed HTML
         match entry::update_content_only(&self.pool, job.entry_id, &processed_html).await {
