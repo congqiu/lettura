@@ -55,6 +55,10 @@ async fn run(args: Cli) -> i32 {
             with_client!(&args, |c| commands::state::run_unstar(c, sc_args))
         }
 
+        Command::Pages { cmd } => with_client!(&args, |c| {
+            commands::pages::run(cmd, c, args.output, args.pretty)
+        }),
+
         Command::Skill { cmd } => match cmd {
             lettura_cli::cli::SkillCmd::Print => commands::skill::run_print(),
             lettura_cli::cli::SkillCmd::Install { path } => {

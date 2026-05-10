@@ -32,6 +32,8 @@ pub enum CliError {
     Conflict(String),
     #[error("network: {0}")]
     Network(String),
+    #[error("upload_failed: {0}")]
+    UploadFailed(String),
 }
 
 impl CliError {
@@ -40,7 +42,7 @@ impl CliError {
             Self::NotFound(_) => ExitCode::NotFound,
             Self::Unauthorized(_) | Self::Forbidden(_) => ExitCode::Unauthorized,
             Self::BadArgs(_) => ExitCode::BadArgs,
-            Self::ServerError(_) | Self::Network(_) => ExitCode::ServerError,
+            Self::ServerError(_) | Self::Network(_) | Self::UploadFailed(_) => ExitCode::ServerError,
             Self::RateLimited { .. } => ExitCode::RateLimited,
             Self::Conflict(_) => ExitCode::Conflict,
         }
@@ -56,6 +58,7 @@ impl CliError {
             Self::RateLimited { .. } => "rate_limited",
             Self::Conflict(_) => "conflict",
             Self::Network(_) => "network",
+            Self::UploadFailed(_) => "upload_failed",
         }
     }
 
@@ -69,6 +72,7 @@ impl CliError {
                 ..
             } => Some(format!("Retry after {s} seconds.")),
             Self::NotFound(_) => Some("Use `lettura-cli list` to find entry ids.".into()),
+            Self::UploadFailed(_) => Some("Check file size and format. Max upload: 50MB for ZIP, 10MB for HTML.".into()),
             _ => None,
         }
     }

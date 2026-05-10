@@ -1,9 +1,11 @@
+use std::path::Path;
 use reqwest::{
     Client, StatusCode,
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
 use serde::{Serialize, de::DeserializeOwned};
 
+use crate::api_types::UploadResponse;
 use crate::error::CliError;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -116,6 +118,34 @@ impl ApiClient {
         } else {
             Err(map_status(status, body, retry_after))
         }
+    }
+
+    pub async fn upload_files(&self, file_path: &Path) -> Result<UploadResponse, CliError> {
+        let file_name = file_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let file_bytes = tokio::fs::read(file_path)
+            .await
+            .map_err(|e| CliError::UploadFailed(format!("Failed to read file: {e}")))?;
+
+        let part = reqwest::multipart::Part::bytes(file_bytes)
+            .file_name(file_name)
+            .mime_str("application/octet-stream")
+            .map_err(|e| CliError::UploadFailed(format!("MIME error: {e}")))?;
+
+        let form = reqwest::multipart::Form::new().part("files", part);
+
+        let resp = self
+            .http
+            .post(self.url("/api/v1/pages/upload"))
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| CliError::Network(e.to_string()))?;
+
+        handle_response(resp).await
     }
 }
 

@@ -73,3 +73,41 @@ pub struct ListAuditLogsResponse {
     pub limit: i64,
     pub offset: i64,
 }
+
+// Pages API types
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UploadResponse {
+    pub upload_id: String,
+    pub html_files: Vec<String>,
+    pub default_entry: String,
+    pub suggested_title: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PageResponse {
+    pub id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub url: String,
+    pub has_password: bool,
+    pub status: Option<String>,
+    pub expires_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PageListResponse {
+    pub items: Vec<PageResponse>,
+    pub total: u32,
+    pub page: u32,
+    pub limit: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PageShareResponse {
+    pub url: String,
+    pub has_password: bool,
+}
