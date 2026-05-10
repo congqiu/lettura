@@ -31,10 +31,10 @@ async fn setup_with_entries(app: &common::TestApp) -> String {
 
     // Manually update entry content via DB so we can search it
     // (fetcher won't actually fetch in test since example.com won't return article content)
-    sqlx::query("UPDATE entries SET title = 'Rust Ownership Guide', content = 'Learn about ownership and borrowing', text_content = 'Learn about ownership and borrowing', extract_method = 'readability', is_content_edited = true WHERE url = 'https://example.com/rust-ownership'")
+    sqlx::query("UPDATE entries SET title = 'Rust Ownership Guide', content = 'Learn about ownership and borrowing', text_content = 'Learn about ownership and borrowing', extract_method = 'readability', is_content_edited = true WHERE url = 'http://localhost:1/rust-ownership'")
         .execute(&app.pool).await.unwrap();
 
-    sqlx::query("UPDATE entries SET title = 'Python Programming', content = 'A beginner guide to Python', text_content = 'A beginner guide to Python', extract_method = 'readability', is_content_edited = true WHERE url = 'https://example.com/python-guide'")
+    sqlx::query("UPDATE entries SET title = 'Python Programming', content = 'A beginner guide to Python', text_content = 'A beginner guide to Python', extract_method = 'readability', is_content_edited = true WHERE url = 'http://localhost:1/python-guide'")
         .execute(&app.pool).await.unwrap();
 
     // Index them in search

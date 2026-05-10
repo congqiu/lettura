@@ -83,15 +83,21 @@ Publish an HTML file as a shareable page:
 lettura-cli pages publish ./site/index.html --title "My Page"
 lettura-cli pages publish ./site/          # directory → auto-zip
 lettura-cli pages publish https://example.com  # URL → fetch & publish
+lettura-cli pages publish ./site/ --password "secret" --expires-at 2026-12-31T23:59:59Z
+lettura-cli pages publish ./site/ --entry-file custom.html
 ```
 
 List, update, and share pages:
 
 ```sh
 lettura-cli pages list
-lettura-cli pages list --status disabled
+lettura-cli pages list --status deleted
 lettura-cli pages update <id> --title "New Title"
 lettura-cli pages update <id> --files ./new-site/  # replace files
+lettura-cli pages update <id> --password "new-secret"
+lettura-cli pages update <id> --clear-password
+lettura-cli pages update <id> --expires-at 2026-12-31T23:59:59Z
+lettura-cli pages update <id> --expires-at none  # clear expiration
 lettura-cli pages share <id>
 ```
 

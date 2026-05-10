@@ -42,8 +42,7 @@ pub async fn run(
 #[derive(serde::Serialize)]
 struct PublishBody {
     upload_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    entry_file: Option<String>,
+    entry_file: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,9 +71,14 @@ async fn publish(
 
     let title = args.title.clone().or(upload.suggested_title.clone());
 
+    let entry_file = args
+        .entry_file
+        .clone()
+        .unwrap_or(upload.default_entry.clone());
+
     let body = PublishBody {
         upload_id: upload.upload_id,
-        entry_file: args.entry_file.clone(),
+        entry_file,
         title,
         description: args.description.clone(),
         password: args.password.clone(),
@@ -91,7 +95,7 @@ async fn publish(
             emit_ids([&page.id]).map_err(CliError::from)?;
         }
         OutputFormat::Human => {
-            info(&format!("Published: {} ({})", page.title, page.url));
+            info(&format!("Published: {} (/p/{})", page.title, page.slug));
         }
     }
 
@@ -294,11 +298,11 @@ async fn list(
                 let status = p.status.as_deref().unwrap_or("-");
                 writeln!(
                     lock,
-                    "{}\t{}\t{}\t{}\t{}",
+                    "{}\t{}\t{}\t/p/{}\t{}",
                     p.slug,
                     p.title,
                     status,
-                    p.url,
+                    p.slug,
                     p.created_at
                 )?;
             }
@@ -313,7 +317,6 @@ async fn list(
 // ---------------------------------------------------------------------------
 
 #[derive(serde::Serialize, Default)]
-#[serde(default)]
 struct UpdateBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     title: Option<String>,
@@ -321,13 +324,10 @@ struct UpdateBody {
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     password: Option<String>,
-    /// null means "clear the password"
-    #[serde(skip_serializing_if = "Option::is_none")]
-    clear_password: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    expires_at: Option<String>,
+    expires_at: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     upload_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -350,14 +350,21 @@ async fn update(
     body.title = args.title.clone();
     body.description = args.description.clone();
     body.status = args.status.clone();
-    body.expires_at = args.expires_at.clone();
     body.entry_file = args.entry_file.clone();
 
     if args.clear_password {
-        body.clear_password = Some(true);
-        body.password = None;
+        // Empty string signals "clear password" to the server
+        body.password = Some(String::new());
     } else {
         body.password = args.password.clone();
+    }
+
+    if let Some(ref exp) = args.expires_at {
+        if exp == "none" {
+            body.expires_at = Some(serde_json::Value::Null);
+        } else {
+            body.expires_at = Some(serde_json::Value::String(exp.clone()));
+        }
     }
 
     // Upload files if --files is provided
@@ -372,6 +379,9 @@ async fn update(
         }
 
         body.upload_id = Some(upload.upload_id);
+        if body.entry_file.is_none() {
+            body.entry_file = Some(upload.default_entry);
+        }
     }
 
     let path = format!("/api/v1/pages/{}", args.id);
@@ -385,7 +395,7 @@ async fn update(
             emit_ids([&page.id]).map_err(CliError::from)?;
         }
         OutputFormat::Human => {
-            info(&format!("Updated: {} ({})", page.title, page.url));
+            info(&format!("Updated: {} (/p/{})", page.title, page.slug));
         }
     }
 

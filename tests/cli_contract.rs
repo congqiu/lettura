@@ -346,43 +346,53 @@ async fn cli_get_markdown_has_frontmatter() {
     app.cleanup().await;
 }
 
+/// Helper: publish a temp HTML file and return the page ID.
+async fn publish_temp_page(
+    bin: &std::path::Path,
+    server: &str,
+    token: &str,
+    title: &str,
+) -> (String, std::path::PathBuf) {
+    let temp_dir = std::env::temp_dir().join(format!("lettura-contract-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let html_file = temp_dir.join("index.html");
+    std::fs::write(
+        &html_file,
+        format!(
+            "<html><head><title>{}</title></head><body>Content</body></html>",
+            title
+        ),
+    )
+    .unwrap();
+
+    let (code, stdout, stderr) = run_cli(
+        bin,
+        server,
+        token,
+        &["pages", "publish", html_file.to_str().unwrap(), "--title", title],
+    )
+    .await;
+    assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
+    let page: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let page_id = page["id"].as_str().unwrap().to_string();
+    (page_id, temp_dir)
+}
+
 #[tokio::test]
 async fn cli_pages_publish_and_list() {
     let app = TestApp::new().await;
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let temp_dir = std::env::temp_dir().join("lettura-contract-pages");
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    std::fs::create_dir_all(&temp_dir).unwrap();
-    let html_file = temp_dir.join("test-page.html");
-    std::fs::write(&html_file, "<html><head><title>Test Page</title></head><body>Hello</body></html>").unwrap();
-
-    // publish
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &[
-            "pages", "publish",
-            html_file.to_str().unwrap(),
-            "--title", "My Page",
-        ],
-    )
-    .await;
-    assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "My Page").await;
 
     // list should include the published page
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &["pages", "list"],
-    )
-    .await;
+    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
     assert_eq!(code, 0, "list failed: stderr={stderr} stdout={stdout}");
     let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    assert!(list["items"].as_array().map(|a| !a.is_empty()).unwrap_or(false), "list should have items");
+    let items = list["items"].as_array().unwrap();
+    assert!(!items.is_empty(), "list should have items");
+    assert!(items.iter().any(|p| p["id"].as_str().unwrap() == page_id));
 
     std::fs::remove_dir_all(&temp_dir).ok();
     app.cleanup().await;
@@ -394,41 +404,19 @@ async fn cli_pages_update_and_share() {
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let temp_dir = std::env::temp_dir().join("lettura-contract-pages-update");
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    std::fs::create_dir_all(&temp_dir).unwrap();
-    let html_file = temp_dir.join("test-page.html");
-    std::fs::write(&html_file, "<html><head><title>Test</title></head><body>Hello</body></html>").unwrap();
-
-    // publish
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &[
-            "pages", "publish",
-            html_file.to_str().unwrap(),
-            "--title", "Original",
-        ],
-    )
-    .await;
-    assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
-
-    // get page id from list
-    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
-    assert_eq!(code, 0, "list failed: stderr={stderr}");
-    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    let page_id = list["items"][0]["id"].as_str().unwrap().to_string();
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Update Test").await;
 
     // update title
     let (code, stdout, stderr) = run_cli(
         &bin,
         &app.addr,
         &token,
-        &["pages", "update", &page_id, "--title", "Updated"],
+        &["pages", "update", &page_id, "--title", "Updated Title"],
     )
     .await;
     assert_eq!(code, 0, "update failed: stderr={stderr} stdout={stdout}");
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(updated["title"].as_str().unwrap(), "Updated Title");
 
     // share
     let (code, stdout, stderr) = run_cli(
@@ -452,31 +440,7 @@ async fn cli_pages_delete_and_restore() {
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let temp_dir = std::env::temp_dir().join("lettura-contract-pages-del");
-    let _ = std::fs::remove_dir_all(&temp_dir);
-    std::fs::create_dir_all(&temp_dir).unwrap();
-    let html_file = temp_dir.join("test-page.html");
-    std::fs::write(&html_file, "<html><head><title>Test</title></head><body>Hello</body></html>").unwrap();
-
-    // publish
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &[
-            "pages", "publish",
-            html_file.to_str().unwrap(),
-            "--title", "To Delete",
-        ],
-    )
-    .await;
-    assert_eq!(code, 0, "publish failed: stderr={stderr}");
-
-    // get page id
-    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
-    assert_eq!(code, 0, "list failed: stderr={stderr}");
-    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    let page_id = list["items"][0]["id"].as_str().unwrap().to_string();
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Delete Test").await;
 
     // delete
     let (code, stdout, stderr) = run_cli(
@@ -488,6 +452,19 @@ async fn cli_pages_delete_and_restore() {
     .await;
     assert_eq!(code, 0, "delete failed: stderr={stderr} stdout={stdout}");
 
+    // list --status deleted should include it
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "list", "--status", "deleted"],
+    )
+    .await;
+    assert_eq!(code, 0, "list deleted failed: stderr={stderr} stdout={stdout}");
+    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let items = list["items"].as_array().unwrap();
+    assert!(items.iter().any(|p| p["id"].as_str().unwrap() == page_id));
+
     // restore
     let (code, stdout, stderr) = run_cli(
         &bin,
@@ -497,6 +474,215 @@ async fn cli_pages_delete_and_restore() {
     )
     .await;
     assert_eq!(code, 0, "restore failed: stderr={stderr} stdout={stdout}");
+
+    // list (active) should include it again
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "list"],
+    )
+    .await;
+    assert_eq!(code, 0, "list active failed: stderr={stderr} stdout={stdout}");
+    let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let items = list["items"].as_array().unwrap();
+    assert!(items.iter().any(|p| p["id"].as_str().unwrap() == page_id));
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_publish_directory() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    // Create a directory with multiple files
+    let temp_dir = std::env::temp_dir().join(format!("lettura-contract-dir-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    std::fs::write(
+        temp_dir.join("index.html"),
+        "<html><head><title>Dir Page</title></head><body>Main</body></html>",
+    )
+    .unwrap();
+    std::fs::write(temp_dir.join("style.css"), "body { color: red; }").unwrap();
+
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &[
+            "pages",
+            "publish",
+            temp_dir.to_str().unwrap(),
+            "--title",
+            "Dir Page",
+        ],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "publish dir failed: stderr={stderr} stdout={stdout}"
+    );
+    let page: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(page["id"].as_str().is_some());
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_password_protection() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let (page_id, temp_dir) =
+        publish_temp_page(&bin, &app.addr, &token, "Password Test").await;
+
+    // update with password
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--password", "s3cret!"],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "set password failed: stderr={stderr} stdout={stdout}"
+    );
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(
+        updated["password"].as_str().is_some(),
+        "page should have password"
+    );
+
+    // clear password
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--clear-password"],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "clear password failed: stderr={stderr} stdout={stdout}"
+    );
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(
+        updated["password"].is_null(),
+        "page should not have password"
+    );
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_update_files_and_entry_file() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let (page_id, temp_dir) =
+        publish_temp_page(&bin, &app.addr, &token, "Files Test").await;
+
+    // Create a new file to replace
+    let new_file = temp_dir.join("updated.html");
+    std::fs::write(
+        &new_file,
+        "<html><head><title>Updated</title></head><body>New content</body></html>",
+    )
+    .unwrap();
+
+    // update with --files to replace content
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--files", new_file.to_str().unwrap()],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "update files failed: stderr={stderr} stdout={stdout}"
+    );
+
+    // update with --entry-file to change the entry point
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--entry-file", "updated.html"],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "update entry-file failed: stderr={stderr} stdout={stdout}"
+    );
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(
+        updated["entry_file"].as_str().unwrap(),
+        "updated.html"
+    );
+
+    std::fs::remove_dir_all(&temp_dir).ok();
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn cli_pages_expires_at() {
+    let app = TestApp::new().await;
+    let token = make_pat(&app).await;
+    let bin = locate_cli_binary();
+
+    let (page_id, temp_dir) =
+        publish_temp_page(&bin, &app.addr, &token, "Expires Test").await;
+
+    // set expires_at
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &[
+            "pages",
+            "update",
+            &page_id,
+            "--expires-at",
+            "2099-12-31T23:59:59Z",
+        ],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "set expires_at failed: stderr={stderr} stdout={stdout}"
+    );
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(
+        updated["expires_at"].as_str().is_some(),
+        "expires_at should be set"
+    );
+
+    // clear expires_at with "none"
+    let (code, stdout, stderr) = run_cli(
+        &bin,
+        &app.addr,
+        &token,
+        &["pages", "update", &page_id, "--expires-at", "none"],
+    )
+    .await;
+    assert_eq!(
+        code, 0,
+        "clear expires_at failed: stderr={stderr} stdout={stdout}"
+    );
+    let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert!(
+        updated["expires_at"].is_null(),
+        "expires_at should be null after clearing"
+    );
 
     std::fs::remove_dir_all(&temp_dir).ok();
     app.cleanup().await;

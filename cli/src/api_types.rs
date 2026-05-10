@@ -84,15 +84,36 @@ pub struct UploadResponse {
     pub suggested_title: Option<String>,
 }
 
+/// Response from POST /api/v1/pages and PATCH /api/v1/pages/{id}
+/// (server returns the full Page model)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PageResponse {
     pub id: String,
     pub slug: String,
+    pub user_id: Option<String>,
     pub title: String,
     pub description: Option<String>,
-    pub url: String,
+    pub entry_file: String,
+    pub password: Option<String>,
+    pub status: Option<String>,
+    pub file_count: i64,
+    pub expires_at: Option<String>,
+    pub deleted_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+/// Response from GET /api/v1/pages (list)
+/// (server returns PageSummary with has_password instead of password hash)
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PageListItem {
+    pub id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: Option<String>,
     pub has_password: bool,
     pub status: Option<String>,
+    pub file_count: i64,
     pub expires_at: Option<String>,
     pub created_at: String,
     pub updated_at: Option<String>,
@@ -100,7 +121,7 @@ pub struct PageResponse {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PageListResponse {
-    pub items: Vec<PageResponse>,
+    pub items: Vec<PageListItem>,
     pub total: u32,
     pub page: u32,
     pub limit: u32,
