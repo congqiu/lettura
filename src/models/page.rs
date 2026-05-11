@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Page {
     pub id: Uuid,
     pub slug: String,
@@ -21,6 +21,35 @@ pub struct Page {
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl Serialize for Page {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        // 13 fields: id, slug, user_id, title, description, entry_file,
+        // has_password, status, file_count, expires_at, deleted_at,
+        // created_at, updated_at
+        // Only expose whether a password is set; the actual hash is never
+        // returned to the client.
+        let mut state = serializer.serialize_struct("Page", 13)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("slug", &self.slug)?;
+        state.serialize_field("user_id", &self.user_id)?;
+        state.serialize_field("title", &self.title)?;
+        state.serialize_field("description", &self.description)?;
+        state.serialize_field("entry_file", &self.entry_file)?;
+        state.serialize_field("has_password", &self.password.is_some())?;
+        state.serialize_field("status", &self.status)?;
+        state.serialize_field("file_count", &self.file_count)?;
+        state.serialize_field("expires_at", &self.expires_at)?;
+        state.serialize_field("deleted_at", &self.deleted_at)?;
+        state.serialize_field("created_at", &self.created_at)?;
+        state.serialize_field("updated_at", &self.updated_at)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -352,5 +381,52 @@ mod tests {
         };
         let json = serde_json::to_string(&summary).unwrap();
         assert!(json.contains("\"has_password\":false"));
+    }
+
+    fn make_page(password: Option<String>) -> Page {
+        Page {
+            id: Uuid::new_v4(),
+            slug: "abc123".to_string(),
+            user_id: Uuid::new_v4(),
+            title: "Test".to_string(),
+            description: None,
+            entry_file: "index.html".to_string(),
+            password,
+            status: "active".to_string(),
+            file_count: 1,
+            expires_at: None,
+            deleted_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn page_serialization_hides_password() {
+        let page = make_page(Some("hashed_value".to_string()));
+        let json = serde_json::to_string(&page).unwrap();
+        assert!(json.contains("\"has_password\":true"));
+        assert!(!json.contains("hashed_value"));
+        assert!(!json.contains("\"password\""));
+    }
+
+    #[test]
+    fn page_serialization_no_password() {
+        let page = make_page(None);
+        let json = serde_json::to_string(&page).unwrap();
+        assert!(json.contains("\"has_password\":false"));
+    }
+
+    #[test]
+    fn page_serialization_includes_all_fields() {
+        let page = make_page(None);
+        let json: serde_json::Value = serde_json::to_value(&page).unwrap();
+        for field in &[
+            "id", "slug", "user_id", "title", "description", "entry_file",
+            "has_password", "status", "file_count", "expires_at",
+            "deleted_at", "created_at", "updated_at",
+        ] {
+            assert!(json.get(field).is_some(), "missing field: {field}");
+        }
     }
 }

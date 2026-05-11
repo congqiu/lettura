@@ -299,8 +299,8 @@ pub fn router_with_search(
             axum::http::header::HeaderName::from_static("referrer-policy"),
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
-        // Content-Security-Policy
-        .layer(SetResponseHeaderLayer::overriding(
+        // Content-Security-Policy (use if_not_present so /p/ routes can set their own CSP)
+        .layer(SetResponseHeaderLayer::if_not_present(
             axum::http::header::HeaderName::from_static("content-security-policy"),
             HeaderValue::from_static(
                 "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"

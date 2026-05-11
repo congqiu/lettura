@@ -15,7 +15,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: false,
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/feed\//, /^\/metrics/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/feed\//, /^\/metrics/, /^\/p\//],
         globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico,webmanifest}'],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
@@ -61,6 +61,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3330',
       '/feed': 'http://localhost:3330',
+      '/p': 'http://localhost:3330',
     },
   },
   test: {

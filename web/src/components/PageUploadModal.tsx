@@ -88,7 +88,7 @@ export default function PageUploadModal({ open, onClose }: Props) {
     }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['pages'] });
-      const fullUrl = `${window.location.origin}${data.url}`;
+      const fullUrl = `${window.location.origin}/p/${data.slug}`;
       navigator.clipboard.writeText(fullUrl);
       toast.success(`页面已发布，链接已复制${data.has_password ? '（需密码访问）' : ''}: /p/${data.slug}`);
       onClose();

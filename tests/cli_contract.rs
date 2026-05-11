@@ -555,7 +555,7 @@ async fn cli_pages_password_protection() {
     );
     let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert!(
-        updated["password"].as_str().is_some(),
+        updated["has_password"].as_bool().unwrap_or(false),
         "page should have password"
     );
 
@@ -573,7 +573,7 @@ async fn cli_pages_password_protection() {
     );
     let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert!(
-        updated["password"].is_null(),
+        !updated["has_password"].as_bool().unwrap_or(false),
         "page should not have password"
     );
 

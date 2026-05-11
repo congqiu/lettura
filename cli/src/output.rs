@@ -85,9 +85,9 @@ pub fn emit_human_audit_logs(
     Ok(())
 }
 
-/// Print an informational message, suppressed by --quiet.
+/// Print an informational message to stderr, suppressed by --quiet.
 pub fn info(msg: &str) {
     if !is_quiet() {
-        let _ = writeln!(std::io::stdout().lock(), "{msg}");
+        let _ = writeln!(std::io::stderr().lock(), "{msg}");
     }
 }

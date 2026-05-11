@@ -16,6 +16,7 @@ export interface PageSummary {
 export interface Page {
   id: string;
   slug: string;
+  user_id: string;
   title: string;
   description: string | null;
   entry_file: string;
@@ -23,6 +24,7 @@ export interface Page {
   status: string;
   file_count: number;
   expires_at: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,15 +44,6 @@ export interface UploadResponse {
   file_count: number;
 }
 
-export interface CreatePageResponse {
-  id: string;
-  slug: string;
-  title: string;
-  url: string;
-  has_password: boolean;
-  created_at: string;
-}
-
 export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   const formData = new FormData();
   files.forEach(f => formData.append('files', f));
@@ -67,7 +60,7 @@ export async function createPage(data: {
   description?: string;
   password?: string;
   expires_at?: string;
-}): Promise<CreatePageResponse> {
+}): Promise<Page> {
   const res = await api.post('/pages', data);
   return res.data;
 }

@@ -313,7 +313,7 @@ pub async fn create_page_handler(
     State(state): State<AppState>,
     auth: AuthUser,
     ValidatedJson(req): ValidatedJson<CreatePageRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<Json<page::Page>, ApiError> {
     let temp_base = tmp_dir(&state).join(&req.upload_id);
 
     let exists = tokio::fs::try_exists(&temp_base)
@@ -359,7 +359,6 @@ pub async fn create_page_handler(
     .await?;
 
     let slug = new_page.slug.clone();
-    let has_password = password.is_some();
 
     if state.config.storage_type == "local" {
         let pages_base = pages_storage_path(&state).join(&slug);
@@ -391,8 +390,6 @@ pub async fn create_page_handler(
 
     tracing::info!(page_id = %new_page.id, slug = %slug, "page created");
 
-    let url = format!("/p/{}", new_page.slug);
-
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),
@@ -404,14 +401,7 @@ pub async fn create_page_handler(
     )
     .await;
 
-    Ok(Json(serde_json::json!({
-        "id": new_page.id,
-        "slug": new_page.slug,
-        "title": new_page.title,
-        "url": url,
-        "has_password": has_password,
-        "created_at": new_page.created_at,
-    })))
+    Ok(Json(new_page))
 }
 
 fn count_files_recursive(

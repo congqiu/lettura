@@ -90,11 +90,11 @@ pub struct UploadResponse {
 pub struct PageResponse {
     pub id: String,
     pub slug: String,
-    pub user_id: Option<String>,
+    pub user_id: String,
     pub title: String,
     pub description: Option<String>,
     pub entry_file: String,
-    pub password: Option<String>,
+    pub has_password: bool,
     pub status: Option<String>,
     pub file_count: i64,
     pub expires_at: Option<String>,
