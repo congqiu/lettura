@@ -58,7 +58,7 @@ pub struct UpdatePageRequest {
     pub description: Option<String>,
     pub password: Option<String>,
     pub status: Option<String>,
-    pub expires_at: Option<Option<String>>,
+    pub expires_at: Option<String>,
     pub upload_id: Option<String>,
     pub entry_file: Option<String>,
 }
@@ -541,14 +541,14 @@ pub async fn update_page_handler(
         }
     }
     let expires_at = match req.expires_at {
-        Some(Some(s)) => {
+        Some(s) if s == "none" => Some(None), // explicitly clear expiration
+        Some(s) => {
             let dt = chrono::DateTime::parse_from_rfc3339(&s).map_err(|_| {
                 ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string())
             })?;
             Some(Some(dt.to_utc()))
         }
-        Some(None) => Some(None), // explicitly clear expiration
-        None => None,             // don't change
+        None => None, // don't change
     };
 
     // Handle file replacement if upload_id is provided
@@ -695,7 +695,7 @@ pub async fn restore_page_handler(
         serde_json::json!({}),
     )
     .await;
-    Ok(Json(serde_json::json!({"success": true})))
+    Ok(Json(serde_json::json!({"id": page_id, "success": true})))
 }
 
 #[derive(Debug, Serialize)]

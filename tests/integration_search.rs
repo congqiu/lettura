@@ -31,14 +31,14 @@ async fn setup_with_entries(app: &common::TestApp) -> String {
 
     // Manually update entry content via DB so we can search it
     // (fetcher won't actually fetch in test since example.com won't return article content)
-    sqlx::query("UPDATE entries SET title = 'Rust Ownership Guide', content = 'Learn about ownership and borrowing', text_content = 'Learn about ownership and borrowing', extract_method = 'readability', is_content_edited = true WHERE url = 'http://localhost:1/rust-ownership'")
+    sqlx::query("UPDATE entries SET title = 'Rust Ownership Guide', content = 'Learn about ownership and borrowing', text_content = 'Learn about ownership and borrowing', extract_method = 'readability', is_content_edited = true WHERE url = 'https://example.com/rust-ownership'")
         .execute(&app.pool).await.unwrap();
 
-    sqlx::query("UPDATE entries SET title = 'Python Programming', content = 'A beginner guide to Python', text_content = 'A beginner guide to Python', extract_method = 'readability', is_content_edited = true WHERE url = 'http://localhost:1/python-guide'")
+    sqlx::query("UPDATE entries SET title = 'Python Programming', content = 'A beginner guide to Python', text_content = 'A beginner guide to Python', extract_method = 'readability', is_content_edited = true WHERE url = 'https://example.com/python-guide'")
         .execute(&app.pool).await.unwrap();
 
     // Index them in search
-    let entries: Vec<(uuid::Uuid, uuid::Uuid, String, String, String, Option<String>)> = sqlx::query_as(
+    let entries: Vec<(uuid::Uuid, uuid::Uuid, Option<String>, String, String, Option<String>)> = sqlx::query_as(
         "SELECT id, user_id, title, COALESCE(text_content, ''), url, domain_name FROM entries WHERE user_id = (SELECT id FROM users LIMIT 1)"
     ).fetch_all(&app.pool).await.unwrap();
 
@@ -47,7 +47,7 @@ async fn setup_with_entries(app: &common::TestApp) -> String {
             .upsert(
                 *id,
                 *user_id,
-                title,
+                title.as_deref().unwrap_or(""),
                 text_content,
                 url,
                 domain.as_deref().unwrap_or(""),

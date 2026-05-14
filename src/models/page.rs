@@ -422,9 +422,19 @@ mod tests {
         let page = make_page(None);
         let json: serde_json::Value = serde_json::to_value(&page).unwrap();
         for field in &[
-            "id", "slug", "user_id", "title", "description", "entry_file",
-            "has_password", "status", "file_count", "expires_at",
-            "deleted_at", "created_at", "updated_at",
+            "id",
+            "slug",
+            "user_id",
+            "title",
+            "description",
+            "entry_file",
+            "has_password",
+            "status",
+            "file_count",
+            "expires_at",
+            "deleted_at",
+            "created_at",
+            "updated_at",
         ] {
             assert!(json.get(field).is_some(), "missing field: {field}");
         }

@@ -1,9 +1,9 @@
-use std::path::Path;
 use reqwest::{
     Client, StatusCode,
     header::{AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT},
 };
 use serde::{Serialize, de::DeserializeOwned};
+use std::path::Path;
 
 use crate::api_types::UploadResponse;
 use crate::error::CliError;

@@ -2,19 +2,17 @@ use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
-use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
+use zip::write::SimpleFileOptions;
 
-use crate::api_types::{
-    PageListResponse, PageResponse, PageShareResponse, UploadResponse,
-};
+use crate::api_types::{PageListResponse, PageResponse, PageShareResponse, UploadResponse};
 use crate::cli::{
-    PagesCmd, PagesDeleteArgs, PagesListArgs, PagesPublishArgs, PagesRestoreArgs,
-    PagesShareArgs, PagesUpdateArgs, OutputFormat,
+    OutputFormat, PagesCmd, PagesDeleteArgs, PagesListArgs, PagesPublishArgs, PagesRestoreArgs,
+    PagesShareArgs, PagesUpdateArgs,
 };
 use crate::client::ApiClient;
 use crate::error::CliError;
-use crate::output::{emit_json, emit_ids, info};
+use crate::output::{emit_ids, emit_json, info};
 
 const MAX_HTML_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
 const MAX_ZIP_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
@@ -192,8 +190,7 @@ fn zip_directory(dir: &str) -> Result<PathBuf, CliError> {
         .map_err(|e| CliError::UploadFailed(format!("Failed to create temp ZIP: {}", e)))?;
 
     let mut zip = ZipWriter::new(file);
-    let options =
-        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     let dir_path = Path::new(dir);
     let mut found_file = false;
@@ -229,7 +226,11 @@ fn walk_dir_recursive(
     found_file: &mut bool,
 ) -> Result<(), CliError> {
     let entries = std::fs::read_dir(current).map_err(|e| {
-        CliError::BadArgs(format!("Cannot read directory '{}': {}", current.display(), e))
+        CliError::BadArgs(format!(
+            "Cannot read directory '{}': {}",
+            current.display(),
+            e
+        ))
     })?;
 
     for entry in entries.flatten() {
@@ -255,8 +256,9 @@ fn walk_dir_recursive(
             zip.start_file(&name, *options)
                 .map_err(|e| CliError::UploadFailed(format!("ZIP start_file error: {}", e)))?;
 
-            let data = std::fs::read(&path)
-                .map_err(|e| CliError::UploadFailed(format!("Cannot read '{}': {}", path.display(), e)))?;
+            let data = std::fs::read(&path).map_err(|e| {
+                CliError::UploadFailed(format!("Cannot read '{}': {}", path.display(), e))
+            })?;
 
             zip.write_all(&data)
                 .map_err(|e| CliError::UploadFailed(format!("ZIP write error: {}", e)))?;
@@ -299,11 +301,7 @@ async fn list(
                 writeln!(
                     lock,
                     "{}\t{}\t{}\t/p/{}\t{}",
-                    p.slug,
-                    p.title,
-                    status,
-                    p.slug,
-                    p.created_at
+                    p.slug, p.title, status, p.slug, p.created_at
                 )?;
             }
         }
@@ -327,7 +325,7 @@ struct UpdateBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    expires_at: Option<serde_json::Value>,
+    expires_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     upload_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -360,11 +358,7 @@ async fn update(
     }
 
     if let Some(ref exp) = args.expires_at {
-        if exp == "none" {
-            body.expires_at = Some(serde_json::Value::Null);
-        } else {
-            body.expires_at = Some(serde_json::Value::String(exp.clone()));
-        }
+        body.expires_at = Some(exp.clone());
     }
 
     // Upload files if --files is provided

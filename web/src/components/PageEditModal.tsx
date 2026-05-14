@@ -80,7 +80,7 @@ export default function PageEditModal({ page, open, onClose }: Props) {
     mutationFn: () => updatePage(page.id, {
       title,
       password: clearPassword ? '' : (password || undefined),
-      expires_at: expiry === '' ? undefined : (expiry === '__clear__' ? null : computeExpiry(expiry)),
+      expires_at: expiry === '' ? undefined : (expiry === '__clear__' ? 'none' : computeExpiry(expiry)),
       upload_id: uploadResult?.upload_id || undefined,
       entry_file: uploadResult ? entryFile : undefined,
     }),

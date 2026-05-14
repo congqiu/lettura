@@ -42,7 +42,9 @@ impl CliError {
             Self::NotFound(_) => ExitCode::NotFound,
             Self::Unauthorized(_) | Self::Forbidden(_) => ExitCode::Unauthorized,
             Self::BadArgs(_) => ExitCode::BadArgs,
-            Self::ServerError(_) | Self::Network(_) | Self::UploadFailed(_) => ExitCode::ServerError,
+            Self::ServerError(_) | Self::Network(_) | Self::UploadFailed(_) => {
+                ExitCode::ServerError
+            }
             Self::RateLimited { .. } => ExitCode::RateLimited,
             Self::Conflict(_) => ExitCode::Conflict,
         }
@@ -72,7 +74,9 @@ impl CliError {
                 ..
             } => Some(format!("Retry after {s} seconds.")),
             Self::NotFound(_) => Some("Use `lettura-cli list` to find entry ids.".into()),
-            Self::UploadFailed(_) => Some("Check file size and format. Max upload: 50MB for ZIP, 10MB for HTML.".into()),
+            Self::UploadFailed(_) => {
+                Some("Check file size and format. Max upload: 50MB for ZIP, 10MB for HTML.".into())
+            }
             _ => None,
         }
     }

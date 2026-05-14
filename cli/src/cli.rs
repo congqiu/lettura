@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum, Args};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(name = "lettura-cli", version, about = "AI-first CLI for Lettura")]

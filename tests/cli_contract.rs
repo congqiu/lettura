@@ -369,7 +369,13 @@ async fn publish_temp_page(
         bin,
         server,
         token,
-        &["pages", "publish", html_file.to_str().unwrap(), "--title", title],
+        &[
+            "pages",
+            "publish",
+            html_file.to_str().unwrap(),
+            "--title",
+            title,
+        ],
     )
     .await;
     assert_eq!(code, 0, "publish failed: stderr={stderr} stdout={stdout}");
@@ -419,13 +425,8 @@ async fn cli_pages_update_and_share() {
     assert_eq!(updated["title"].as_str().unwrap(), "Updated Title");
 
     // share
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &["pages", "share", &page_id],
-    )
-    .await;
+    let (code, stdout, stderr) =
+        run_cli(&bin, &app.addr, &token, &["pages", "share", &page_id]).await;
     assert_eq!(code, 0, "share failed: stderr={stderr} stdout={stdout}");
     let share: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert!(share["url"].as_str().unwrap().starts_with("/p/"));
@@ -443,13 +444,8 @@ async fn cli_pages_delete_and_restore() {
     let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Delete Test").await;
 
     // delete
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &["pages", "delete", &page_id],
-    )
-    .await;
+    let (code, stdout, stderr) =
+        run_cli(&bin, &app.addr, &token, &["pages", "delete", &page_id]).await;
     assert_eq!(code, 0, "delete failed: stderr={stderr} stdout={stdout}");
 
     // list --status deleted should include it
@@ -460,30 +456,25 @@ async fn cli_pages_delete_and_restore() {
         &["pages", "list", "--status", "deleted"],
     )
     .await;
-    assert_eq!(code, 0, "list deleted failed: stderr={stderr} stdout={stdout}");
+    assert_eq!(
+        code, 0,
+        "list deleted failed: stderr={stderr} stdout={stdout}"
+    );
     let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     let items = list["items"].as_array().unwrap();
     assert!(items.iter().any(|p| p["id"].as_str().unwrap() == page_id));
 
     // restore
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &["pages", "restore", &page_id],
-    )
-    .await;
+    let (code, stdout, stderr) =
+        run_cli(&bin, &app.addr, &token, &["pages", "restore", &page_id]).await;
     assert_eq!(code, 0, "restore failed: stderr={stderr} stdout={stdout}");
 
     // list (active) should include it again
-    let (code, stdout, stderr) = run_cli(
-        &bin,
-        &app.addr,
-        &token,
-        &["pages", "list"],
-    )
-    .await;
-    assert_eq!(code, 0, "list active failed: stderr={stderr} stdout={stdout}");
+    let (code, stdout, stderr) = run_cli(&bin, &app.addr, &token, &["pages", "list"]).await;
+    assert_eq!(
+        code, 0,
+        "list active failed: stderr={stderr} stdout={stdout}"
+    );
     let list: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     let items = list["items"].as_array().unwrap();
     assert!(items.iter().any(|p| p["id"].as_str().unwrap() == page_id));
@@ -538,8 +529,7 @@ async fn cli_pages_password_protection() {
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let (page_id, temp_dir) =
-        publish_temp_page(&bin, &app.addr, &token, "Password Test").await;
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Password Test").await;
 
     // update with password
     let (code, stdout, stderr) = run_cli(
@@ -587,8 +577,7 @@ async fn cli_pages_update_files_and_entry_file() {
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let (page_id, temp_dir) =
-        publish_temp_page(&bin, &app.addr, &token, "Files Test").await;
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Files Test").await;
 
     // Create a new file to replace
     let new_file = temp_dir.join("updated.html");
@@ -603,7 +592,13 @@ async fn cli_pages_update_files_and_entry_file() {
         &bin,
         &app.addr,
         &token,
-        &["pages", "update", &page_id, "--files", new_file.to_str().unwrap()],
+        &[
+            "pages",
+            "update",
+            &page_id,
+            "--files",
+            new_file.to_str().unwrap(),
+        ],
     )
     .await;
     assert_eq!(
@@ -624,10 +619,7 @@ async fn cli_pages_update_files_and_entry_file() {
         "update entry-file failed: stderr={stderr} stdout={stdout}"
     );
     let updated: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    assert_eq!(
-        updated["entry_file"].as_str().unwrap(),
-        "updated.html"
-    );
+    assert_eq!(updated["entry_file"].as_str().unwrap(), "updated.html");
 
     std::fs::remove_dir_all(&temp_dir).ok();
     app.cleanup().await;
@@ -639,8 +631,7 @@ async fn cli_pages_expires_at() {
     let token = make_pat(&app).await;
     let bin = locate_cli_binary();
 
-    let (page_id, temp_dir) =
-        publish_temp_page(&bin, &app.addr, &token, "Expires Test").await;
+    let (page_id, temp_dir) = publish_temp_page(&bin, &app.addr, &token, "Expires Test").await;
 
     // set expires_at
     let (code, stdout, stderr) = run_cli(
