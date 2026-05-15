@@ -262,7 +262,7 @@ fn extract_zip(data: &[u8]) -> Result<Vec<(String, Vec<u8>)>, ApiError> {
     Ok(files)
 }
 
-fn strip_common_prefix(files: &mut Vec<(String, Vec<u8>)>) {
+fn strip_common_prefix(files: &mut [(String, Vec<u8>)]) {
     if files.is_empty() {
         return;
     }
@@ -297,12 +297,12 @@ fn sanitize_filename(name: &str) -> String {
 fn extract_title(html_content: &[u8], fallback: &str) -> String {
     let content = String::from_utf8_lossy(html_content);
     let lower = content.to_lowercase();
-    if let Some(start) = lower.find("<title>") {
-        if let Some(end) = lower.find("</title>") {
-            let title = content[start + 7..end].trim();
-            if !title.is_empty() {
-                return title.to_string();
-            }
+    if let Some(start) = lower.find("<title>")
+        && let Some(end) = lower.find("</title>")
+    {
+        let title = content[start + 7..end].trim();
+        if !title.is_empty() {
+            return title.to_string();
         }
     }
     fallback.trim_end_matches(".html").to_string()
@@ -339,7 +339,7 @@ pub async fn create_page_handler(
     let expires_at = req
         .expires_at
         .as_deref()
-        .map(|s| chrono::DateTime::parse_from_rfc3339(s))
+        .map(chrono::DateTime::parse_from_rfc3339)
         .transpose()
         .map_err(|_| {
             ApiError::BadRequest("invalid expires_at format, expected ISO 8601".to_string())
@@ -349,12 +349,14 @@ pub async fn create_page_handler(
     let new_page = page::create_page_with_retry(
         &state.pool,
         auth.user_id,
-        &req.title,
-        req.description.as_deref(),
-        &req.entry_file,
-        password.as_deref(),
-        file_count as i32,
-        expires_at,
+        &page::CreatePageParams {
+            title: req.title,
+            description: req.description,
+            entry_file: req.entry_file,
+            password_hash: password,
+            file_count: file_count as i32,
+            expires_at,
+        },
     )
     .await?;
 
@@ -404,6 +406,10 @@ pub async fn create_page_handler(
     Ok(Json(new_page))
 }
 
+type DirEntries = Vec<(String, std::path::PathBuf)>;
+type DirResult =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<DirEntries, std::io::Error>> + Send>>;
+
 fn count_files_recursive(
     dir: std::path::PathBuf,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize, std::io::Error>> + Send>> {
@@ -442,14 +448,7 @@ fn copy_dir_recursive(
     })
 }
 
-fn read_dir_recursive(
-    dir: std::path::PathBuf,
-) -> std::pin::Pin<
-    Box<
-        dyn std::future::Future<Output = Result<Vec<(String, std::path::PathBuf)>, std::io::Error>>
-            + Send,
-    >,
-> {
+fn read_dir_recursive(dir: std::path::PathBuf) -> DirResult {
     Box::pin(async move {
         let mut files = Vec::new();
         let mut entries = tokio::fs::read_dir(&dir).await?;
@@ -533,12 +532,13 @@ pub async fn update_page_handler(
     Path(page_id): Path<Uuid>,
     ValidatedJson(req): ValidatedJson<UpdatePageRequest>,
 ) -> Result<Json<page::Page>, ApiError> {
-    if let Some(ref status) = req.status {
-        if status != "active" && status != "disabled" {
-            return Err(ApiError::BadRequest(
-                "status must be 'active' or 'disabled'".to_string(),
-            ));
-        }
+    if let Some(ref status) = req.status
+        && status != "active"
+        && status != "disabled"
+    {
+        return Err(ApiError::BadRequest(
+            "status must be 'active' or 'disabled'".to_string(),
+        ));
     }
     let expires_at = match req.expires_at {
         Some(s) if s == "none" => Some(None), // explicitly clear expiration

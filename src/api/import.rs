@@ -52,15 +52,13 @@ pub async fn import_wallabag(
                     if let Err(e) = entry::update_entry_content(
                         &state.pool,
                         new_entry.id,
-                        wb_entry.title.as_deref(),
-                        Some(content),
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        0,
-                        "manual",
+                        &entry::ExtractedContent {
+                            title: wb_entry.title.clone(),
+                            content: Some(content.clone()),
+                            http_status: 0,
+                            extract_method: "manual".to_string(),
+                            ..Default::default()
+                        },
                     )
                     .await
                     {
@@ -125,27 +123,27 @@ pub async fn import_wallabag(
                 }
 
                 // Import tags from Wallabag
-                if let Some(ref tag_labels) = wb_entry.tags {
-                    if !tag_labels.is_empty() {
-                        if let Err(e) = crate::models::tag::ensure_and_link(
-                            &state.pool,
-                            auth.user_id,
-                            &[new_entry.id],
-                            tag_labels,
-                        )
-                        .await
-                        {
-                            tracing::warn!(entry_id = %new_entry.id, "failed to import tags: {e}");
-                        }
-                    }
+                if let Some(ref tag_labels) = wb_entry.tags
+                    && !tag_labels.is_empty()
+                    && let Err(e) = crate::models::tag::ensure_and_link(
+                        &state.pool,
+                        auth.user_id,
+                        &[new_entry.id],
+                        tag_labels,
+                    )
+                    .await
+                {
+                    tracing::warn!(entry_id = %new_entry.id, "failed to import tags: {e}");
                 }
 
                 imported += 1;
             }
             Err(e) => {
                 if matches!(e, crate::models::error::ModelError::Conflict(_)) {
+                    // URL already exists — skip silently
                     skipped += 1;
                 } else {
+                    tracing::warn!("import: failed to create entry for {url}: {e}");
                     skipped += 1;
                 }
             }
@@ -217,15 +215,12 @@ pub async fn import_browser(
                     if let Err(e) = entry::update_entry_content(
                         &state.pool,
                         new_entry.id,
-                        Some(title),
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        0,
-                        "pending",
+                        &entry::ExtractedContent {
+                            title: Some(title.clone()),
+                            http_status: 0,
+                            extract_method: "pending".to_string(),
+                            ..Default::default()
+                        },
                     )
                     .await
                     {

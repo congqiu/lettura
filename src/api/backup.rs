@@ -478,7 +478,7 @@ pub async fn restore(
         tracing::warn!("failed to clear search index after restore: {e}");
     }
 
-    let entries_for_index: Vec<(Uuid, Uuid, Option<String>, Option<String>, String, Option<String>)> =
+    let entries_for_index: Vec<crate::models::entry::SearchableEntry> =
         sqlx::query_as(
             "SELECT id, user_id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
         )
@@ -486,20 +486,20 @@ pub async fn restore(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    for (id, user_id, title, text_content, url, domain) in &entries_for_index {
-        if let Err(e) = state
+    for e in &entries_for_index {
+        if let Err(err) = state
             .search_index
             .upsert(
-                *id,
-                *user_id,
-                title.as_deref().unwrap_or(""),
-                text_content.as_deref().unwrap_or(""),
-                url,
-                domain.as_deref().unwrap_or(""),
+                e.id,
+                e.user_id,
+                e.title.as_deref().unwrap_or(""),
+                e.text_content.as_deref().unwrap_or(""),
+                &e.url,
+                e.domain_name.as_deref().unwrap_or(""),
             )
             .await
         {
-            tracing::warn!(entry_id = %id, "failed to re-index entry after restore: {e}");
+            tracing::warn!(entry_id = %e.id, "failed to re-index entry after restore: {err}");
         }
     }
 

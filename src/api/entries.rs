@@ -52,15 +52,15 @@ pub async fn create_entry(
     let r = entry::create_or_get_entry(&state.pool, auth.user_id, &req.url).await?;
 
     // Apply title override only for brand new entries
-    if !r.already_existed {
-        if let Some(title) = req.title.as_ref() {
-            sqlx::query("UPDATE entries SET title = $1 WHERE id = $2")
-                .bind(title)
-                .bind(r.entry.id)
-                .execute(&state.pool)
-                .await
-                .map_err(|e| ApiError::Internal(e.to_string()))?;
-        }
+    if !r.already_existed
+        && let Some(title) = req.title.as_ref()
+    {
+        sqlx::query("UPDATE entries SET title = $1 WHERE id = $2")
+            .bind(title)
+            .bind(r.entry.id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| ApiError::Internal(e.to_string()))?;
     }
 
     // Union-merge tags (single transaction, batch insert).
@@ -136,23 +136,22 @@ pub async fn list_entries(
     Query(params): Query<ListQueryParams>,
 ) -> Result<axum::response::Response, ApiError> {
     const MAX_PAGE: i64 = 50;
-    if params.inner.cursor.is_none() {
-        if let Some(p) = params.inner.page {
-            if p > MAX_PAGE {
-                return Err(ApiError::BadRequest(format!(
-                    "page {} exceeds max {} — narrow filter or use cursor",
-                    p, MAX_PAGE
-                )));
-            }
-        }
+    if params.inner.cursor.is_none()
+        && let Some(p) = params.inner.page
+        && p > MAX_PAGE
+    {
+        return Err(ApiError::BadRequest(format!(
+            "page {} exceeds max {} — narrow filter or use cursor",
+            p, MAX_PAGE
+        )));
     }
 
     // Pre-validate the cursor at the API boundary so a malformed cursor turns
     // into a 400 (rather than relying on the model's Database error → 500).
-    if let Some(c) = params.inner.cursor.as_deref() {
-        if entry::cursor::decode(c).is_none() {
-            return Err(ApiError::BadRequest(format!("invalid cursor: {}", c)));
-        }
+    if let Some(c) = params.inner.cursor.as_deref()
+        && entry::cursor::decode(c).is_none()
+    {
+        return Err(ApiError::BadRequest(format!("invalid cursor: {}", c)));
     }
 
     // If deleted=true, return soft-deleted entries
@@ -162,22 +161,22 @@ pub async fn list_entries(
     }
 
     // If search query provided, use tantivy to get matching IDs first
-    if let Some(ref query) = params.inner.search {
-        if !query.is_empty() {
-            let ids = match state.search_index.search(query, Some(auth.user_id), 100) {
-                Ok(ids) => ids,
-                Err(e) => {
-                    tracing::warn!("Search query {:?} failed: {e}", query);
-                    Vec::new()
-                }
-            };
-            if !ids.is_empty() {
-                let entries = entry::list_entries_by_ids(&state.pool, auth.user_id, &ids).await?;
-                return Ok(Json(entries).into_response());
+    if let Some(ref query) = params.inner.search
+        && !query.is_empty()
+    {
+        let ids = match state.search_index.search(query, Some(auth.user_id), 100) {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::warn!("Search query {:?} failed: {e}", query);
+                Vec::new()
             }
-            // Tantivy returned 0 results — fall through to SQL ILIKE search
-            // which handles cases where the index is incomplete or stale.
+        };
+        if !ids.is_empty() {
+            let entries = entry::list_entries_by_ids(&state.pool, auth.user_id, &ids).await?;
+            return Ok(Json(entries).into_response());
         }
+        // Tantivy returned 0 results — fall through to SQL ILIKE search
+        // which handles cases where the index is incomplete or stale.
     }
 
     let per_page = params.inner.per_page.unwrap_or(20).min(100);
@@ -264,8 +263,8 @@ pub async fn restore_entry(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     entry::restore_entry(&state.pool, entry_id, auth.user_id).await?;
     // Re-index restored entry
-    if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await {
-        if let Err(e) = state
+    if let Ok(Some(restored)) = entry::find_entry_by_id(&state.pool, auth.user_id, entry_id).await
+        && let Err(e) = state
             .search_index
             .upsert(
                 restored.id,
@@ -276,9 +275,8 @@ pub async fn restore_entry(
                 restored.domain_name.as_deref().unwrap_or(""),
             )
             .await
-        {
-            tracing::warn!("search index upsert failed for entry {entry_id}: {e}");
-        }
+    {
+        tracing::warn!("search index upsert failed for entry {entry_id}: {e}");
     }
     tracing::info!(entry_id = %entry_id, "entry restored");
 

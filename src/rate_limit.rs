@@ -31,22 +31,21 @@ impl GlobalRateLimit {
 
 pub fn extract_client_ip(request: &Request, trust_proxy: bool) -> String {
     if trust_proxy {
-        if let Some(xff) = request.headers().get("x-forwarded-for") {
-            if let Ok(val) = xff.to_str() {
-                if let Some(ip) = val.split(',').next() {
-                    let trimmed = ip.trim();
-                    if !trimmed.is_empty() {
-                        return trimmed.to_string();
-                    }
-                }
+        if let Some(xff) = request.headers().get("x-forwarded-for")
+            && let Ok(val) = xff.to_str()
+            && let Some(ip) = val.split(',').next()
+        {
+            let trimmed = ip.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
             }
         }
-        if let Some(xri) = request.headers().get("x-real-ip") {
-            if let Ok(val) = xri.to_str() {
-                let trimmed = val.trim();
-                if !trimmed.is_empty() {
-                    return trimmed.to_string();
-                }
+        if let Some(xri) = request.headers().get("x-real-ip")
+            && let Ok(val) = xri.to_str()
+        {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
             }
         }
     }

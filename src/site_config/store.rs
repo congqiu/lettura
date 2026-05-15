@@ -74,10 +74,10 @@ impl SiteConfigStore {
 
     /// Look up a site config for the given domain and URL.
     pub fn find(&self, domain: &str, url: &str) -> Option<SiteConfig> {
-        if let Some(config) = self.local.get(domain) {
-            if config.matches_url(url) {
-                return Some(config.clone());
-            }
+        if let Some(config) = self.local.get(domain)
+            && config.matches_url(url)
+        {
+            return Some(config.clone());
         }
         None
     }

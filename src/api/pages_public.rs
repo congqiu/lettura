@@ -89,21 +89,17 @@ async fn serve_page_file_inner(
         }
     };
 
-    if let Some(expires) = page_record.expires_at {
-        if expires < chrono::Utc::now() {
-            return render_status_page(StatusCode::GONE, "分享已过期", "该页面的分享有效期已结束");
-        }
+    if let Some(expires) = page_record.expires_at
+        && expires < chrono::Utc::now()
+    {
+        return render_status_page(StatusCode::GONE, "分享已过期", "该页面的分享有效期已结束");
     }
 
-    if page_record.password.is_some() {
-        let (authenticated, needs_upgrade) = if let Some(pw) = query_password {
-            let stored = page_record
-                .password
-                .as_ref()
-                .expect("password is Some when is_some() is true");
-            let ok = crate::auth::password::verify_page_password(pw, stored).is_ok();
+    if let Some(pw) = &page_record.password {
+        let (authenticated, needs_upgrade) = if let Some(pw_input) = query_password {
+            let ok = crate::auth::password::verify_page_password(pw_input, pw).is_ok();
             // Lazy upgrade: mark if stored password is plaintext and auth succeeded
-            (ok, ok && !stored.starts_with("$argon2"))
+            (ok, ok && !pw.starts_with("$argon2"))
         } else {
             (
                 get_cookie_value(headers, slug)
@@ -116,16 +112,15 @@ async fn serve_page_file_inner(
             return render_password_page(slug, false);
         }
         // Lazy upgrade: hash plaintext passwords on successful authentication
-        if needs_upgrade {
-            if let Some(pw) = query_password {
-                if let Ok(hashed) = crate::auth::password::hash_page_password(pw) {
-                    let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
-                        .bind(&hashed)
-                        .bind(page_record.id)
-                        .execute(&state.pool)
-                        .await;
-                }
-            }
+        if needs_upgrade
+            && let Some(pw) = query_password
+            && let Ok(hashed) = crate::auth::password::hash_page_password(pw)
+        {
+            let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
+                .bind(&hashed)
+                .bind(page_record.id)
+                .execute(&state.pool)
+                .await;
         }
     }
 
@@ -192,14 +187,14 @@ pub async fn auth_page(
             if crate::auth::password::verify_page_password(&form.password, stored_password).is_ok()
             {
                 // Lazy upgrade: if the stored password is plaintext, hash it now
-                if !stored_password.starts_with("$argon2") {
-                    if let Ok(hashed) = crate::auth::password::hash_page_password(&form.password) {
-                        let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
-                            .bind(&hashed)
-                            .bind(page_record.id)
-                            .execute(&state.pool)
-                            .await;
-                    }
+                if !stored_password.starts_with("$argon2")
+                    && let Ok(hashed) = crate::auth::password::hash_page_password(&form.password)
+                {
+                    let _ = sqlx::query("UPDATE pages SET password = $1 WHERE id = $2")
+                        .bind(&hashed)
+                        .bind(page_record.id)
+                        .execute(&state.pool)
+                        .await;
                 }
                 let sig = sign_cookie(&state.config.jwt_secret, &slug);
                 let secure_flag = if state.config.production {

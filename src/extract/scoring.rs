@@ -30,18 +30,16 @@ pub fn score_nodes(document: &Html) -> HashMap<ego_tree::NodeId, f64> {
 
         if let Some(parent_el) = parent {
             let parent_id = parent_el.id();
-            if !scores.contains_key(&parent_id) {
-                scores.insert(parent_id, initial_score(parent_el));
-            }
+            scores
+                .entry(parent_id)
+                .or_insert_with(|| initial_score(parent_el));
 
             let content_score = compute_content_score(text);
             *scores.entry(parent_id).or_insert(0.0) += content_score;
 
             if let Some(gp_el) = grandparent {
                 let gp_id = gp_el.id();
-                if !scores.contains_key(&gp_id) {
-                    scores.insert(gp_id, initial_score(gp_el));
-                }
+                scores.entry(gp_id).or_insert_with(|| initial_score(gp_el));
                 // Grandparent gets half the score
                 *scores.entry(gp_id).or_insert(0.0) += content_score / 2.0;
             }
@@ -51,12 +49,12 @@ pub fn score_nodes(document: &Html) -> HashMap<ego_tree::NodeId, f64> {
     // Apply link density penalty to all scored nodes
     let scored_ids: Vec<ego_tree::NodeId> = scores.keys().copied().collect();
     for node_id in scored_ids {
-        if let Some(node_ref) = document.tree.get(node_id) {
-            if let Some(element) = ElementRef::wrap(node_ref) {
-                let link_density = compute_link_density(element);
-                if let Some(score) = scores.get_mut(&node_id) {
-                    *score *= 1.0 - link_density;
-                }
+        if let Some(node_ref) = document.tree.get(node_id)
+            && let Some(element) = ElementRef::wrap(node_ref)
+        {
+            let link_density = compute_link_density(element);
+            if let Some(score) = scores.get_mut(&node_id) {
+                *score *= 1.0 - link_density;
             }
         }
     }

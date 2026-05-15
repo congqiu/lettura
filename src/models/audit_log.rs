@@ -176,6 +176,7 @@ pub async fn log_success(
 }
 
 /// Like `log_success` but includes IP address and User-Agent for security-relevant actions.
+#[allow(clippy::too_many_arguments)]
 pub async fn log_success_with_context(
     pool: &PgPool,
     user_id: Option<Uuid>,
@@ -203,6 +204,7 @@ pub async fn log_success_with_context(
 }
 
 /// Fire-and-forget helper for logging an action without blocking the request.
+#[allow(clippy::too_many_arguments)]
 pub fn fire_and_forget(
     pool: PgPool,
     user_id: Option<Uuid>,

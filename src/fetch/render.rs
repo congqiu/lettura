@@ -103,10 +103,10 @@ impl RenderService {
     /// Graceful shutdown: close the browser if it was started.
     pub async fn shutdown(&self) {
         let mut guard = self.browser.write().await;
-        if let Some(browser) = guard.take() {
-            if let Some(b) = Arc::into_inner(browser) {
-                close_browser(b).await;
-            }
+        if let Some(browser) = guard.take()
+            && let Some(b) = Arc::into_inner(browser)
+        {
+            close_browser(b).await;
         }
     }
 
@@ -143,10 +143,10 @@ impl RenderService {
             );
             // Drop the browser so the next attempt after cooldown starts fresh.
             let mut browser_guard = self.browser.write().await;
-            if let Some(browser) = browser_guard.take() {
-                if let Some(b) = Arc::into_inner(browser) {
-                    close_browser(b).await;
-                }
+            if let Some(browser) = browser_guard.take()
+                && let Some(b) = Arc::into_inner(browser)
+            {
+                close_browser(b).await;
             }
             self.failures.store(0, Ordering::Relaxed);
         }

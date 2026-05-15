@@ -25,22 +25,21 @@ fn extract_ip(
     peer_addr: Option<&SocketAddr>,
 ) -> Option<String> {
     if trust_proxy {
-        if let Some(xff) = headers.get("x-forwarded-for") {
-            if let Ok(val) = xff.to_str() {
-                if let Some(ip) = val.split(',').next() {
-                    let trimmed = ip.trim();
-                    if !trimmed.is_empty() {
-                        return Some(trimmed.chars().take(45).collect());
-                    }
-                }
+        if let Some(xff) = headers.get("x-forwarded-for")
+            && let Ok(val) = xff.to_str()
+            && let Some(ip) = val.split(',').next()
+        {
+            let trimmed = ip.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.chars().take(45).collect());
             }
         }
-        if let Some(xri) = headers.get("x-real-ip") {
-            if let Ok(val) = xri.to_str() {
-                let trimmed = val.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.chars().take(45).collect());
-                }
+        if let Some(xri) = headers.get("x-real-ip")
+            && let Ok(val) = xri.to_str()
+        {
+            let trimmed = val.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.chars().take(45).collect());
             }
         }
     }

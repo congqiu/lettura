@@ -106,15 +106,15 @@ pub async fn promote_memo(
         entry::update_entry_content(
             &state.pool,
             new_entry.id,
-            Some(&m.content),
-            Some(&format!("<p>{}</p>", m.content)),
-            Some(&m.content),
-            None,
-            None,
-            None,
-            Some(1),
-            0,
-            "manual",
+            &entry::ExtractedContent {
+                title: Some(m.content.clone()),
+                content: Some(format!("<p>{}</p>", m.content)),
+                text_content: Some(m.content.clone()),
+                reading_time: Some(1),
+                http_status: 0,
+                extract_method: "manual".to_string(),
+                ..Default::default()
+            },
         )
         .await?;
         memo::set_promoted_entry(&state.pool, memo_id, new_entry.id).await?;

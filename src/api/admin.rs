@@ -76,7 +76,7 @@ pub async fn reindex(
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
-    let entries: Vec<(uuid::Uuid, uuid::Uuid, Option<String>, Option<String>, String, Option<String>)> =
+    let entries: Vec<crate::models::entry::SearchableEntry> =
         sqlx::query_as(
             "SELECT id, user_id, title, text_content, url, domain_name FROM entries WHERE deleted_at IS NULL",
         )
@@ -85,20 +85,20 @@ pub async fn reindex(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     let count = entries.len();
-    for (id, user_id, title, text_content, url, domain) in entries {
-        if let Err(e) = state
+    for e in &entries {
+        if let Err(err) = state
             .search_index
             .upsert(
-                id,
-                user_id,
-                title.as_deref().unwrap_or(""),
-                text_content.as_deref().unwrap_or(""),
-                &url,
-                domain.as_deref().unwrap_or(""),
+                e.id,
+                e.user_id,
+                e.title.as_deref().unwrap_or(""),
+                e.text_content.as_deref().unwrap_or(""),
+                &e.url,
+                e.domain_name.as_deref().unwrap_or(""),
             )
             .await
         {
-            tracing::warn!("reindex: failed to upsert entry {id}: {e}");
+            tracing::warn!("reindex: failed to upsert entry {}: {err}", e.id);
         }
     }
 

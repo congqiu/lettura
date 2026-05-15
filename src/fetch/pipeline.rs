@@ -55,22 +55,22 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
     let site_config = site_config::store::find_config(&domain_str, &job.url);
 
     // render.mode == force → skip the static path entirely.
-    if let Some(ref sc) = site_config {
-        if sc.render.mode == RenderMode::Force {
-            // SSRF protection must apply to the render path too.
-            if let Err(e) = crate::fetch::ssrf::validate_url(&job.url) {
-                tracing::warn!(entry_id = %job.entry_id, url = %job.url, "SSRF blocked (render): {e}");
-                mark_failed(&ctx.pool, job.entry_id, 0).await;
-                return;
-            }
-            if try_render_then_extract(ctx, job, sc, 200).await {
-                return;
-            }
-            tracing::warn!(
-                entry_id = %job.entry_id,
-                "render forced but fallback unavailable or failed; attempting static fetch"
-            );
+    if let Some(ref sc) = site_config
+        && sc.render.mode == RenderMode::Force
+    {
+        // SSRF protection must apply to the render path too.
+        if let Err(e) = crate::fetch::ssrf::validate_url(&job.url) {
+            tracing::warn!(entry_id = %job.entry_id, url = %job.url, "SSRF blocked (render): {e}");
+            mark_failed(&ctx.pool, job.entry_id, 0).await;
+            return;
         }
+        if try_render_then_extract(ctx, job, sc, 200).await {
+            return;
+        }
+        tracing::warn!(
+            entry_id = %job.entry_id,
+            "render forced but fallback unavailable or failed; attempting static fetch"
+        );
     }
 
     // Apply URL rewrite rules if present.
@@ -205,12 +205,10 @@ async fn process_body(
                         site_config
                             .map(|sc| sc.render.mode)
                             .unwrap_or(RenderMode::Never),
-                    ) {
-                        if let Some(sc) = site_config {
-                            if try_render_then_extract(ctx, job, sc, status).await {
-                                return;
-                            }
-                        }
+                    ) && let Some(sc) = site_config
+                        && try_render_then_extract(ctx, job, sc, status).await
+                    {
+                        return;
                     }
                     save(ctx, job, &result.inner, status, method).await;
                 }
@@ -234,30 +232,29 @@ async fn html_rules_from_config(
     job: &FetchJob,
     site_config: Option<&SiteConfig>,
 ) -> Option<extract::SiteRuleConfig> {
-    if let Some(sc) = site_config {
-        if let Some(html) = sc.response.html.as_ref() {
-            return Some(extract::SiteRuleConfig {
-                content_selector: html.body.first().cloned(),
-                title_selector: html.title.clone(),
-                strip_selectors: if html.strip.is_empty() {
-                    None
-                } else {
-                    Some(html.strip.clone())
-                },
-            });
-        }
+    if let Some(sc) = site_config
+        && let Some(html) = sc.response.html.as_ref()
+    {
+        return Some(extract::SiteRuleConfig {
+            content_selector: html.body.first().cloned(),
+            title_selector: html.title.clone(),
+            strip_selectors: if html.strip.is_empty() {
+                None
+            } else {
+                Some(html.strip.clone())
+            },
+        });
     }
     // DB site_rules fallback (preserves Plan 3a behavior).
-    if let Some(ref domain) = entry::extract_domain(&job.url) {
-        if let Ok(Some(rule)) =
+    if let Some(ref domain) = entry::extract_domain(&job.url)
+        && let Ok(Some(rule)) =
             crate::models::site_rule::find_by_domain(&ctx.pool, job.user_id, domain).await
-        {
-            return Some(extract::SiteRuleConfig {
-                content_selector: Some(rule.content_selector),
-                title_selector: rule.title_selector,
-                strip_selectors: rule.strip_selectors,
-            });
-        }
+    {
+        return Some(extract::SiteRuleConfig {
+            content_selector: Some(rule.content_selector),
+            title_selector: rule.title_selector,
+            strip_selectors: rule.strip_selectors,
+        });
     }
     None
 }
@@ -270,19 +267,20 @@ async fn save(
     status: i16,
     method: &str,
 ) {
-    // Save original content first, then queue async image processing
     if let Err(e) = entry::update_entry_content(
         &ctx.pool,
         job.entry_id,
-        result.title.as_deref(),
-        Some(&result.content), // Original HTML with external image URLs
-        Some(&result.text_content),
-        result.language.as_deref(),
-        result.preview_image.as_deref(),
-        result.author.as_deref(),
-        Some(result.reading_time as i32),
-        status,
-        method,
+        &entry::ExtractedContent {
+            title: result.title.clone(),
+            content: Some(result.content.clone()),
+            text_content: Some(result.text_content.clone()),
+            language: result.language.clone(),
+            preview_picture: result.preview_image.clone(),
+            published_by: result.author.clone(),
+            reading_time: Some(result.reading_time as i32),
+            http_status: status,
+            extract_method: method.to_string(),
+        },
     )
     .await
     {
@@ -360,12 +358,10 @@ async fn apply_tagging_rules(
             for tag_label in &rule.tags {
                 if let Ok(tag) =
                     crate::models::tag::find_or_create_tag(pool, user_id, tag_label).await
-                {
-                    if let Err(e) =
+                    && let Err(e) =
                         crate::models::tag::add_tag_to_entry(pool, user_id, entry_id, tag.id).await
-                    {
-                        tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
-                    }
+                {
+                    tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
                 }
             }
         }
@@ -374,7 +370,13 @@ async fn apply_tagging_rules(
 
 async fn mark_failed(pool: &PgPool, entry_id: Uuid, status: i16) {
     if let Err(e) = entry::update_entry_content(
-        pool, entry_id, None, None, None, None, None, None, None, status, "failed",
+        pool,
+        entry_id,
+        &entry::ExtractedContent {
+            http_status: status,
+            extract_method: "failed".to_string(),
+            ..Default::default()
+        },
     )
     .await
     {

@@ -131,7 +131,7 @@ fn rebuild_html(
                 output.push('>');
             }
             Node::Text(text) => {
-                output.push_str(&text);
+                output.push_str(text);
             }
             Node::Document => {
                 for child in node_ref.children() {

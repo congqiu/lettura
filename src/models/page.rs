@@ -97,25 +97,28 @@ pub fn generate_slug() -> String {
         .collect()
 }
 
+pub struct CreatePageParams {
+    pub title: String,
+    pub description: Option<String>,
+    pub entry_file: String,
+    pub password_hash: Option<String>,
+    pub file_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
 pub async fn create_page(
     pool: &PgPool,
     user_id: Uuid,
-    title: &str,
-    description: Option<&str>,
-    entry_file: &str,
-    password_hash: Option<&str>,
-    file_count: i32,
-    expires_at: Option<DateTime<Utc>>,
+    params: &CreatePageParams,
 ) -> Result<Page, ModelError> {
     let slug = generate_slug();
-    let password = password_hash.map(|s| s.to_string());
 
     match sqlx::query_as::<_, Page>(
         "INSERT INTO pages (slug, user_id, title, description, entry_file, password, file_count, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *"
     )
-    .bind(&slug).bind(user_id).bind(title).bind(description)
-    .bind(entry_file).bind(&password).bind(file_count).bind(expires_at)
+    .bind(&slug).bind(user_id).bind(&params.title).bind(&params.description)
+    .bind(&params.entry_file).bind(&params.password_hash).bind(params.file_count).bind(params.expires_at)
     .fetch_one(pool).await {
         Ok(page) => Ok(page),
         Err(sqlx::Error::Database(db_err)) if db_err.constraint() == Some("pages_slug_key") => {
@@ -128,26 +131,10 @@ pub async fn create_page(
 pub async fn create_page_with_retry(
     pool: &PgPool,
     user_id: Uuid,
-    title: &str,
-    description: Option<&str>,
-    entry_file: &str,
-    password_hash: Option<&str>,
-    file_count: i32,
-    expires_at: Option<DateTime<Utc>>,
+    params: &CreatePageParams,
 ) -> Result<Page, ModelError> {
     for _ in 0..5 {
-        match create_page(
-            pool,
-            user_id,
-            title,
-            description,
-            entry_file,
-            password_hash,
-            file_count,
-            expires_at,
-        )
-        .await
-        {
+        match create_page(pool, user_id, params).await {
             Ok(page) => return Ok(page),
             Err(ModelError::Conflict(_)) => continue,
             Err(e) => return Err(e),
@@ -190,7 +177,7 @@ pub async fn list_pages(
     page: i64,
     limit: i64,
 ) -> Result<(Vec<PageSummary>, i64), ModelError> {
-    let limit = limit.min(100).max(1);
+    let limit = limit.clamp(1, 100);
     let offset = (page.max(1) - 1) * limit;
 
     let (items, count) = match status {

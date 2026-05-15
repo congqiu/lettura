@@ -173,12 +173,11 @@ impl SearchIndex {
         let mut ids = Vec::new();
         for (_score, doc_address) in top_docs {
             let doc: TantivyDocument = searcher.doc(doc_address)?;
-            if let Some(id_val) = doc.get_first(self.f_id) {
-                if let Some(id_str) = id_val.as_str() {
-                    if let Ok(uuid) = Uuid::parse_str(id_str) {
-                        ids.push(uuid);
-                    }
-                }
+            if let Some(id_val) = doc.get_first(self.f_id)
+                && let Some(id_str) = id_val.as_str()
+                && let Ok(uuid) = Uuid::parse_str(id_str)
+            {
+                ids.push(uuid);
             }
         }
         Ok(ids)

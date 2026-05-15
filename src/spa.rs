@@ -58,23 +58,23 @@ fn build_asset_response(path: &str, file: EmbeddedFile, req_headers: &HeaderMap)
     let etag = etag_of(&file);
     let cache_control = cache_control_for(path);
 
-    if let Some(if_none_match) = req_headers.get(header::IF_NONE_MATCH) {
-        if if_none_match.as_bytes() == etag.as_bytes() {
-            let mut resp = Response::builder()
-                .status(StatusCode::NOT_MODIFIED)
-                .body(Body::empty())
-                .expect("NOT_MODIFIED response is always valid");
-            let h = resp.headers_mut();
-            h.insert(
-                header::ETAG,
-                HeaderValue::from_str(&etag).expect("ETag is valid ASCII"),
-            );
-            h.insert(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static(cache_control),
-            );
-            return resp;
-        }
+    if let Some(if_none_match) = req_headers.get(header::IF_NONE_MATCH)
+        && if_none_match.as_bytes() == etag.as_bytes()
+    {
+        let mut resp = Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .body(Body::empty())
+            .expect("NOT_MODIFIED response is always valid");
+        let h = resp.headers_mut();
+        h.insert(
+            header::ETAG,
+            HeaderValue::from_str(&etag).expect("ETag is valid ASCII"),
+        );
+        h.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static(cache_control),
+        );
+        return resp;
     }
 
     let mime = mime_guess::from_path(path).first_or_octet_stream();

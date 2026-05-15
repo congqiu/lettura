@@ -65,15 +65,15 @@ pub fn extract_with_fallback(
     let mut meta = metadata::extract_metadata(&document, url);
 
     // Apply strip selectors from site rules
-    if let Some(rule) = site_rule {
-        if let Some(ref strip_selectors) = rule.strip_selectors {
-            for sel_str in strip_selectors {
-                if let Ok(sel) = scraper::Selector::parse(sel_str) {
-                    let ids: Vec<_> = document.select(&sel).map(|el| el.id()).collect();
-                    for id in ids {
-                        if let Some(mut node) = document.tree.get_mut(id) {
-                            node.detach();
-                        }
+    if let Some(rule) = site_rule
+        && let Some(ref strip_selectors) = rule.strip_selectors
+    {
+        for sel_str in strip_selectors {
+            if let Ok(sel) = scraper::Selector::parse(sel_str) {
+                let ids: Vec<_> = document.select(&sel).map(|el| el.id()).collect();
+                for id in ids {
+                    if let Some(mut node) = document.tree.get_mut(id) {
+                        node.detach();
                     }
                 }
             }
@@ -93,34 +93,28 @@ pub fn extract_with_fallback(
     };
 
     // Layer 1: Site-specific content selector
-    if let Some(rule) = site_rule {
-        if let Some(ref content_selector) = rule.content_selector {
-            if let Ok(content) =
-                readability::extract_content_with_selector(&document, content_selector)
-            {
-                let clean_html = sanitize::sanitize(&content);
-                if !is_content_too_short(&clean_html) {
-                    return Ok(FallbackExtractResult {
-                        inner: build_result(title, clean_html, meta),
-                        method: ExtractMethod::SiteRule,
-                    });
-                }
-            }
+    if let Some(rule) = site_rule
+        && let Some(ref content_selector) = rule.content_selector
+        && let Ok(content) = readability::extract_content_with_selector(&document, content_selector)
+    {
+        let clean_html = sanitize::sanitize(&content);
+        if !is_content_too_short(&clean_html) {
+            return Ok(FallbackExtractResult {
+                inner: build_result(title, clean_html, meta),
+                method: ExtractMethod::SiteRule,
+            });
         }
     }
 
     // Layer 2: Readability algorithm
-    match readability::extract_content(&document) {
-        Ok(content) => {
-            let clean_html = sanitize::sanitize(&content);
-            if !is_content_too_short(&clean_html) {
-                return Ok(FallbackExtractResult {
-                    inner: build_result(title, clean_html, meta),
-                    method: ExtractMethod::Readability,
-                });
-            }
+    if let Ok(content) = readability::extract_content(&document) {
+        let clean_html = sanitize::sanitize(&content);
+        if !is_content_too_short(&clean_html) {
+            return Ok(FallbackExtractResult {
+                inner: build_result(title, clean_html, meta),
+                method: ExtractMethod::Readability,
+            });
         }
-        Err(_) => {}
     }
 
     // Layer 3: Body content extraction

@@ -149,10 +149,7 @@ impl Config {
         }
         #[cfg(feature = "rendering")]
         {
-            match self.rendering_enabled.as_str() {
-                "false" | "0" | "off" => false,
-                _ => true,
-            }
+            !matches!(self.rendering_enabled.as_str(), "false" | "0" | "off")
         }
     }
 }

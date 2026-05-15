@@ -57,10 +57,10 @@ pub async fn download_image(url: &str, max_size: usize) -> Result<(Vec<u8>, Stri
         .await
         .map_err(|e| StorageError::Io(e.to_string()))?;
 
-    if let Some(len) = resp.content_length() {
-        if len as usize > max_size {
-            return Err(StorageError::Io(format!("image too large: {len} bytes")));
-        }
+    if let Some(len) = resp.content_length()
+        && len as usize > max_size
+    {
+        return Err(StorageError::Io(format!("image too large: {len} bytes")));
     }
 
     let content_type = resp
@@ -92,7 +92,7 @@ pub fn image_key_from_url(url: &str, content_type: Option<&str>) -> String {
     let hash = hex::encode(Sha256::digest(url.as_bytes()));
     // Use content-type derived extension if available, otherwise fall back to URL extension
     let ext = content_type
-        .and_then(|ct| mime_to_ext(ct))
+        .and_then(mime_to_ext)
         .or_else(|| url_extension(url))
         .unwrap_or("jpg");
     format!("images/{}.{}", &hash[..16], ext)
@@ -115,7 +115,7 @@ fn mime_to_ext(content_type: &str) -> Option<&'static str> {
 /// Extract extension from URL
 fn url_extension(url: &str) -> Option<&'static str> {
     // Strip query string and fragment first
-    let path = url.split(|c| c == '?' || c == '#').next()?;
+    let path = url.split(['?', '#']).next()?;
     // Get the last path segment (filename)
     let filename = path.rsplit('/').next()?;
     let filename = filename.trim_end_matches('.');
@@ -197,7 +197,7 @@ pub async fn process_images(
 
     // Apply longest-URL-first so a shorter URL that is a substring of a
     // longer one cannot accidentally match inside the already-rewritten text.
-    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    replacements.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
     let mut result = html.to_string();
     for (old_url, new_url) in replacements {

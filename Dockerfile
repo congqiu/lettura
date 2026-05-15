@@ -21,6 +21,8 @@ RUN pnpm run build
 FROM rust:bookworm AS backend-builder
 ARG RENDERING
 
+RUN rustup component add rustfmt clippy
+
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./

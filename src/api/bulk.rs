@@ -50,14 +50,14 @@ pub struct BulkResult {
 }
 
 fn check_max(ids: &[uuid::Uuid], max: Option<i64>) -> Result<(), ApiError> {
-    if let Some(m) = max {
-        if ids.len() as i64 > m {
-            return Err(ApiError::BadRequest(format!(
-                "matched {} exceeds max {}",
-                ids.len(),
-                m
-            )));
-        }
+    if let Some(m) = max
+        && ids.len() as i64 > m
+    {
+        return Err(ApiError::BadRequest(format!(
+            "matched {} exceeds max {}",
+            ids.len(),
+            m
+        )));
     }
     Ok(())
 }

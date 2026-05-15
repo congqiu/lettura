@@ -365,14 +365,14 @@ fn build_where_clause(
             qb.push(")");
         }
     }
-    if let Some(s) = &params.search {
-        if !s.is_empty() {
-            qb.push(" AND (title ILIKE ");
-            qb.push_bind(format!("%{s}%"));
-            qb.push(" OR content ILIKE ");
-            qb.push_bind(format!("%{s}%"));
-            qb.push(")");
-        }
+    if let Some(s) = &params.search
+        && !s.is_empty()
+    {
+        qb.push(" AND (title ILIKE ");
+        qb.push_bind(format!("%{s}%"));
+        qb.push(" OR content ILIKE ");
+        qb.push_bind(format!("%{s}%"));
+        qb.push(")");
     }
 }
 
@@ -524,29 +524,53 @@ pub async fn find_ids_matching(
     Ok(rows.into_iter().map(|(id,)| id).collect())
 }
 
+#[derive(Default)]
+pub struct ExtractedContent {
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub text_content: Option<String>,
+    pub language: Option<String>,
+    pub preview_picture: Option<String>,
+    pub published_by: Option<String>,
+    pub reading_time: Option<i32>,
+    pub http_status: i16,
+    pub extract_method: String,
+}
+
 pub async fn update_entry_content(
     pool: &PgPool,
     entry_id: Uuid,
-    title: Option<&str>,
-    content: Option<&str>,
-    text_content: Option<&str>,
-    language: Option<&str>,
-    preview_picture: Option<&str>,
-    published_by: Option<&str>,
-    reading_time: Option<i32>,
-    http_status: i16,
-    extract_method: &str,
+    ec: &ExtractedContent,
 ) -> Result<(), ModelError> {
     sqlx::query(
         "UPDATE entries SET title=COALESCE($2,title), content=$3, text_content=$4, language=$5, preview_picture=$6, published_by=$7, reading_time=$8, http_status=$9, extract_method=$10, updated_at=now() WHERE id=$1 AND is_content_edited=false"
     )
-    .bind(entry_id).bind(title).bind(content).bind(text_content).bind(language)
-    .bind(preview_picture).bind(published_by).bind(reading_time).bind(http_status).bind(extract_method)
+    .bind(entry_id)
+    .bind(&ec.title)
+    .bind(&ec.content)
+    .bind(&ec.text_content)
+    .bind(&ec.language)
+    .bind(&ec.preview_picture)
+    .bind(&ec.published_by)
+    .bind(ec.reading_time)
+    .bind(ec.http_status)
+    .bind(&ec.extract_method)
     .execute(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
     Ok(())
 }
 
 /// Update only the content field (used by async image processor).
+/// Lightweight row type for search index rebuild queries.
+#[derive(sqlx::FromRow)]
+pub struct SearchableEntry {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub title: Option<String>,
+    pub text_content: Option<String>,
+    pub url: String,
+    pub domain_name: Option<String>,
+}
+
 pub async fn update_content_only(
     pool: &PgPool,
     entry_id: Uuid,

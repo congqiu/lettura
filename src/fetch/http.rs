@@ -138,10 +138,10 @@ pub fn apply_request_config(
         }
     }
 
-    if let Some(ua) = request.user_agent.as_deref() {
-        if let Ok(hv) = reqwest::header::HeaderValue::from_str(ua) {
-            builder = builder.header(reqwest::header::USER_AGENT, hv);
-        }
+    if let Some(ua) = request.user_agent.as_deref()
+        && let Ok(hv) = reqwest::header::HeaderValue::from_str(ua)
+    {
+        builder = builder.header(reqwest::header::USER_AGENT, hv);
     }
 
     builder
@@ -205,10 +205,10 @@ fn resolve_redirect_url(current_url: &str, location: &str) -> String {
         return location.to_string();
     }
     // Relative URL: resolve against the current URL's origin.
-    if let Ok(base) = url::Url::parse(current_url) {
-        if let Ok(joined) = base.join(location) {
-            return joined.to_string();
-        }
+    if let Ok(base) = url::Url::parse(current_url)
+        && let Ok(joined) = base.join(location)
+    {
+        return joined.to_string();
     }
     // Fallback: treat as-is.
     location.to_string()
@@ -281,10 +281,10 @@ async fn send_with_retry_inner(
         }
         if status.as_u16() == 429 || status.is_server_error() {
             tracing::warn!(attempt, status = status.as_u16(), url = %url, "retryable HTTP error");
-            if status.as_u16() == 429 {
-                if let Some(d) = parse_retry_after_header(response.headers().get("retry-after")) {
-                    tokio::time::sleep(d).await;
-                }
+            if status.as_u16() == 429
+                && let Some(d) = parse_retry_after_header(response.headers().get("retry-after"))
+            {
+                tokio::time::sleep(d).await;
             }
             if attempt < max_retries {
                 continue;

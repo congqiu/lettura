@@ -90,12 +90,11 @@ fn extract_meta_content(document: &Html, attrs: &[(&str, &str)]) -> Option<Strin
                 .attr(attr_name)
                 .map(|v| v.eq_ignore_ascii_case(attr_value))
                 == Some(true)
+                && let Some(content) = el.attr("content")
             {
-                if let Some(content) = el.attr("content") {
-                    let trimmed = content.trim().to_string();
-                    if !trimmed.is_empty() {
-                        return Some(trimmed);
-                    }
+                let trimmed = content.trim().to_string();
+                if !trimmed.is_empty() {
+                    return Some(trimmed);
                 }
             }
         }

@@ -72,7 +72,7 @@ pub async fn request_id_layer(mut request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
 
     // Add to response headers
-    if let Ok(header_value) = (&request_id.0).parse() {
+    if let Ok(header_value) = request_id.0.parse() {
         response.headers_mut().insert(
             axum::http::HeaderName::from_static(REQUEST_ID_HEADER),
             header_value,
