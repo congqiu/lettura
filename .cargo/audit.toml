@@ -1,0 +1,13 @@
+# Advisory ignore list for `cargo audit`.
+#
+# Entries here are **transitive dependencies** we cannot directly upgrade.
+# cargo-audit reads .cargo/audit.toml (not project-root audit.toml).
+# Format: [advisories] ignore = ["RUSTSEC-xxx", ...]
+
+[advisories]
+# rsa 0.9.x — Marvin Attack. Comes from sqlx → sqlx-mysql → rsa.
+# We only use PostgreSQL, so the vulnerable code path is never exercised.
+# No fixed rsa version exists yet. Revisit when sqlx 0.9 is stable.
+ignore = [
+    "RUSTSEC-2023-0071",
+]
