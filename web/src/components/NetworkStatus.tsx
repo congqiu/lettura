@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { WifiOff, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getOfflineQueue, removeFromOfflineQueue } from '../utils/offlineQueue';
+import { createEntry } from '../api/entries';
+import { toast } from 'sonner';
 
 export default function NetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -11,6 +14,20 @@ export default function NetworkStatus() {
       setIsOnline(true);
       setShowRecovered(true);
       setTimeout(() => setShowRecovered(false), 2000);
+
+      // Process offline save queue
+      const queue = getOfflineQueue();
+      if (queue.length > 0) {
+        toast.info(`正在同步 ${queue.length} 个离线保存...`);
+        queue.forEach(async (item) => {
+          try {
+            await createEntry(item.url);
+            removeFromOfflineQueue(item.url);
+          } catch {
+            // Keep in queue if it fails again
+          }
+        });
+      }
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -36,7 +53,7 @@ export default function NetworkStatus() {
       )}
     >
       {isOnline ? <CheckCircle2 size={16} /> : <WifiOff size={16} />}
-      {isOnline ? '网络已恢复' : '网络连接已断开，请检查网络后重试'}
+      {isOnline ? '网络已恢复' : '网络连接已断开，显示已缓存的内容'}
     </div>
   );
 }

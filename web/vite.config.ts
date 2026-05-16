@@ -17,15 +17,60 @@ export default defineConfig({
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/feed\//, /^\/metrics/, /^\/p\//],
         globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico,webmanifest}'],
-        runtimeCaching: [],
+        runtimeCaching: [
+          {
+            urlPattern: /^https?:\/\/.+\.(?:png|jpg|jpeg|gif|webp|avif|svg)(\?.*)?$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/api\/v1\/entries(?:\/|$)/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-entries',
+              expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /\/api\/v1\/tags(?:\/|$)/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-tags',
+              expiration: { maxEntries: 20, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /\/api\/v1\/annotations(?:\/|$)/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-annotations',
+              expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /\/api\/v1\/memos(?:\/|$)/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-memos',
+              expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+        ],
         cleanupOutdatedCaches: true,
       },
       manifest: {
         name: 'Lettura',
         short_name: 'Lettura',
         description: 'Self-hosted read-it-later app',
-        theme_color: '#fefcf3',
-        background_color: '#fefcf3',
+        theme_color: '#fafaf9',
+        background_color: '#fafaf9',
         display: 'standalone',
         start_url: '/',
         scope: '/',

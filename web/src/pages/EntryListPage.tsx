@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star, ArrowUp } from 'lucide-react';
+import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star, ArrowUp, WifiOff } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -296,6 +296,14 @@ export default function EntryListPage({ filter }: Props) {
         </div>
       </div>
 
+      {/* Offline indicator */}
+      {!navigator.onLine && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80 mb-4 px-1">
+          <WifiOff size={12} />
+          <span>离线模式 — 显示已缓存的内容</span>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative mb-5">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
@@ -404,10 +412,10 @@ export default function EntryListPage({ filter }: Props) {
 
       {/* Bulk action bar */}
       {selectionMode && selectedIds.size > 0 && (
-        <div className="fixed left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border/60 shadow-lg pb-[env(safe-area-inset-bottom)] animate-slide-in-right">
-          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-semibold shrink-0">
-              已选 {selectedIds.size} 篇
+        <div className="fixed left-0 right-0 bottom-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/60 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)] animate-slide-in-right">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-2.5 flex items-center gap-2">
+            <span className="text-sm font-semibold shrink-0 tabular-nums">
+              {selectedIds.size}
             </span>
 
             {/* Tag input */}
@@ -420,8 +428,8 @@ export default function EntryListPage({ filter }: Props) {
                     setShowBulkTagSuggest(true);
                   }}
                   onFocus={() => setShowBulkTagSuggest(true)}
-                  placeholder="打标签..."
-                  className="h-8 w-28 text-sm rounded-lg"
+                  placeholder="添加标签..."
+                  className="h-8 w-28 sm:w-36 text-sm rounded-lg"
                 />
                 {showBulkTagSuggest && bulkTagInput && tagSuggestions.length > 0 && (
                   <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
@@ -444,7 +452,7 @@ export default function EntryListPage({ filter }: Props) {
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="outline" onClick={() => handleBulkTag()} disabled={!bulkTagInput.trim()} className="h-8 w-8 p-0 rounded-lg">
+              <Button size="icon" variant="outline" onClick={() => handleBulkTag()} disabled={!bulkTagInput.trim()} className="h-8 w-8 rounded-lg">
                 <Tag size={14} />
               </Button>
             </div>
@@ -459,8 +467,8 @@ export default function EntryListPage({ filter }: Props) {
                     setShowBulkUntagSuggest(true);
                   }}
                   onFocus={() => setShowBulkUntagSuggest(true)}
-                  placeholder="取消标签..."
-                  className="h-8 w-28 text-sm rounded-lg"
+                  placeholder="移除标签..."
+                  className="h-8 w-28 sm:w-36 text-sm rounded-lg"
                 />
                 {showBulkUntagSuggest && bulkUntagInput && untagSuggestions.length > 0 && (
                   <div className="absolute bottom-full mb-1 left-0 w-48 z-50">
@@ -483,21 +491,23 @@ export default function EntryListPage({ filter }: Props) {
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()} className="h-8 w-8 p-0 rounded-lg">
+              <Button size="icon" variant="outline" onClick={() => handleBulkUntag()} disabled={!bulkUntagInput.trim()} className="h-8 w-8 rounded-lg">
                 <Tags size={14} />
               </Button>
             </div>
 
-            <Button size="sm" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))} className="h-8 rounded-lg">
-              <Archive size={14} className="mr-1" /> 归档
+            <div className="flex-1" />
+
+            <Button size="icon" variant="outline" onClick={() => bulkArchiveMutation.mutate(Array.from(selectedIds))} className="h-8 w-8 rounded-lg">
+              <Archive size={15} />
             </Button>
 
-            <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="h-8 rounded-lg">
-              <Trash2 size={14} className="mr-1" /> 删除
+            <Button size="icon" variant="destructive" onClick={() => setDeleteConfirmOpen(true)} className="h-8 w-8 rounded-lg">
+              <Trash2 size={15} />
             </Button>
 
-            <Button size="sm" variant="ghost" onClick={clearSelection} className="ml-auto h-8 w-8 p-0 rounded-lg">
-              <X size={14} />
+            <Button size="icon" variant="ghost" onClick={clearSelection} className="h-8 w-8 rounded-lg">
+              <X size={15} />
             </Button>
           </div>
         </div>

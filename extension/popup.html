@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=360, initial-scale=1.0">
@@ -9,33 +9,69 @@
 <body>
   <div id="app">
     <header>
+      <div class="logo"><span>L</span></div>
       <h1>Lettura</h1>
     </header>
 
     <!-- Login Form -->
     <div id="login-section" class="section hidden">
-      <div class="form-group">
-        <label for="server-url">Server URL</label>
-        <input type="url" id="server-url" placeholder="https://lettura.example.com" />
+      <div class="tabs">
+        <button id="tab-password" class="tab active">密码登录</button>
+        <button id="tab-token" class="tab">令牌登录</button>
       </div>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="user@example.com" />
+
+      <div id="form-password">
+        <div class="form-group">
+          <label for="server-url">服务器地址</label>
+          <input type="url" id="server-url" placeholder="https://lettura.example.com" />
+        </div>
+        <div class="form-group">
+          <label for="email">邮箱</label>
+          <input type="email" id="email" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input type="password" id="password" placeholder="输入密码" />
+        </div>
+        <button id="login-btn" class="btn btn-primary">登录</button>
+        <div id="login-error" class="message error hidden"></div>
       </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="Password" />
+
+      <div id="form-token" class="hidden">
+        <div class="form-group">
+          <label for="token-server-url">服务器地址</label>
+          <input type="url" id="token-server-url" placeholder="https://lettura.example.com" />
+        </div>
+        <div class="form-group">
+          <label for="token-input">API 令牌</label>
+          <input type="text" id="token-input" placeholder="lta_..." />
+        </div>
+        <button id="token-btn" class="btn btn-primary">连接</button>
+        <div id="token-error" class="message error hidden"></div>
       </div>
-      <button id="login-btn" class="btn btn-primary">Login</button>
-      <div id="login-error" class="message error hidden"></div>
     </div>
 
     <!-- Logged-in Section -->
     <div id="main-section" class="section hidden">
-      <div id="server-info" class="server-info"></div>
-      <button id="save-btn" class="btn btn-primary">Save this page</button>
+      <div class="server-info" id="server-info"></div>
+
+      <!-- Page preview placeholder (populated by JS if desired) -->
+      <div id="page-preview" class="page-preview hidden">
+        <div class="page-preview-favicon"></div>
+        <div class="page-preview-text">
+          <div class="page-preview-title" id="preview-title">当前页面</div>
+          <div class="page-preview-url" id="preview-url"></div>
+        </div>
+      </div>
+
+      <button id="save-btn" class="btn btn-primary">保存此页面</button>
       <div id="save-status" class="message hidden"></div>
-      <button id="logout-btn" class="btn btn-secondary">Logout</button>
+
+      <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px;">
+        <span id="token-badge" class="token-badge hidden"></span>
+      </div>
+
+      <button id="logout-btn" class="btn btn-secondary">退出登录</button>
     </div>
 
     <!-- Loading -->

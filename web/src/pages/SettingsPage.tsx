@@ -54,11 +54,11 @@ function SectionCard({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="mb-8">
-      <div className="flex items-center justify-between mb-4">
+    <section className="mb-6 last:mb-0">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Icon size={17} className="text-muted-foreground/60" />
-          <h3 className="font-semibold text-foreground text-[15px]">{title}</h3>
+          <h3 className="font-semibold text-foreground text-title">{title}</h3>
         </div>
         {action}
       </div>
@@ -66,6 +66,17 @@ function SectionCard({
         {children}
       </div>
     </section>
+  );
+}
+
+function SectionGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-10 last:mb-0">
+      <h2 className="text-label font-semibold uppercase tracking-wider text-muted-foreground/60 mb-5">
+        {title}
+      </h2>
+      <div>{children}</div>
+    </div>
   );
 }
 
@@ -263,139 +274,96 @@ export default function SettingsPage() {
         <h2 className="text-xl font-bold tracking-tight text-foreground">设置</h2>
       </div>
 
-      {/* Tags management */}
-      <SectionCard icon={Tag} title="标签管理">
-        {tagStats.length === 0 ? (
-          <p className="text-sm text-muted-foreground">暂无标签</p>
-        ) : (
-          <>
-            {/* Desktop table */}
-            <div className="border border-border/50 rounded-lg overflow-hidden hidden sm:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50 bg-muted/30">
-                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-[13px]">标签名</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-[13px]">文章数</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-[13px]">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tagStats.map((tag) => (
-                    <tr key={tag.id} className="border-b border-border/40 last:border-b-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5">
-                        {editingTagId === tag.id ? (
-                          <Input
-                            value={editingLabel}
-                            onChange={(e) => setEditingLabel(e.target.value)}
-                            onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
-                            onBlur={() => setEditingTagId(null)}
-                            className="h-7 text-sm"
-                            autoFocus
-                          />
-                        ) : (
-                          <span className="font-medium">{tag.label}</span>
-                        )}
-                      </td>
-                      <td className="text-right px-4 py-2.5 text-muted-foreground tabular-nums">{tag.entry_count}</td>
-                      <td className="text-right px-4 py-2.5">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 rounded-lg"
-                            onClick={() => {
-                              setEditingTagId(tag.id);
-                              setEditingLabel(tag.label);
-                            }}
-                          >
-                            <Pencil size={13} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 rounded-lg hover:text-destructive"
-                            onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
-                          >
-                            <Trash2 size={13} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <SectionGroup title="标签与自动化">
+        {/* Tags management */}
+        <SectionCard icon={Tag} title="标签管理">
+          {tagStats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center mb-3">
+                <Tag size={22} className="text-muted-foreground/50" />
+              </div>
+              <p className="text-sm text-muted-foreground">暂无标签</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">为文章添加标签后将在此管理</p>
             </div>
-
-            {/* Mobile cards */}
-            <div className="space-y-2 sm:hidden">
+          ) : (
+            <div className="border border-border/50 rounded-xl overflow-hidden divide-y divide-border/40">
               {tagStats.map((tag) => (
-                <div key={tag.id} className="border border-border/50 rounded-lg p-3.5 bg-card">
-                  <div className="flex items-center justify-between mb-2">
+                <div
+                  key={tag.id}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/25 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
                     {editingTagId === tag.id ? (
                       <Input
                         value={editingLabel}
                         onChange={(e) => setEditingLabel(e.target.value)}
                         onKeyDown={(e) => handleRenameKeyDown(e, tag.id)}
                         onBlur={() => setEditingTagId(null)}
-                        className="h-7 text-sm flex-1 mr-2"
+                        className="h-8 text-sm"
                         autoFocus
                       />
                     ) : (
-                      <span className="font-medium text-card-foreground">{tag.label}</span>
+                      <span className="text-sm font-medium">{tag.label}</span>
                     )}
-                    <span className="text-sm text-muted-foreground tabular-nums">{tag.entry_count} 篇</span>
                   </div>
-                  <div className="flex items-center gap-1">
+
+                  <span className="text-[11px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full tabular-nums shrink-0">
+                    {tag.entry_count}
+                  </span>
+
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 rounded-lg"
-                      onClick={() => { setEditingTagId(tag.id); setEditingLabel(tag.label); }}
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setEditingTagId(tag.id);
+                        setEditingLabel(tag.label);
+                      }}
                     >
-                      <Pencil size={13} className="mr-1.5" /> 编辑
+                      <Pencil size={14} />
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 rounded-lg hover:text-destructive"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
                       onClick={() => setDeleteTarget({ id: tag.id, label: tag.label })}
                     >
-                      <Trash2 size={13} className="mr-1.5" /> 删除
+                      <Trash2 size={14} />
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
-          </>
-        )}
-      </SectionCard>
+          )}
+        </SectionCard>
 
-      {/* Tag delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除标签</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除标签「{deleteTarget?.label}」吗？此操作将从所有文章中移除该标签，且不可撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              className="rounded-lg"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Tag delete confirmation */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除标签</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除标签「{deleteTarget?.label}」吗？此操作将从所有文章中移除该标签，且不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                className="rounded-lg"
+                onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              >
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* Tagging rules */}
-      <SectionCard
-        icon={Shield}
-        title="标签规则"
+        {/* Tagging rules */}
+        <SectionCard
+          icon={Shield}
+          title="标签规则"
         action={
           !showRuleForm && (
             <Button
@@ -528,32 +496,34 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
-      </SectionCard>
+        </SectionCard>
 
-      {/* Rule delete confirmation */}
-      <AlertDialog open={!!deleteRuleTarget} onOpenChange={(open) => { if (!open) setDeleteRuleTarget(null); }}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除规则</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除规则「{deleteRuleTarget?.rule}」吗？此操作不可撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              className="rounded-lg"
-              onClick={() => deleteRuleTarget && deleteRuleMutation.mutate(deleteRuleTarget.id)}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Rule delete confirmation */}
+        <AlertDialog open={!!deleteRuleTarget} onOpenChange={(open) => { if (!open) setDeleteRuleTarget(null); }}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除规则</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除规则「{deleteRuleTarget?.rule}」吗？此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-lg">取消</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                className="rounded-lg"
+                onClick={() => deleteRuleTarget && deleteRuleMutation.mutate(deleteRuleTarget.id)}
+              >
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </SectionGroup>
 
-      {/* Import */}
-      <SectionCard icon={Upload} title="导入">
+      <SectionGroup title="数据管理">
+        {/* Import */}
+        <SectionCard icon={Upload} title="导入">
         <div className="space-y-3">
           <label className="text-sm text-muted-foreground block">Wallabag JSON 导入</label>
           <div className="flex items-center gap-2">
@@ -575,10 +545,10 @@ export default function SettingsPage() {
             <p className="text-sm text-success font-medium">{importResult}</p>
           )}
         </div>
-      </SectionCard>
+        </SectionCard>
 
-      {/* Export */}
-      <SectionCard icon={Download} title="导出">
+        {/* Export */}
+        <SectionCard icon={Download} title="导出">
         <Button
           onClick={() => exportAll.mutate()}
           disabled={exportAll.isPending}
@@ -588,15 +558,18 @@ export default function SettingsPage() {
           <FileJson size={15} className="mr-2" />
           {exportAll.isPending ? '导出中...' : '导出全部数据 (JSON)'}
         </Button>
-      </SectionCard>
+        </SectionCard>
+      </SectionGroup>
 
-      {/* API Tokens */}
-      <SectionCard icon={Shield} title="API 令牌">
+      <SectionGroup title="开发者">
+        {/* API Tokens */}
+        <SectionCard icon={Shield} title="API 令牌">
         <p className="text-sm text-muted-foreground mb-4">
           管理用于 lettura-cli 或其他第三方客户端访问你数据的个人访问令牌。
         </p>
         <TokensPanel />
       </SectionCard>
+      </SectionGroup>
     </div>
   );
 }

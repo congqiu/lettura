@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Star, StickyNote, Globe, MoreHorizontal, Home } from 'lucide-react';
+import { BookOpen, Star, StickyNote, Globe, MoreHorizontal, Archive } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '../../store/auth';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 const bottomNavItems = [
   { to: '/', label: '未读', icon: BookOpen, end: true },
   { to: '/starred', label: '收藏', icon: Star, end: true },
+  { to: '/archived', label: '归档', icon: Archive, end: true },
   { to: '/memos', label: '便签', icon: StickyNote, end: false },
 ];
 
@@ -31,17 +32,16 @@ export function MobileBottomNav() {
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
-      try { await apiLogout(refreshToken); } catch {}
+      try { await apiLogout(refreshToken); } catch { /* ignore logout failure */ }
     }
     logout();
     navigate('/login');
   };
 
   const moreItems = [
-    { to: '/archived', label: '归档', icon: Home },
     { to: '/pages', label: 'Pages', icon: Globe },
     { to: '/tags', label: '标签', icon: Star },
-    { to: '/audit-logs', label: '操作日志', icon: Home },
+    { to: '/audit-logs', label: '操作日志', icon: Archive },
   ];
 
   const isActiveRoute = (to: string, end?: boolean) => {

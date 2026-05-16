@@ -139,9 +139,9 @@ export default function PageEditModal({ page, open, onClose }: Props) {
               />
             </div>
           ) : (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
+            <div className="bg-success/10 border border-success/20 rounded-xl p-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                <p className="text-sm text-success font-medium">
                   {uploadResult.file_count} 个文件已准备替换
                 </p>
                 <Button type="button" variant="ghost" size="sm" onClick={clearUpload} className="text-destructive hover:text-destructive">
@@ -177,8 +177,8 @@ export default function PageEditModal({ page, open, onClose }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              访问密码 {page.has_password && !clearPassword && <span className="text-amber-500 text-xs">(已设置)</span>}
-              {clearPassword && <span className="text-green-500 text-xs">(将清除)</span>}
+              访问密码 {page.has_password && !clearPassword && <span className="text-warning text-xs">(已设置)</span>}
+              {clearPassword && <span className="text-success text-xs">(将清除)</span>}
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">

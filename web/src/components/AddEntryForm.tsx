@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Link2, Loader2, ArrowRight } from 'lucide-react';
+import { addToOfflineQueue } from '../utils/offlineQueue';
 
 export default function AddEntryForm() {
   const [url, setUrl] = useState('');
@@ -18,8 +19,15 @@ export default function AddEntryForm() {
       qc.invalidateQueries({ queryKey: ['entries'] });
       toast.success('文章已保存');
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || '保存失败');
+    onError: (err, failedUrl: string) => {
+      if (!navigator.onLine) {
+        addToOfflineQueue(failedUrl);
+        toast.info('已加入离线队列，网络恢复后将自动保存');
+        setUrl('');
+        return;
+      }
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      toast.error(apiErr.response?.data?.message || '保存失败');
     },
   });
 

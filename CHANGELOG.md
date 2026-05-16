@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- PWA offline save queue: automatically queues URL saves when network is down and retries on reconnect (`offlineQueue.ts` + `NetworkStatus` component).
+- Floating text-selection toolbar on article pages: select text to reveal a mini toolbar with one-tap "添加批注".
+- Chrome extension fully rewritten in React: tabbed login (password / token), page preview, clear save-state feedback, shared design tokens.
+- Design system documentation (`DESIGN.md`) covering color system, typography scale, component patterns, and animation specs.
+- PWA Workbox runtime caching: `NetworkFirst` for API endpoints, `StaleWhileRevalidate` for images.
 - Personal Access Tokens (PAT) management UI and API (`POST/GET /api/v1/tokens`, `DELETE /api/v1/tokens/:id`). Tokens authenticate alongside JWT via `Authorization: Bearer lta_...`. Fine-grained scope: `read` (GET-only) or `write` (full API).
 - `lettura-cli` AI-first CLI with subcommands: `login`, `whoami`, `config`, `list`, `search`, `get` (markdown/json/html/text), `save` (with `--wait`), `tag` / `untag` / `archive` / `star` (single + batch via `--filter`), `tags`, `skill print` / `skill install`.
 - Filter DSL for `list` / batch operations: AND-combined conditions like `tag:rust,untagged,since:7d`.
@@ -15,6 +20,15 @@
 - `dev.sh dev` command for combined backend (Docker) + frontend (Vite) development with unified logs.
 
 ### Changed
+- Complete design-system overhaul: indigo-600 primary, warm stone backgrounds, strict 6-level typography scale (`text-display` → `text-label`), semantic CSS tokens.
+- `--accent` token changed from amber-500 to warm gray (`30 6% 92%`); amber/yellow is now reserved exclusively for bookmark/star actions.
+- `EntryCard` compact redesign: thumbnail hidden on mobile (`hidden sm:block w-24 h-16`), icon-only ghost action buttons, metadata uses `gap-x-3` spacing instead of `·` separators, max 3 tags with `+N` overflow.
+- `EntryListPage` bulk-action bar replaced with compact icon-only toolbar.
+- `EntryDetailPage` action toolbar converged into subtle icon row; reading width fixed at `max-w-170` (680 px); floating selection toolbar for annotation capture.
+- `MobileBottomNav` promotes "归档" to a primary tab (was hidden in "more" overflow).
+- `SettingsPage` reorganized into grouped sections: 标签与自动化 / 数据管理 / 开发者.
+- `AnnotationsSidebar` removed manual "捕获" button; quote is now auto-populated from the floating selection toolbar via `key` remount pattern.
+- Tag management UI unified into a single flex list (replaced separate desktop table + mobile card implementations); pill badges for counts, icon-only edit/delete with opacity hover.
 - Entry save (`POST /api/v1/entries`) is now idempotent: same URL returns existing entry with `already_existed: true`, tag set merged as union.
 - `GET /api/v1/entries` list endpoint gained filters: `tag`, `exclude_tag`, `untagged`, `domain`, `since`, `before`, `is_read` (alias for `is_archived`).
 - Repo is now a Cargo workspace (`.` and `cli/`); server crate is still `lettura`.
@@ -26,6 +40,7 @@
 - Web client token-refresh interceptor now skips auth endpoints (login/register) to prevent infinite retry loops on 401 responses.
 
 ### Fixed
+- Design token contrast fixes: `success`/`warning` foreground colors for light backgrounds, dark-mode card contrast, eliminated hardcoded `green-*`/`amber-*` in components.
 - `admin reindex` now commits the index clear before the rebuild, preventing a half-cleared index if the rebuild phase fails.
 - PAT `last_used_at` update no longer aborts the request on transient DB errors.
 

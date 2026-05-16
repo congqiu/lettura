@@ -7,10 +7,14 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
-interface Props { entryId: string; compact?: boolean; }
+interface Props { 
+  entryId: string; 
+  compact?: boolean; 
+  preselectedQuote?: string;
+}
 
-export default function AnnotationsSidebar({ entryId, compact }: Props) {
-  const [newQuote, setNewQuote] = useState('');
+export default function AnnotationsSidebar({ entryId, compact, preselectedQuote }: Props) {
+  const [newQuote, setNewQuote] = useState(preselectedQuote ?? '');
   const [newText, setNewText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -39,23 +43,11 @@ export default function AnnotationsSidebar({ entryId, compact }: Props) {
     onError: () => toast.error('删除批注失败'),
   });
 
-  const handleCaptureSelection = () => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim()) {
-      setNewQuote(selection.toString().trim());
-    }
-  };
-
   return (
     <div className={compact ? 'bg-card p-4 overflow-y-auto' : 'w-80 border-l border-border bg-card p-4 overflow-y-auto'}>
       <h3 className="font-medium text-card-foreground mb-4">批注</h3>
 
       <div className="mb-4 p-3 bg-secondary rounded-lg border border-border">
-        {!compact && (
-          <Button variant="ghost" size="sm" onClick={handleCaptureSelection} className="text-muted-foreground hover:text-foreground mb-2">
-            捕获选中文字
-          </Button>
-        )}
         {newQuote && (
           <blockquote className="text-sm text-muted-foreground border-l-2 border-accent pl-2 mb-2 italic">
             {newQuote}
@@ -64,21 +56,28 @@ export default function AnnotationsSidebar({ entryId, compact }: Props) {
         <textarea
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
-          placeholder="添加笔记..."
+          placeholder={newQuote ? '添加笔记...' : '选中文章中的文字以添加批注'}
           className="w-full text-sm px-2 py-1 border border-border rounded-md resize-none h-16 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         />
-        <Button onClick={() => create.mutate()} disabled={!newQuote || create.isPending} size="sm" className="mt-1">
+        <Button 
+          onClick={() => create.mutate()} 
+          disabled={!newQuote || create.isPending} 
+          size="sm" 
+          className="mt-1"
+        >
           添加
         </Button>
       </div>
 
       {annotations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">暂无批注。选中文字后点击"捕获选中文字"。</p>
+        <p className="text-sm text-muted-foreground">
+          {newQuote ? '添加笔记后点击「添加」保存批注。' : '选中文章中的文字即可添加批注。'}
+        </p>
       ) : (
         <div className="space-y-3">
           {annotations.map((ann: Annotation) => (
-            <div key={ann.id} className={`p-3 bg-secondary rounded-lg border ${ann.is_orphaned ? 'border-amber-500/50' : 'border-border'}`}>
-              {ann.is_orphaned && <span className="text-xs text-amber-600 dark:text-amber-400 block mb-1">已失效（内容被编辑）</span>}
+            <div key={ann.id} className={`p-3 bg-secondary rounded-lg border ${ann.is_orphaned ? 'border-warning/50' : 'border-border'}`}>
+              {ann.is_orphaned && <span className="text-xs text-warning block mb-1">已失效（内容被编辑）</span>}
               <blockquote className="text-sm text-muted-foreground border-l-2 border-muted-foreground/30 pl-2 mb-2 italic">{ann.quote}</blockquote>
               {editingId === ann.id ? (
                 <div>

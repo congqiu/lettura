@@ -179,7 +179,7 @@ export default function GenerateTokenDialog({ open, onOpenChange, onCreated }: P
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              <p className="text-sm text-warning font-medium">
                 这是唯一一次看到完整令牌的机会 —— 请立即复制保存。
               </p>
 
@@ -193,7 +193,7 @@ export default function GenerateTokenDialog({ open, onOpenChange, onCreated }: P
                   title="复制令牌"
                 >
                   {copied ? (
-                    <Check size={16} className="text-green-600" />
+                    <Check size={16} className="text-success" />
                   ) : (
                     <Copy size={16} className="text-muted-foreground" />
                   )}

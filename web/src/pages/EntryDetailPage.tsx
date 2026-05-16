@@ -19,7 +19,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Star, Archive, RefreshCw, Edit3, MessageSquare, Trash2, MoreHorizontal, ExternalLink, Clock, Globe } from 'lucide-react';
+import { ArrowLeft, Star, Archive, RefreshCw, Edit3, MessageSquare, Trash2, MoreHorizontal, ExternalLink, Clock, Globe, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function EntryDetailPage() {
@@ -56,6 +56,14 @@ export default function EntryDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const articleRef = useRef<HTMLElement>(null);
+  const [pendingQuote, setPendingQuote] = useState('');
+  const [annotationKey, setAnnotationKey] = useState(0);
+  const [selectionToolbar, setSelectionToolbar] = useState<{
+    visible: boolean;
+    text: string;
+    x: number;
+    y: number;
+  }>({ visible: false, text: '', x: 0, y: 0 });
 
   const { data: entry, isLoading, error, refetch: refetchEntryQuery } = useQuery({
     queryKey: ['entry', id],
@@ -101,6 +109,53 @@ export default function EntryDetailPage() {
 
     return () => cleanups.forEach(fn => fn());
   }, [entry?.content]);
+
+  // Show floating toolbar when text is selected in article
+  useEffect(() => {
+    const handleSelection = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !articleRef.current) {
+        setSelectionToolbar(prev => ({ ...prev, visible: false }));
+        return;
+      }
+
+      const text = selection.toString().trim();
+      if (!text || text.length < 2) {
+        setSelectionToolbar(prev => ({ ...prev, visible: false }));
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      if (!articleRef.current.contains(range.commonAncestorContainer)) {
+        setSelectionToolbar(prev => ({ ...prev, visible: false }));
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      setSelectionToolbar({
+        visible: true,
+        text,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 8,
+      });
+    };
+
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  }, []);
+
+  // Hide toolbar on click outside
+  useEffect(() => {
+    if (!selectionToolbar.visible) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.selection-toolbar')) {
+        setSelectionToolbar(prev => ({ ...prev, visible: false }));
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [selectionToolbar.visible]);
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['entry', id] }); qc.invalidateQueries({ queryKey: ['entries'] }); };
 
@@ -166,7 +221,7 @@ export default function EntryDetailPage() {
         transition: swipeOffset.x === 0 ? 'transform 0.2s ease-out' : 'none',
       } : undefined}
     >
-      <div className={`flex-1 px-0 sm:px-4 w-full overflow-hidden lg:max-w-3xl ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
+      <div className={`flex-1 px-4 w-full overflow-hidden max-w-170 ${!showAnnotations ? 'lg:mx-auto' : ''}`}>
         {/* Back button */}
         <Button
           variant="ghost"
@@ -238,82 +293,100 @@ export default function EntryDetailPage() {
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <Button
-            variant={entry.is_starred ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => toggleStar.mutate()}
-            className={cn(
-              'h-9 rounded-lg gap-1.5 text-[13px]',
-              entry.is_starred && 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
-            )}
-          >
-            <Star size={15} className={cn(entry.is_starred && 'fill-current')} />
-            {entry.is_starred ? '已收藏' : '收藏'}
-          </Button>
+        {/* Offline indicator */}
+        {!navigator.onLine && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80 mb-4 px-1">
+            <WifiOff size={12} />
+            <span>离线模式 — 显示已缓存的内容</span>
+          </div>
+        )}
 
-          <Button
-            variant={entry.is_archived ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => toggleArchive.mutate()}
-            className={cn(
-              'h-9 rounded-lg gap-1.5 text-[13px]',
-              entry.is_archived && 'bg-success hover:bg-success/90 text-white border-success'
-            )}
-          >
-            <Archive size={15} className={cn(entry.is_archived && 'fill-current')} />
-            {entry.is_archived ? '已归档' : '归档'}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch.mutate()}
-            disabled={refetch.isPending}
-            className="h-9 rounded-lg gap-1.5 text-[13px]"
-          >
-            <RefreshCw size={15} className={cn(refetch.isPending && 'animate-spin')} />
-            {refetch.isPending ? '抓取中...' : '重新抓取'}
-          </Button>
-
-          {entry.content && !editing && (
+        {/* Action toolbar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-0.5">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(true)}
-              className="h-9 rounded-lg gap-1.5 text-[13px]"
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleStar.mutate()}
+              className={cn(
+                'h-9 w-9 rounded-lg transition-colors',
+                entry.is_starred
+                  ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              )}
+              title={entry.is_starred ? '取消收藏' : '收藏'}
             >
-              <Edit3 size={15} />
-              编辑
+              <Star size={18} className={cn(entry.is_starred && 'fill-current')} />
             </Button>
-          )}
 
-          <Button
-            variant={showAnnotations ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowAnnotations(!showAnnotations)}
-            className="h-9 rounded-lg gap-1.5 text-[13px]"
-          >
-            <MessageSquare size={15} />
-            批注
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleArchive.mutate()}
+              className={cn(
+                'h-9 w-9 rounded-lg transition-colors',
+                entry.is_archived
+                  ? 'text-success hover:text-success hover:bg-success/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              )}
+              title={entry.is_archived ? '取消归档' : '归档'}
+            >
+              <Archive size={18} className={cn(entry.is_archived && 'fill-current')} />
+            </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
-                <MoreHorizontal size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive rounded-lg cursor-pointer"
-                onClick={() => { if (confirm('确定删除这篇文章？')) remove.mutate(); }}
+            <Button
+              variant={showAnnotations ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setShowAnnotations(!showAnnotations)}
+              className="h-9 w-9 rounded-lg"
+              title="批注"
+            >
+              <MessageSquare size={18} />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetch.mutate()}
+              disabled={refetch.isPending}
+              className="h-8 px-2.5 rounded-lg text-caption text-muted-foreground hover:text-foreground"
+              title="重新抓取内容"
+            >
+              <RefreshCw size={14} className={cn('mr-1.5', refetch.isPending && 'animate-spin')} />
+              {refetch.isPending ? '抓取中' : '重抓'}
+            </Button>
+
+            {entry.content && !editing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(true)}
+                className="h-8 px-2.5 rounded-lg text-caption text-muted-foreground hover:text-foreground"
+                title="编辑内容"
               >
-                <Trash2 size={14} className="mr-2" /> 删除
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Edit3 size={14} className="mr-1.5" />
+                编辑
+              </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground">
+                  <MoreHorizontal size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl">
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive rounded-lg cursor-pointer"
+                  onClick={() => { if (confirm('确定删除这篇文章？')) remove.mutate(); }}
+                >
+                  <Trash2 size={14} className="mr-2" /> 删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Content */}
@@ -330,15 +403,45 @@ export default function EntryDetailPage() {
             <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline ml-1 font-medium">查看原文</a>
           </div>
         ) : entry.content ? (
-          <article
-            ref={articleRef}
-            className="entry-content max-w-none overflow-x-hidden"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
-              FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
-              FORBID_ATTR: ['formaction', 'xlink:href', 'style'],
-              ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z]|$))/i,
-            }) }}
-          />
+          <>
+            <article
+              ref={articleRef}
+              className="entry-content max-w-none overflow-x-hidden"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(entry.content, {
+                FORBID_TAGS: ['iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed', 'applet'],
+                FORBID_ATTR: ['formaction', 'xlink:href', 'style'],
+                ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z]|$))/i,
+              }) }}
+            />
+
+            {/* Floating selection toolbar */}
+            {selectionToolbar.visible && (
+              <div
+                className="selection-toolbar fixed z-50 bg-card border border-border/60 shadow-lg rounded-lg px-1.5 py-1 flex items-center gap-0.5 animate-scale-in"
+                style={{
+                  left: selectionToolbar.x,
+                  top: selectionToolbar.y,
+                  transform: 'translateX(-50%) translateY(-100%)',
+                }}
+              >
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs rounded-md gap-1.5"
+                  onClick={() => {
+                    setPendingQuote(selectionToolbar.text);
+                    setAnnotationKey(prev => prev + 1);
+                    setShowAnnotations(true);
+                    setSelectionToolbar(prev => ({ ...prev, visible: false }));
+                    window.getSelection()?.removeAllRanges();
+                  }}
+                >
+                  <MessageSquare size={13} />
+                  添加批注
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-muted-foreground py-8">暂无内容</p>
         )}
@@ -368,11 +471,11 @@ export default function EntryDetailPage() {
       {isMobile ? (
         <Sheet open={showAnnotations} onOpenChange={setShowAnnotations}>
           <SheetContent side="bottom" className="h-[65dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
-            {id && <AnnotationsSidebar entryId={id} compact />}
+            {id && <AnnotationsSidebar key={annotationKey} entryId={id} compact preselectedQuote={pendingQuote} />}
           </SheetContent>
         </Sheet>
       ) : (
-        showAnnotations && id && <AnnotationsSidebar entryId={id} />
+        showAnnotations && id && <AnnotationsSidebar key={annotationKey} entryId={id} preselectedQuote={pendingQuote} />
       )}
     </div>
   );
