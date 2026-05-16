@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteEntries } from '../hooks/useInfiniteEntries';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Loader2, Tag, Tags, Archive, Trash2, X, Sparkles, Star, ArrowUp, WifiOff } from 'lucide-react';
+import { Search, Loader2, Tag, Tags, Archive, Trash2, X, BookOpen, Star, ArrowUp, WifiOff } from 'lucide-react';
 import type { EntrySummary, ListParams } from '../api/entries';
 import { bulkTagByIds, bulkUntagByIds, bulkDeleteByIds, bulkArchiveByIds, fetchTagStats } from '../api/tags';
 import EntryCard from '../components/EntryCard';
@@ -35,7 +35,7 @@ interface Props {
 }
 
 const TITLES = { unread: '未读', archived: '归档', starred: '收藏' };
-const TITLE_ICONS = { unread: Sparkles, archived: Archive, starred: Star };
+const TITLE_ICONS = { unread: BookOpen, archived: Archive, starred: Star };
 
 // Intersection Observer hook for infinite scroll
 function useIntersectionObserver(
@@ -69,9 +69,11 @@ function useIntersectionObserver(
 
 export default function EntryListPage({ filter }: Props) {
   const [search, setSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [domain, setDomain] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTagInput, setBulkTagInput] = useState('');
@@ -162,8 +164,19 @@ export default function EntryListPage({ filter }: Props) {
 
   useListKeyboardNav(entries, selectedIndex, setSelectedIndex);
 
-  const title = TITLES[filter || 'unread'];
-  const TitleIcon = TITLE_ICONS[filter || 'unread'];
+  let title = TITLES[filter || 'unread'];
+  let TitleIcon = TITLE_ICONS[filter || 'unread'];
+
+  if (tagFilter) {
+    title = tagFilter;
+    TitleIcon = Tag;
+  } else if (untagged) {
+    title = '未标签文章';
+    TitleIcon = Tags;
+  } else if (excludeTag) {
+    title = `排除「${excludeTag}」`;
+    TitleIcon = Tag;
+  }
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -278,8 +291,16 @@ export default function EntryListPage({ filter }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-        <Button
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant={filterOpen || search || domain ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setFilterOpen(!filterOpen)}
+            className="h-8 w-8 p-0 rounded-lg"
+          >
+            <Search size={15} />
+          </Button>
+          <Button
             variant={selectionMode ? 'default' : 'ghost'}
             size="sm"
             onClick={() => {
@@ -304,51 +325,43 @@ export default function EntryListPage({ filter }: Props) {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-        <Input
-          type="text"
-          placeholder="搜索文章标题、内容..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 pr-10 h-10 bg-card border-border/60 rounded-xl focus-visible:ring-primary/30"
-        />
-        {search && (
-          <button
-            onClick={() => setSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-          >
-            <X size={14} />
-          </button>
-        )}
-      </div>
-
-      {/* Active filters */}
-      {(domain || tagFilter || untagged) && (
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+      {/* Filter panel */}
+      {(filterOpen || search || domain) && (
+        <div className="mb-4 p-3 bg-card border border-border/50 rounded-xl animate-fade-in-down space-y-2.5">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="搜索文章标题、内容..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-8 h-9 text-sm bg-muted/30 border-border/40 rounded-lg focus-visible:ring-primary/20"
+            />
+            {search && (
+              <button
+                onClick={() => {
+                  setSearch('');
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
           {domain && (
-            <TagBadge label={domain} onRemove={() => setDomain('')} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <TagBadge label={domain} onRemove={() => setDomain('')} />
+            </div>
           )}
-          {tagFilter && (
-            <TagBadge
-              label={tagFilter}
-              onRemove={() => {
-                searchParams.delete('tag');
-                setSearchParams(searchParams);
-              }}
-            />
-          )}
-          {untagged && (
-            <TagBadge
-              label="未标签"
-              clickable={false}
-              onRemove={() => {
-                searchParams.delete('untagged');
-                setSearchParams(searchParams);
-              }}
-            />
-          )}
+        </div>
+      )}
+
+      {/* Active domain filter */}
+      {domain && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <TagBadge label={domain} onRemove={() => setDomain('')} />
         </div>
       )}
 

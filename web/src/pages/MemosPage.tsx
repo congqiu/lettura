@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { Button } from '../components/ui/button';
-import { Loader2, FileText, Trash2, ArrowUpRight } from 'lucide-react';
+import { Loader2, StickyNote, Trash2, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function MemosPage() {
@@ -46,10 +46,10 @@ export default function MemosPage() {
     <div className="animate-fade-in">
       <div className="flex items-center gap-2.5 mb-5">
         <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-          <FileText size={18} />
+          <StickyNote size={18} />
         </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">收集箱</h2>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">便签</h2>
           <p className="text-xs text-muted-foreground">快速记录想法、链接和灵感</p>
         </div>
       </div>

@@ -23,7 +23,7 @@ const SECTIONS = [
       { keys: ['1'], desc: '未读列表' },
       { keys: ['2'], desc: '归档列表' },
       { keys: ['3'], desc: '收藏列表' },
-      { keys: ['4'], desc: '收集箱' },
+      { keys: ['4'], desc: '便签' },
       { keys: ['h', '←'], desc: '返回上页' },
     ],
   },

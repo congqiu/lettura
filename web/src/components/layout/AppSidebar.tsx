@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { BookOpen, Archive, Star, StickyNote, Globe, ShieldCheck, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon, ChevronRight } from 'lucide-react';
+import { BookOpen, Archive, Star, StickyNote, Globe, ShieldIcon, Settings, LogOut, Sun, Moon, Monitor, Tag as TagIcon, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/auth';
 import { useThemeStore } from '../../store/theme';
@@ -24,7 +24,7 @@ const navItems = [
 
 const toolItems = [
   { to: '/pages', label: 'Pages', icon: Globe, end: false },
-  { to: '/audit-logs', label: '操作日志', icon: ShieldCheck, end: false },
+  { to: '/audit-logs', label: '操作日志', icon: ShieldIcon, end: false },
 ];
 
 export function AppSidebar() {
@@ -81,14 +81,14 @@ export function AppSidebar() {
                 const active = isActivePath(item.to, item.end);
                 return (
                   <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild isActive={active} className="group/menu-button">
+                    <SidebarMenuButton asChild className="group/menu-button">
                       <NavLink
                         to={item.to}
                         end={item.end}
                         className={cn(
                           'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                           active
-                            ? 'bg-primary/15 text-primary shadow-sm'
+                            ? 'bg-primary/15 text-primary shadow-sm hover:bg-primary/15 hover:text-primary'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                         )}
                       >
@@ -120,7 +120,7 @@ export function AppSidebar() {
                         className={cn(
                           'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150',
                           currentTag === tag.label
-                            ? 'bg-primary/15 text-primary font-medium'
+                            ? 'bg-primary/15 text-primary font-medium hover:bg-primary/15 hover:text-primary'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                         )}
                       >
@@ -137,7 +137,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild>
                       <NavLink
-                        to="/tags"
+                        to="/settings"
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-150"
                       >
                         <span className="ml-[22px]">查看全部标签</span>
@@ -160,14 +160,14 @@ export function AppSidebar() {
                 const active = isActivePath(item.to, item.end);
                 return (
                   <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild isActive={active}>
+                    <SidebarMenuButton asChild>
                       <NavLink
                         to={item.to}
                         end={item.end}
                         className={cn(
                           'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                           active
-                            ? 'bg-primary/15 text-primary'
+                            ? 'bg-primary/15 text-primary hover:bg-primary/15 hover:text-primary'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                         )}
                       >
@@ -187,13 +187,13 @@ export function AppSidebar() {
         <Separator className="mb-2 mx-2 w-auto opacity-60" />
         <SidebarMenu className="space-y-0.5">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isActivePath('/settings', false)}>
+            <SidebarMenuButton asChild>
               <NavLink
                 to="/settings"
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                   isActivePath('/settings', false)
-                    ? 'bg-primary/15 text-primary'
+                    ? 'bg-primary/15 text-primary hover:bg-primary/15 hover:text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
               >
