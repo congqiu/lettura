@@ -9,6 +9,7 @@ pub struct TestApp {
     pub client: reqwest::Client,
     pub db_name: String,
     pub search_index: SearchIndex,
+    pub config: Config,
     base_url: String,
 }
 
@@ -57,6 +58,10 @@ impl TestApp {
             fetch_max_retries: 3,
             proxy: None,
             site_configs_path: None,
+            fetch_concurrency: 5,
+            fetch_max_attempts: 5,
+            fetch_lease_secs: 300,
+            fetch_dead_ttl_days: 30,
             rendering_enabled: "false".to_string(),
             chromium_path: None,
             render_concurrency: 1,
@@ -99,12 +104,51 @@ impl TestApp {
             client: reqwest::Client::new(),
             db_name,
             search_index,
+            config: config.clone(),
             base_url,
         }
     }
 
     pub fn url(&self, path: &str) -> String {
         format!("{}{}", self.addr, path)
+    }
+
+    /// Insert a user directly via SQL, bypassing the auth API.
+    /// Returns the new user's ID. Use this in DAO tests that don't need
+    /// a real password hash or JWT.
+    pub async fn create_user(&self, username: &str) -> Uuid {
+        let id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO users (id, username, email, password_hash) \
+             VALUES ($1, $2, $3, 'x-not-a-real-hash')",
+        )
+        .bind(id)
+        .bind(username)
+        .bind(format!("{}@test.local", username))
+        .execute(&self.pool)
+        .await
+        .expect("create_user insert");
+        id
+    }
+
+    /// Insert a minimal entry row for the given user, returning the entry ID.
+    pub async fn create_entry(&self, user_id: Uuid, url: &str) -> Uuid {
+        use sha1::{Digest, Sha1};
+        let hashed = hex::encode(Sha1::digest(url.as_bytes()));
+        let id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO entries \
+             (id, user_id, url, given_url, hashed_url, hashed_given_url) \
+             VALUES ($1, $2, $3, $3, $4, $4)",
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(url)
+        .bind(hashed)
+        .execute(&self.pool)
+        .await
+        .expect("create_entry insert");
+        id
     }
 
     pub async fn cleanup(self) {
