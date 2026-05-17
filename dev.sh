@@ -98,18 +98,27 @@ cmd_psql() {
 }
 
 # Regenerate the frontend OpenAPI types. Uses the offline path (no running
-# server required): cargo dumps the schema to JSON in the builder container,
-# openapi-typescript reads the file. Run this whenever a #[utoipa::path]
-# handler annotation changes or a #[derive(ToSchema)] type is touched.
+# server required): cargo dumps the schema to JSON, openapi-typescript reads
+# the file. Run this whenever a #[utoipa::path] handler annotation changes
+# or a #[derive(ToSchema)] type is touched.
+#
+# Prefers host cargo if available (faster, no docker overhead). Falls back to
+# the lettura-bb-sccache builder container if cargo is missing.
 cmd_codegen() {
   log "Dumping OpenAPI schema from Rust..."
-  docker run --rm \
-    -v "$(pwd)":/app \
-    -v lettura-target:/app/target \
-    -v lettura-cargo-registry:/usr/local/cargo/registry \
-    -w /app lettura-bb-sccache \
+  if command -v cargo >/dev/null 2>&1; then
     cargo run --bin dump_openapi --no-default-features --quiet \
-    > web/src/api/openapi.json
+      > web/src/api/openapi.json
+  else
+    warn "host cargo not found, using docker builder"
+    docker run --rm \
+      -v "$(pwd)":/app \
+      -v lettura-target:/app/target \
+      -v lettura-cargo-registry:/usr/local/cargo/registry \
+      -w /app lettura-bb-sccache \
+      cargo run --bin dump_openapi --no-default-features --quiet \
+      > web/src/api/openapi.json
+  fi
   log "Generating web/src/api/schema.ts..."
   (cd web && pnpm codegen)
   log "Done. Commit web/src/api/openapi.json + web/src/api/schema.ts."
