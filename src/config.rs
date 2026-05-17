@@ -201,6 +201,17 @@ mod tests {
     use super::*;
     use std::env;
 
+    /// Serializes all config tests so parallel test runners can't race on
+    /// shared process env vars. Without this guard, set_env/cleanup_env in
+    /// one test can be observed mid-execution by another.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        // Recover from poisoned lock (a previous test panicked); a stale
+        // guard is fine because cleanup_env runs after every test body.
+        ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     fn set_env(jwt_secret: &str) {
         unsafe {
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -222,6 +233,7 @@ mod tests {
 
     #[test]
     fn rejects_short_jwt_secret() {
+        let _g = lock_env();
         set_env("too-short");
         let result = Config::from_env();
         cleanup_env();
@@ -231,6 +243,7 @@ mod tests {
 
     #[test]
     fn rejects_default_jwt_secret() {
+        let _g = lock_env();
         set_env("change-me-in-production");
         let result = Config::from_env();
         cleanup_env();
@@ -244,6 +257,7 @@ mod tests {
 
     #[test]
     fn accepts_valid_jwt_secret() {
+        let _g = lock_env();
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
         let result = Config::from_env();
         cleanup_env();
@@ -256,6 +270,7 @@ mod tests {
 
     #[test]
     fn render_concurrency_parses() {
+        let _g = lock_env();
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
         unsafe {
             env::set_var("LETTURA_RENDER_CONCURRENCY", "4");
@@ -267,6 +282,7 @@ mod tests {
 
     #[test]
     fn rendering_enabled_disabled_via_env() {
+        let _g = lock_env();
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
         unsafe {
             env::set_var("LETTURA_RENDERING_ENABLED", "false");
@@ -278,6 +294,7 @@ mod tests {
 
     #[test]
     fn rejects_wildcard_cors_in_production_mode() {
+        let _g = lock_env();
         set_env("a-very-secure-secret-that-is-at-least-32-chars!");
         unsafe {
             env::set_var("LETTURA_PRODUCTION", "true");
