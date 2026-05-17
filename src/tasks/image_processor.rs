@@ -6,6 +6,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tokio_util::sync::CancellationToken;
 
 use crate::models::{entry, image_process_job};
 use crate::storage::ImageStorage;
@@ -36,9 +37,17 @@ impl ImageProcessor {
         }
     }
 
-    /// Run the processor loop.
-    pub async fn run(self: Arc<Self>) {
+    /// Run the processor loop until `cancel` is triggered.
+    ///
+    /// On cancel, stops claiming new jobs immediately. Already-dispatched
+    /// jobs run to completion in their own tokio tasks — they're idempotent
+    /// (the DB row state machine handles retries), so being killed mid-flight
+    /// would just trigger a normal retry on the next startup.
+    pub async fn run(self: Arc<Self>, cancel: CancellationToken) {
         loop {
+            if cancel.is_cancelled() {
+                break;
+            }
             match image_process_job::claim_pending(&self.pool).await {
                 Ok(Some(job)) => {
                     let processor = self.clone();
@@ -55,15 +64,23 @@ impl ImageProcessor {
                     });
                 }
                 Ok(None) => {
-                    // No jobs available, wait before polling again
-                    tokio::time::sleep(POLL_INTERVAL).await;
+                    // No jobs available, wait before polling again — but
+                    // wake up immediately if cancel fires so shutdown is fast.
+                    tokio::select! {
+                        _ = cancel.cancelled() => break,
+                        _ = tokio::time::sleep(POLL_INTERVAL) => {}
+                    }
                 }
                 Err(e) => {
                     tracing::error!("Failed to claim image process job: {e}");
-                    tokio::time::sleep(POLL_INTERVAL).await;
+                    tokio::select! {
+                        _ = cancel.cancelled() => break,
+                        _ = tokio::time::sleep(POLL_INTERVAL) => {}
+                    }
                 }
             }
         }
+        tracing::info!("image processor stopped");
     }
 
     async fn process_job(&self, job: &image_process_job::ImageProcessJob) {
@@ -110,17 +127,19 @@ impl ImageProcessor {
     }
 }
 
-/// Start the image processor as a background task.
+/// Start the image processor as a background task. Stops claiming new jobs
+/// when `cancel` is triggered.
 pub fn start_image_processor(
     pool: sqlx::PgPool,
     storage: Arc<dyn ImageStorage>,
     max_image_size: usize,
+    cancel: CancellationToken,
 ) -> Arc<ImageProcessor> {
     let processor = Arc::new(ImageProcessor::new(pool, storage, max_image_size));
     let processor_clone = processor.clone();
 
     tokio::spawn(async move {
-        processor_clone.run().await;
+        processor_clone.run(cancel).await;
     });
 
     processor

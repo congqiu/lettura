@@ -41,9 +41,10 @@ async fn main() {
     let (app, search_index, _fetch_queue, storage) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
 
-    // CancellationToken drives graceful worker shutdown. Currently only the
-    // fetch workers observe it; the image processor and other periodic tasks
-    // will be migrated in a later cleanup pass.
+    // CancellationToken drives graceful shutdown of every long-running task.
+    // SIGTERM / Ctrl-C flips it; every periodic task wakes immediately from
+    // its sleep/tick, breaks out of its loop, and the axum server stops
+    // accepting new requests via `with_graceful_shutdown` below.
     let cancel = tokio_util::sync::CancellationToken::new();
     {
         let cancel = cancel.clone();
@@ -92,20 +93,32 @@ async fn main() {
     );
 
     // Start image processor
-    lettura::tasks::start_image_processor(pool.clone(), storage.clone(), config.max_image_size);
+    lettura::tasks::start_image_processor(
+        pool.clone(),
+        storage.clone(),
+        config.max_image_size,
+        cancel.clone(),
+    );
 
     // Background task: flush search index every 3 seconds. Documents become
     // searchable within this window after a write. Critical paths (e.g.
     // permanent delete) call commit() directly for stronger guarantees.
+    // On shutdown, breaks out of the loop; the final flush happens in the
+    // axum `with_graceful_shutdown` callback below so any writes after the
+    // last tick are still committed.
     {
         let idx = search_index.clone();
+        let cancel = cancel.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(
                 config.search_commit_interval_secs,
             ));
             let mut consecutive_failures: u64 = 0;
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {}
+                }
                 match idx.commit().await {
                     Ok(()) => consecutive_failures = 0,
                     Err(e) => {
@@ -127,12 +140,16 @@ async fn main() {
 
     {
         let cleanup_pool = pool.clone();
+        let cancel = cancel.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(
                 config.token_cleanup_interval_secs,
             ));
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {}
+                }
                 match lettura::models::user::cleanup_expired_refresh_tokens(&cleanup_pool).await {
                     Ok(count) if count > 0 => {
                         tracing::info!(removed = count, "cleaned up expired refresh tokens")
@@ -227,11 +244,15 @@ async fn main() {
         // Background task to periodically report gauge metrics
         let search_idx = search_index.clone();
         let pool_for_metrics = pool.clone();
+        let cancel = cancel.clone();
         tokio::spawn(async move {
             let mut interval =
                 tokio::time::interval(std::time::Duration::from_secs(config.metrics_interval_secs));
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {}
+                }
                 if let Ok(count) = search_idx.doc_count() {
                     metrics::gauge!("search_index_documents").set(count as f64);
                 }
