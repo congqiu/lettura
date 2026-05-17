@@ -45,6 +45,7 @@ pub enum AuditAction {
     DeleteSiteRule,
     ImportWallabag,
     ImportBrowser,
+    ImportLettura,
     ExportAll,
     CreatePage,
     UpdatePage,

@@ -11,7 +11,7 @@ export type AuditAction =
   | 'create_memo' | 'delete_memo' | 'promote_memo'
   | 'create_tagging_rule' | 'update_tagging_rule' | 'delete_tagging_rule'
   | 'create_site_rule' | 'update_site_rule' | 'delete_site_rule'
-  | 'import_wallabag' | 'import_browser' | 'export_all'
+  | 'import_wallabag' | 'import_browser' | 'import_lettura' | 'export_all'
   | 'create_page' | 'update_page' | 'delete_page' | 'restore_page'
   | 'admin_backup' | 'admin_restore' | 'admin_reindex' | 'admin_list_users'
   | 'bulk_tag_add' | 'bulk_untag' | 'bulk_archive' | 'bulk_star';

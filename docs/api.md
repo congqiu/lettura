@@ -121,8 +121,9 @@
 | 方法 | 路径 | 认证 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/import/wallabag` | 是 | 导入 Wallabag JSON 导出文件。Body: Wallabag 条目数组 |
-| POST | `/api/v1/import/browser` | 是 | 导入浏览器书签 HTML 文件。Body: `{ html }` |
-| GET | `/api/v1/export` | 是 | 导出当前用户所有数据（JSON） |
+| POST | `/api/v1/import/browser` | 是 | 导入浏览器书签 HTML 文件。Body: 原始 HTML 文本，`Content-Type: text/html` |
+| POST | `/api/v1/import/lettura` | 是 | 导入 Lettura 备份 JSON 文件（由 `/export` 导出，支持跨账号迁移）。Body: 完整导出 JSON，`Content-Type: application/json`。返回 `{imported, skipped, total, failed_entries, failed_links, failed_annotations, failed_memos, failed_rules}`。接受任意 `1.x` 版本的导出 |
+| GET | `/api/v1/export?scope={all\|unread\|archived\|starred}` | 是 | 导出当前用户数据（JSON），包含 entries、tags、annotations、memos、tagging_rules、site_rules 及 entry_tags 关联。默认 scope=all |
 
 ---
 

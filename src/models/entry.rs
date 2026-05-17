@@ -50,7 +50,7 @@ pub mod cursor {
     }
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Entry {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -79,6 +79,12 @@ pub struct Entry {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct EntryTagLink {
+    pub entry_id: Uuid,
+    pub tag_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -427,6 +433,34 @@ pub async fn update_entry(
     .bind(entry_id).bind(user_id).bind(title).bind(content).bind(is_content_edited)
     .bind(is_archived).bind(archived_at).bind(is_starred).bind(starred_at)
     .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+}
+
+/// Restore archived/starred flags + their original timestamps verbatim.
+/// Used by import paths where preserving the original moment matters; the
+/// regular `update_entry` would stamp `now()` and lose backup fidelity.
+pub async fn restore_import_status(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    is_archived: bool,
+    archived_at: Option<DateTime<Utc>>,
+    is_starred: bool,
+    starred_at: Option<DateTime<Utc>>,
+) -> Result<(), ModelError> {
+    sqlx::query(
+        "UPDATE entries SET is_archived = $3, archived_at = $4, is_starred = $5, starred_at = $6, updated_at = now() \
+         WHERE id = $1 AND user_id = $2",
+    )
+    .bind(entry_id)
+    .bind(user_id)
+    .bind(is_archived)
+    .bind(archived_at)
+    .bind(is_starred)
+    .bind(starred_at)
+    .execute(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
 }
 
 pub async fn list_entries_by_ids(

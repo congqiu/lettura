@@ -220,6 +220,7 @@ pub fn router_with_search(
         // Import/Export
         .route("/api/v1/import/wallabag", post(import::import_wallabag))
         .route("/api/v1/import/browser", post(import::import_browser))
+        .route("/api/v1/import/lettura", post(import::import_lettura))
         .route("/api/v1/export", get(export::export_all))
         // RSS Feeds (no auth - uses feed token)
         .route("/feed/{user_token}/unread", get(feed::feed_unread))

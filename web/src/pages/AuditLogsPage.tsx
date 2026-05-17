@@ -44,6 +44,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   delete_site_rule: '删除站点规则',
   import_wallabag: '导入 Wallabag',
   import_browser: '导入浏览器书签',
+  import_lettura: '导入 Lettura 备份',
   export_all: '导出全部',
   create_page: '创建页面',
   update_page: '更新页面',

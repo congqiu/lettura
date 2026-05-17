@@ -6,7 +6,7 @@ use validator::Validate;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Annotation {
     pub id: Uuid,
     pub entry_id: Uuid,
@@ -83,6 +83,34 @@ pub async fn update(
         "UPDATE annotations SET text = $3, ranges = $4, updated_at = now() WHERE id = $1 AND user_id = $2 RETURNING *")
         .bind(annotation_id).bind(user_id).bind(text).bind(ranges)
         .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))
+}
+
+/// Insert a new annotation as part of an import. A fresh UUID is generated
+/// by the DB (DEFAULT gen_random_uuid()): preserving the source UUID would
+/// collide with the original owner's data when migrating across accounts on
+/// the same instance.
+pub async fn import_annotation(
+    pool: &PgPool,
+    annotation: &Annotation,
+    new_entry_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), ModelError> {
+    sqlx::query(
+        "INSERT INTO annotations (entry_id, user_id, quote, text, ranges, is_orphaned, created_at, updated_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+    )
+    .bind(new_entry_id)
+    .bind(user_id)
+    .bind(&annotation.quote)
+    .bind(&annotation.text)
+    .bind(&annotation.ranges)
+    .bind(annotation.is_orphaned)
+    .bind(annotation.created_at)
+    .bind(annotation.updated_at)
+    .execute(pool)
+    .await
+    .map_err(|e| ModelError::Database(e.to_string()))?;
+    Ok(())
 }
 
 pub async fn delete(pool: &PgPool, annotation_id: Uuid, user_id: Uuid) -> Result<bool, ModelError> {
