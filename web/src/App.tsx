@@ -8,8 +8,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ShareTargetPage from './pages/ShareTargetPage';
 import EntryListPage from './pages/EntryListPage';
-import EntryDetailPage from './pages/EntryDetailPage';
 
+const EntryDetailPage = lazy(() => import('./pages/EntryDetailPage'));
 const MemosPage = lazy(() => import('./pages/MemosPage'));
 const PagesPage = lazy(() => import('./pages/PagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
