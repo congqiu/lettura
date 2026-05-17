@@ -87,6 +87,7 @@ use utoipa::OpenApi;
         crate::api::fetch_jobs::delete,
         crate::api::fetch_jobs::retry,
         crate::api::fetch_jobs::retry_all_dead,
+        crate::api::pages::upload_files,
         crate::api::pages::list_pages_handler,
         crate::api::pages::create_page_handler,
         crate::api::pages::update_page_handler,
@@ -94,6 +95,7 @@ use utoipa::OpenApi;
         crate::api::pages::restore_page_handler,
         crate::api::pages::get_share_url_handler,
         crate::api::backup::backup,
+        crate::api::backup::restore,
     ),
     components(schemas(
         crate::api::health::HealthResponse,
@@ -171,6 +173,7 @@ use utoipa::OpenApi;
         crate::api::backup::BackupMemo,
         crate::api::backup::BackupTaggingRule,
         crate::api::backup::BackupSiteRule,
+        crate::api::backup::RestoreResponse,
     )),
     tags(
         (name = "health", description = "Service liveness and readiness"),

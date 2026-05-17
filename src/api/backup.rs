@@ -443,6 +443,41 @@ struct NdjsonLineIn {
 /// even on small instances. Adjust if a real user hits the limit.
 const MAX_RESTORE_BODY_BYTES: u64 = 500 * 1024 * 1024; // 500 MiB
 
+/// Summary returned by a successful restore.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct RestoreResponse {
+    pub message: String,
+    pub users: usize,
+    pub entries: usize,
+    pub tags: usize,
+    pub entry_tags: usize,
+    pub annotations: usize,
+    pub memos: usize,
+    pub tagging_rules: usize,
+    pub site_rules: usize,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/restore",
+    operation_id = "admin_restore",
+    tag = "admin",
+    params(
+        ("confirm" = Option<bool>, Query, description = "Must be `true` to proceed; safety guard against accidental wipes"),
+    ),
+    request_body(
+        description = "NDJSON stream produced by `GET /api/v1/admin/backup` (v2.0) or a legacy JSON bundle (v1.0). Maximum body size 500 MiB.",
+        content_type = "application/x-ndjson",
+        content = String,
+    ),
+    responses(
+        (status = 200, description = "Restore complete; existing data was wiped and replaced", body = RestoreResponse),
+        (status = 400, description = "Missing confirm flag, body too large, or unrecognised backup format"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn restore(
     State(state): State<AppState>,
     auth: AuthUser,

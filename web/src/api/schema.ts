@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["admin_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -670,6 +686,22 @@ export interface paths {
         get: operations["list_pages_handler"];
         put?: never;
         post: operations["create_page_handler"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upload_files"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1345,11 +1377,9 @@ export interface components {
         MessageResponse: {
             message: string;
         };
-        /** @description Schema type for the delete page response. */
         PageDeleteResponse: {
             success: boolean;
         };
-        /** @description Schema type for the list pages response. */
         PageListResponse: {
             items: components["schemas"]["PageSummaryResponse"][];
             /** Format: int64 */
@@ -1387,7 +1417,6 @@ export interface components {
             /** Format: uuid */
             user_id: string;
         };
-        /** @description Schema type for the restore page response. */
         PageRestoreResponse: {
             /** Format: uuid */
             id: string;
@@ -1440,6 +1469,18 @@ export interface components {
         };
         RenameTagRequest: {
             label: string;
+        };
+        /** @description Summary returned by a successful restore. */
+        RestoreResponse: {
+            annotations: number;
+            entries: number;
+            entry_tags: number;
+            memos: number;
+            message: string;
+            site_rules: number;
+            tagging_rules: number;
+            tags: number;
+            users: number;
         };
         RetryAllResponse: {
             /** Format: int64 */
@@ -1853,6 +1894,55 @@ export interface operations {
                 content?: never;
             };
             /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    admin_restore: {
+        parameters: {
+            query?: {
+                /** @description Must be `true` to proceed; safety guard against accidental wipes */
+                confirm?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description NDJSON stream produced by `GET /api/v1/admin/backup` (v2.0) or a legacy JSON bundle (v1.0). Maximum body size 500 MiB. */
+        requestBody: {
+            content: {
+                "application/x-ndjson": string;
+            };
+        };
+        responses: {
+            /** @description Restore complete; existing data was wiped and replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreResponse"];
+                };
+            };
+            /** @description Missing confirm flag, body too large, or unrecognised backup format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin required */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3359,6 +3449,45 @@ export interface operations {
             };
             /** @description Validation error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upload_files: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description One or more files (HTML, CSS, images, or a single ZIP archive) staged into a temporary upload session that subsequent `POST /api/v1/pages` calls reference by `upload_id`. */
+        requestBody: {
+            content: {
+                "multipart/form-data": number[];
+            };
+        };
+        responses: {
+            /** @description Files staged; returns the upload session id and a list of HTML entry candidates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+            /** @description Malformed multipart body or upload exceeded size limits */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

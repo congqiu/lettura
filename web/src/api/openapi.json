@@ -310,6 +310,62 @@
         ]
       }
     },
+    "/api/v1/admin/restore": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "admin_restore",
+        "parameters": [
+          {
+            "name": "confirm",
+            "in": "query",
+            "description": "Must be `true` to proceed; safety guard against accidental wipes",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "NDJSON stream produced by `GET /api/v1/admin/backup` (v2.0) or a legacy JSON bundle (v1.0). Maximum body size 500 MiB.",
+          "content": {
+            "application/x-ndjson": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Restore complete; existing data was wiped and replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing confirm flag, body too large, or unrecognised backup format"
+          },
+          "401": {
+            "description": "Missing or invalid auth"
+          },
+          "403": {
+            "description": "Admin required"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/users": {
       "get": {
         "tags": [
@@ -2073,6 +2129,53 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/upload": {
+      "post": {
+        "tags": [
+          "pages"
+        ],
+        "operationId": "upload_files",
+        "requestBody": {
+          "description": "One or more files (HTML, CSS, images, or a single ZIP archive) staged into a temporary upload session that subsequent `POST /api/v1/pages` calls reference by `upload_id`.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Files staged; returns the upload session id and a list of HTML entry candidates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed multipart body or upload exceeded size limits"
+          },
+          "401": {
+            "description": "Missing or invalid auth"
           }
         },
         "security": [
@@ -4608,7 +4711,6 @@
       },
       "PageDeleteResponse": {
         "type": "object",
-        "description": "Schema type for the delete page response.",
         "required": [
           "success"
         ],
@@ -4620,7 +4722,6 @@
       },
       "PageListResponse": {
         "type": "object",
-        "description": "Schema type for the list pages response.",
         "required": [
           "items",
           "total",
@@ -4723,7 +4824,6 @@
       },
       "PageRestoreResponse": {
         "type": "object",
-        "description": "Schema type for the restore page response.",
         "required": [
           "id",
           "success"
@@ -4897,6 +4997,58 @@
         "properties": {
           "label": {
             "type": "string"
+          }
+        }
+      },
+      "RestoreResponse": {
+        "type": "object",
+        "description": "Summary returned by a successful restore.",
+        "required": [
+          "message",
+          "users",
+          "entries",
+          "tags",
+          "entry_tags",
+          "annotations",
+          "memos",
+          "tagging_rules",
+          "site_rules"
+        ],
+        "properties": {
+          "annotations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entries": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entry_tags": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "memos": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          },
+          "site_rules": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tagging_rules": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tags": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "users": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

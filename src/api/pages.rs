@@ -109,6 +109,22 @@ fn tmp_dir(state: &AppState) -> std::path::PathBuf {
 // Handlers
 // ---------------------------------------------------------------------------
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/pages/upload",
+    tag = "pages",
+    request_body(
+        description = "One or more files (HTML, CSS, images, or a single ZIP archive) staged into a temporary upload session that subsequent `POST /api/v1/pages` calls reference by `upload_id`.",
+        content_type = "multipart/form-data",
+        content = Vec<u8>,
+    ),
+    responses(
+        (status = 200, description = "Files staged; returns the upload session id and a list of HTML entry candidates", body = UploadResponse),
+        (status = 400, description = "Malformed multipart body or upload exceeded size limits"),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 #[tracing::instrument(skip(state, multipart), err)]
 pub async fn upload_files(
     State(state): State<AppState>,
