@@ -130,6 +130,11 @@ cmd_cache_stats() {
   else
     docker run --rm $args alpine sh -c 'du -sh /v/* 2>/dev/null | sort -h'
   fi
+
+  echo ""
+  log "BuildKit cache mounts (cargo registry, sccache, target — survive across docker builds):"
+  docker buildx du --filter type=exec.cachemount 2>/dev/null | head -10 || \
+    warn "BuildKit cache info unavailable"
 }
 
 # Drop cargo's per-crate incremental caches across all build volumes. These
