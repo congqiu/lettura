@@ -94,9 +94,8 @@ docker build --target test -t lettura-test .
 # 只运行特定模块的测试（更快）
 docker build --target test --build-arg "TEST_ARGS=--lib search" -t lettura-test .
 
-# 集成测试（需要 postgres-test 运行）
-docker compose -f docker-compose.test.yml up -d postgres-test
-docker compose -f docker-compose.test.yml run --rm lettura cargo test --test '*'
+# 集成测试（使用主数据库）
+docker compose exec lettura cargo test --test '*'
 ```
 
 ### 配置

@@ -1,0 +1,72 @@
+# 开发模式 Dockerfile - 支持热更新
+# 需要先有 rust:bookworm 镜像
+FROM rust:bookworm
+
+ARG RENDERING=1
+
+# 安装依赖
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    libssl3 \
+    pkg-config \
+    && if [ "$RENDERING" = "1" ]; then \
+         apt-get install -y --no-install-recommends \
+           chromium \
+           fonts-noto-cjk \
+           fonts-noto-color-emoji; \
+       fi \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 cargo watch + sccache
+# sccache 把 rustc 编译输出按代码指纹缓存，cargo watch 反复重编时大幅加速
+# （改一个文件的 link 时间从 ~60s 降到 ~10s），且容量自封顶不会撑爆磁盘。
+RUN cargo install cargo-watch sccache --locked
+
+# 安装 Node.js（用于前端构建）
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+# sccache 配置：把缓存放在 /sccache（开发者可挂 volume 持久化）。
+# CARGO_INCREMENTAL=0 是 cargo team 在 sccache 场景下的推荐——incremental
+# 缓存会与 sccache 重叠，且无上限累积容易把 target volume 撑到几十 GB。
+ENV RUSTC_WRAPPER=sccache \
+    SCCACHE_DIR=/sccache \
+    SCCACHE_CACHE_SIZE=10G \
+    CARGO_INCREMENTAL=0
+RUN mkdir -p /sccache
+
+WORKDIR /app
+
+# 复制依赖文件
+COPY Cargo.toml Cargo.lock ./
+COPY cli/Cargo.toml cli/Cargo.toml
+
+# 创建空的 main.rs 以预编译依赖
+RUN mkdir -p src cli/src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "fn main() {}" > cli/src/main.rs
+
+# 预编译依赖（利用 Docker 缓存）
+RUN cargo build --bin lettura && \
+    rm -rf src cli/src
+
+# 复制实际源码
+COPY src/ src/
+COPY cli/src/ cli/src/
+COPY migrations/ migrations/
+COPY skills/ skills/
+
+# 构建前端
+COPY web/package.json web/pnpm-lock.yaml ./web/
+RUN cd web && pnpm install
+COPY web/ ./web/
+RUN cd web && pnpm run build
+
+# 创建数据目录
+RUN mkdir -p /data/tantivy /data/site-configs /data/pages /data/storage
+
+# 使用 cargo watch 监听文件变化并自动重新编译运行
+ENV LETTURA_TRUST_PROXY="false"
+ENV LETTURA_SITE_CONFIGS_PATH="/data/site-configs"
+
+CMD ["cargo", "watch", "-x", "run", "-b", "lettura"]

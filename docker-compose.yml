@@ -16,6 +16,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # 开发模式：支持热更新（需要先拉取 rust:bookworm 镜像）
+  # 启动: docker compose up -d --build lettura-dev
+  lettura-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "127.0.0.1:${APP_PORT:-3330}:3330"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-lettura}:${POSTGRES_PASSWORD:-lettura}@postgres:5432/${POSTGRES_DB:-lettura}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      LETTURA_PRODUCTION: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      LETTURA_SITE_CONFIGS_PATH: /data/site-configs
+    volumes:
+      - ./site-configs-local:/data/site-configs:ro
+      - appdata:/data
+      - ./src:/app/src:cached
+      - ./cli:/app/cli:cached
+      - ./migrations:/app/migrations:ro
+      - ./skills:/app/skills:ro
+      - ./Cargo.toml:/app/Cargo.toml:ro
+      - ./Cargo.lock:/app/Cargo.lock:ro
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/app/target
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+    profiles:
+      - dev
+
   lettura:
     build:
       context: .
@@ -47,3 +79,5 @@ services:
 volumes:
   pgdata:
   appdata:
+  cargo-registry:
+  cargo-target:
