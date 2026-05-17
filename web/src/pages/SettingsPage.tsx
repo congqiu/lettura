@@ -1,18 +1,22 @@
 import { useState } from 'react';
-import { Tag, ListChecks, Database, KeyRound, Settings } from 'lucide-react';
+import { Tag, ListChecks, Database, KeyRound, Settings, Inbox } from 'lucide-react';
 import TagsPanel from '@/components/settings/TagsPanel';
 import RulesPanel from '@/components/settings/RulesPanel';
 import DataPanel from '@/components/settings/DataPanel';
 import TokensPanel from '@/components/settings/TokensPanel';
+import FetchJobsPanel from '@/components/settings/FetchJobsPanel';
 import { cn } from '@/lib/utils';
 
-type PanelKey = 'tags' | 'rules' | 'data' | 'tokens';
+type PanelKey = 'tags' | 'rules' | 'data' | 'tokens' | 'fetch-jobs';
 
 const NAV_ITEMS: { key: PanelKey; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
   { key: 'tags', label: '标签管理', icon: Tag },
   { key: 'rules', label: '标签规则', icon: ListChecks },
   { key: 'data', label: '数据管理', icon: Database },
   { key: 'tokens', label: 'API 令牌', icon: KeyRound },
+  // Admin-only: backend 403s for non-admin users. Matches AuditLogsPage convention,
+  // which is shown to all users and gated server-side.
+  { key: 'fetch-jobs', label: '抓取队列', icon: Inbox },
 ];
 
 const PANELS: Record<PanelKey, React.ComponentType> = {
@@ -20,6 +24,7 @@ const PANELS: Record<PanelKey, React.ComponentType> = {
   rules: RulesPanel,
   data: DataPanel,
   tokens: TokensPanel,
+  'fetch-jobs': FetchJobsPanel,
 };
 
 export default function SettingsPage() {
