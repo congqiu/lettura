@@ -23,8 +23,10 @@ export default function RegisterPage() {
       const res = await register(username, email, password);
       authLogin(res.access_token, res.refresh_token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '注册失败');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      setError(message || '注册失败');
     } finally {
       setLoading(false);
     }

@@ -9,14 +9,17 @@ import { useEffect, useState } from 'react';
 
 export default function Layout() {
   const location = useLocation();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  // Track latest pathname applied to the DOM. When it differs from the current
+  // location, we render with opacity 0 for a brief frame then schedule a flip
+  // back via an effect — avoiding synchronous setState inside the effect body.
+  const [appliedPath, setAppliedPath] = useState(location.pathname);
+  const isTransitioning = appliedPath !== location.pathname;
 
-  // Subtle page transition on route change
   useEffect(() => {
-    setIsTransitioning(true);
-    const timer = setTimeout(() => setIsTransitioning(false), 50);
+    if (appliedPath === location.pathname) return;
+    const timer = setTimeout(() => setAppliedPath(location.pathname), 50);
     return () => clearTimeout(timer);
-  }, [location.pathname]);
+  }, [location.pathname, appliedPath]);
 
   return (
     <SidebarProvider>

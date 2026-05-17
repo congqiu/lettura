@@ -48,7 +48,11 @@ export function useSwipe(
   const isSwipingRef = useRef(false);
   const startedFromEdgeRef = useRef<'left' | 'right' | null>(null);
   const callbacksRef = useRef(callbacks);
-  callbacksRef.current = callbacks;
+  // Sync latest callbacks into the ref after render so touch handlers below
+  // always see fresh callbacks without re-binding listeners every render.
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  });
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     const touch = e.touches[0];

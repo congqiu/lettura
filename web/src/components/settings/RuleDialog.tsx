@@ -44,10 +44,16 @@ interface Props {
 export default function RuleDialog({ open, onOpenChange, initialData }: Props) {
   const qc = useQueryClient();
   const isEdit = !!initialData;
-  const [ruleField, setRuleField] = useState('title');
-  const [ruleOperator, setRuleOperator] = useState('contains');
-  const [ruleValue, setRuleValue] = useState('');
-  const [ruleTags, setRuleTags] = useState('');
+
+  // Lazy initial state derived from initialData. Caller should pass a `key`
+  // that changes whenever initialData identity changes so this component
+  // remounts and re-runs the initializers — that way form state stays in sync
+  // without a setState-in-effect cascade.
+  const initialRule = initialData?.rule as { field: string; operator: string; value: string } | undefined;
+  const [ruleField, setRuleField] = useState(() => initialRule?.field ?? 'title');
+  const [ruleOperator, setRuleOperator] = useState(() => initialRule?.operator ?? 'contains');
+  const [ruleValue, setRuleValue] = useState(() => initialRule?.value ?? '');
+  const [ruleTags, setRuleTags] = useState(() => initialData?.tags.join(', ') ?? '');
   const [ruleTagInput, setRuleTagInput] = useState('');
   const [showRuleTagSuggest, setShowRuleTagSuggest] = useState(false);
   const ruleTagContainerRef = useRef<HTMLDivElement>(null);
@@ -56,25 +62,6 @@ export default function RuleDialog({ open, onOpenChange, initialData }: Props) {
     queryKey: ['tags', 'stats'],
     queryFn: fetchTagStats,
   });
-
-  useEffect(() => {
-    if (open) {
-      if (initialData) {
-        const rule = initialData.rule as { field: string; operator: string; value: string };
-        setRuleField(rule.field);
-        setRuleOperator(rule.operator);
-        setRuleValue(rule.value);
-        setRuleTags(initialData.tags.join(', '));
-      } else {
-        setRuleField('title');
-        setRuleOperator('contains');
-        setRuleValue('');
-        setRuleTags('');
-      }
-      setRuleTagInput('');
-      setShowRuleTagSuggest(false);
-    }
-  }, [open, initialData]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

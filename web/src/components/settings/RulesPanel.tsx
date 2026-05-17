@@ -126,7 +126,10 @@ export default function RulesPanel() {
         </div>
       )}
 
+      {/* key forces remount so RuleDialog re-runs its lazy state initializers
+          when switching between create / edit-different-rule. */}
       <RuleDialog
+        key={editingRule?.id ?? 'new'}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         initialData={editingRule}

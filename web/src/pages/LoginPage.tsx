@@ -25,8 +25,10 @@ export default function LoginPage() {
       const res = await login(email, password);
       authLogin(res.access_token, res.refresh_token);
       navigate(redirect);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '登录失败');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      setError(message || '登录失败');
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { extractUrl } from '../../pages/ShareTargetPage';
 
 describe('extractUrl', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createEntry } from '../api/entries';
 import { useAuthStore } from '../store/auth';
@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/;
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function extractUrl(urlParam: string | null, textParam: string | null): string | null {
   if (urlParam && URL_REGEX.test(urlParam)) return urlParam.match(URL_REGEX)![0];
   if (textParam) {
@@ -23,11 +24,23 @@ export default function ShareTargetPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
-  const [status, setStatus] = useState<'loading' | 'success' | 'duplicate' | 'error' | 'no-url'>('loading');
+  // Async-driven status only — the no-url case is derived from `url` below,
+  // so we never need to call setState synchronously from an effect to express
+  // it. Default is null which means "derive from url" (loading or no-url).
+  const [asyncStatus, setAsyncStatus] = useState<'success' | 'duplicate' | 'error' | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [savedEntryId, setSavedEntryId] = useState('');
   const timerRef = useRef<number>(0);
   const mountedRef = useRef(true);
+
+  // Derive the extracted URL from search params synchronously. When it's
+  // missing we render the no-url state without any setState ping-pong.
+  const url = useMemo(() => {
+    return extractUrl(searchParams.get('url'), searchParams.get('text'));
+  }, [searchParams]);
+
+  const status: 'loading' | 'success' | 'duplicate' | 'error' | 'no-url' =
+    asyncStatus ?? (url ? 'loading' : 'no-url');
 
   useEffect(() => {
     mountedRef.current = true;
@@ -47,40 +60,34 @@ export default function ShareTargetPage() {
 
     sessionStorage.removeItem(SHARE_STORAGE_KEY);
 
-    const urlParam = searchParams.get('url');
-    const textParam = searchParams.get('text');
-    const url = extractUrl(urlParam, textParam);
-
-    if (!url) {
-      setStatus('no-url');
-      return;
-    }
+    if (!url) return;
 
     createEntry(url)
       .then((entry) => {
         if (!mountedRef.current) return;
         setSavedEntryId(entry.id);
-        setStatus('success');
+        setAsyncStatus('success');
         timerRef.current = window.setTimeout(() => navigate(`/entry/${entry.id}`), 2000);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (!mountedRef.current) return;
-        if (err.response?.status === 409) {
-          const existingId = err.response?.data?.id;
+        const response = (err as { response?: { status?: number; data?: { id?: string; message?: string } } })?.response;
+        if (response?.status === 409) {
+          const existingId = response.data?.id;
           if (existingId) {
             setSavedEntryId(existingId);
-            setStatus('duplicate');
+            setAsyncStatus('duplicate');
             timerRef.current = window.setTimeout(() => navigate(`/entry/${existingId}`), 2000);
           } else {
-            setStatus('error');
+            setAsyncStatus('error');
             setErrorMsg('该链接已保存，但无法定位已有文章');
           }
         } else {
-          setStatus('error');
-          setErrorMsg(err.response?.data?.message || '保存失败');
+          setAsyncStatus('error');
+          setErrorMsg(response?.data?.message || '保存失败');
         }
       });
-  }, [isAuthenticated, searchParams, navigate]);
+  }, [isAuthenticated, navigate, url]);
 
   const statusConfig = {
     loading: {

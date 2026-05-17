@@ -53,7 +53,11 @@ export function AppSidebar() {
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
-      try { await apiLogout(refreshToken); } catch {}
+      try {
+        await apiLogout(refreshToken);
+      } catch {
+        // Ignore network failures — local logout still proceeds below.
+      }
     }
     logout();
     navigate('/login');

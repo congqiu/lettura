@@ -12,7 +12,12 @@ interface ShortcutHandlers {
 export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
   const navigate = useNavigate();
   const handlersRef = useRef(handlers);
-  handlersRef.current = handlers;
+  // Sync the latest handlers into the ref after each render so the keydown
+  // listener (registered once below) always sees fresh callbacks without
+  // re-binding the event listener.
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,7 +32,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
         case 'e': e.preventDefault(); h.onEdit?.(); break;
         case 'Backspace':
         case 'h':
-          if (!e.metaKey && !e.ctrlKey) { h.onBack?.() || navigate(-1); }
+          if (!e.metaKey && !e.ctrlKey) {
+            if (h.onBack) {
+              h.onBack();
+            } else {
+              navigate(-1);
+            }
+          }
           break;
         case '1': navigate('/'); break;
         case '2': navigate('/archived'); break;
@@ -47,9 +58,12 @@ export function useListKeyboardNav(
 ) {
   const navigate = useNavigate();
   const entriesRef = useRef(entries);
-  entriesRef.current = entries;
   const selectedRef = useRef(selectedIndex);
-  selectedRef.current = selectedIndex;
+  // Sync latest values into refs after render — see comment above.
+  useEffect(() => {
+    entriesRef.current = entries;
+    selectedRef.current = selectedIndex;
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

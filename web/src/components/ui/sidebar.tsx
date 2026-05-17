@@ -606,10 +606,10 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Random width between 50 to 90%. useState lazy initializer runs exactly
+  // once per component instance, so it's a safe place to call Math.random
+  // without violating react-hooks/purity (useMemo isn't allowed to be impure).
+  const [width] = React.useState(() => `${Math.floor(Math.random() * 40) + 50}%`)
 
   return (
     <div
@@ -698,6 +698,10 @@ function SidebarMenuSubButton({
   )
 }
 
+// `useSidebar` is a hook (not a component) co-located in this shadcn-style
+// file alongside the Sidebar components. Splitting it into a separate module
+// would diverge from the upstream shadcn template, so we suppress the
+// react-refresh rule here.
 export {
   Sidebar,
   SidebarContent,
@@ -722,5 +726,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  // eslint-disable-next-line react-refresh/only-export-components
   useSidebar,
 }
