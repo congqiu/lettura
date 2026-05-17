@@ -1,6 +1,7 @@
 use lettura::config::Config;
-use lettura::search::SearchIndex;
+use lettura::search::{LocalTantivyBackend, SearchBackend};
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct TestApp {
@@ -8,9 +9,12 @@ pub struct TestApp {
     pub pool: PgPool,
     pub client: reqwest::Client,
     pub db_name: String,
-    pub search_index: SearchIndex,
+    /// Concrete tantivy backend (not the trait) so tests can call
+    /// inherent methods like reader().reload() for synchronous reload.
+    /// Production code uses Arc<dyn SearchBackend> via AppState.
+    pub search_index: Arc<LocalTantivyBackend>,
     pub config: Config,
-    pub caches: std::sync::Arc<lettura::cache::Caches>,
+    pub caches: Arc<lettura::cache::Caches>,
     base_url: String,
 }
 
@@ -33,7 +37,7 @@ impl TestApp {
 
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
 
-        let search_index = SearchIndex::in_memory().unwrap();
+        let search_index: Arc<LocalTantivyBackend> = Arc::new(LocalTantivyBackend::in_memory().unwrap());
 
         let config = Config {
             database_url: test_db_url,
@@ -82,10 +86,11 @@ impl TestApp {
             metrics_interval_secs: 15,
         };
 
+        let backend: Arc<dyn SearchBackend> = search_index.clone();
         let (app, _, _, _, caches) = lettura::api::router_with_search(
             pool.clone(),
             config.clone(),
-            Some(search_index.clone()),
+            Some(backend),
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = format!("http://{}", listener.local_addr().unwrap());

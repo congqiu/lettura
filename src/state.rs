@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::cache::Caches;
 use crate::config::Config;
-use crate::search::SearchIndex;
+use crate::search::SearchBackend;
 use crate::storage::ImageStorage;
 use crate::tasks::fetcher::FetchQueue;
 
@@ -12,7 +12,7 @@ pub struct AppState {
     pub pool: PgPool,
     pub config: Config,
     pub fetch_queue: FetchQueue,
-    pub search_index: SearchIndex,
+    pub search_index: Arc<dyn SearchBackend>,
     pub storage: Arc<dyn ImageStorage>,
     /// Per-instance in-memory caches (tags, tag stats, rules). Held by Arc so
     /// AppState.clone() is cheap and handler code can pass `&state.caches`

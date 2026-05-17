@@ -1,4 +1,5 @@
 mod common;
+use lettura::search::SearchBackend;
 use serde_json::json;
 
 async fn setup_with_entries(app: &common::TestApp) -> String {
@@ -56,7 +57,7 @@ async fn setup_with_entries(app: &common::TestApp) -> String {
             .unwrap();
     }
     app.search_index.commit().await.unwrap();
-    app.search_index.reader().reload().unwrap();
+    app.search_index.reload_reader().await.unwrap();
 
     token
 }

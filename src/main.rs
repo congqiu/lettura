@@ -258,7 +258,7 @@ async fn main() {
                     _ = cancel.cancelled() => break,
                     _ = interval.tick() => {}
                 }
-                if let Ok(count) = search_idx.doc_count() {
+                if let Ok(count) = search_idx.doc_count().await {
                     metrics::gauge!("search_index_documents").set(count as f64);
                 }
                 metrics::gauge!("db_pool_size").set(pool_for_metrics.size() as f64);

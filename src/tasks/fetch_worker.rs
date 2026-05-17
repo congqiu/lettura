@@ -11,7 +11,7 @@
 
 use crate::fetch::pipeline::{self, FetchContext, FetchError};
 use crate::models::fetch_job;
-use crate::search::SearchIndex;
+use crate::search::SearchBackend;
 use crate::storage::ImageStorage;
 use crate::tasks::fetcher::FetchJob;
 use sqlx::PgPool;
@@ -26,7 +26,7 @@ use uuid::Uuid;
 pub struct WorkerConfig {
     pub pool: PgPool,
     pub image_storage: Arc<dyn ImageStorage>,
-    pub search_index: SearchIndex,
+    pub search_index: Arc<dyn SearchBackend>,
     pub client: reqwest::Client,
     pub max_retries: u32,
     /// Shared with `AppState.caches` so cache invalidations performed by

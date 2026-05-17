@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use axum::{
     Router,
     http::{HeaderValue, Method},
@@ -10,7 +11,7 @@ use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
 use crate::config::Config;
 use crate::rate_limit::{GlobalRateLimit, rate_limit_middleware};
-use crate::search::SearchIndex;
+use crate::search::SearchBackend;
 use crate::state::AppState;
 use crate::tasks::fetcher;
 
@@ -59,7 +60,7 @@ pub fn router_with_handles(
     config: Config,
 ) -> (
     Router,
-    SearchIndex,
+    Arc<dyn SearchBackend>,
     fetcher::FetchQueue,
     std::sync::Arc<dyn crate::storage::ImageStorage>,
     std::sync::Arc<crate::cache::Caches>,
@@ -89,16 +90,16 @@ async fn api_redirect(
 pub fn router_with_search(
     pool: PgPool,
     config: Config,
-    search: Option<SearchIndex>,
+    search: Option<Arc<dyn SearchBackend>>,
 ) -> (
     Router,
-    SearchIndex,
+    Arc<dyn SearchBackend>,
     fetcher::FetchQueue,
     std::sync::Arc<dyn crate::storage::ImageStorage>,
     std::sync::Arc<crate::cache::Caches>,
 ) {
     let search_index = search.unwrap_or_else(|| {
-        SearchIndex::open(std::path::Path::new(&config.index_path))
+        crate::search::create_search_backend(std::path::Path::new(&config.index_path))
             .expect("failed to open search index")
     });
     let storage: std::sync::Arc<dyn crate::storage::ImageStorage> =

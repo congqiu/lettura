@@ -7,7 +7,7 @@
 use crate::extract::{self, ExtractResult};
 use crate::fetch::{http, json_extract, rewrite};
 use crate::models::entry;
-use crate::search::SearchIndex;
+use crate::search::SearchBackend;
 use crate::site_config::{self, RenderMode, ResponseType, SiteConfig};
 use crate::storage::ImageStorage;
 use crate::tasks::fetcher::FetchJob;
@@ -47,7 +47,7 @@ pub(crate) fn should_try_render(text_len: usize, render_mode: RenderMode) -> boo
 pub struct FetchContext {
     pub pool: PgPool,
     pub image_storage: Arc<dyn ImageStorage>,
-    pub search_index: SearchIndex,
+    pub search_index: Arc<dyn SearchBackend>,
     pub client: reqwest::Client,
     pub max_retries: u32,
     pub rate_limiter: Arc<Mutex<http::DomainRateLimiter>>,
