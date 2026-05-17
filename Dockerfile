@@ -23,6 +23,17 @@ ARG RENDERING
 
 RUN rustup component add rustfmt clippy
 
+# sccache: rustc wrapper that caches compilation outputs by source-hash.
+# Survives across `docker build` invocations via the /sccache BuildKit cache
+# mount below, so changing a single file no longer re-compiles all 600+ deps.
+# Cache is capped (SCCACHE_CACHE_SIZE) so the volume can't grow unbounded.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install sccache --locked --version "^0.8"
+ENV RUSTC_WRAPPER=sccache \
+    SCCACHE_DIR=/sccache \
+    SCCACHE_CACHE_SIZE=10G \
+    CARGO_INCREMENTAL=0
+
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
@@ -33,16 +44,20 @@ COPY cli/src/ cli/src/
 COPY skills/ skills/
 COPY --from=frontend-builder /app/web/dist web/dist
 
-# BuildKit cache mounts: registry caches downloaded crates,
-# target caches incremental compilation outputs. Both survive across
-# rebuilds in the same CI runner.
+# Three persistent caches: cargo registry (downloaded crates), sccache
+# (compiled rustc outputs), and target/ (link artifacts). sccache replaces
+# what CARGO_INCREMENTAL used to do but with cross-build reuse + a hard
+# size cap. CARGO_INCREMENTAL=0 is the cargo team's recommendation when
+# sccache is in use — incremental adds disk overhead with no extra win.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/app/target \
     if [ "$RENDERING" = "1" ]; then \
       cargo build --release --bin lettura && cp target/release/lettura /lettura; \
     else \
       cargo build --release --no-default-features --bin lettura && cp target/release/lettura /lettura; \
-    fi
+    fi && \
+    sccache --show-stats
 
 # Stage 2b: Unit test
 # Usage:
@@ -53,12 +68,14 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM backend-builder AS test
 ARG TEST_ARGS=""
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/app/target \
     if [ "$RENDERING" = "1" ]; then \
       cargo test ${TEST_ARGS} -- --nocapture; \
     else \
       cargo test --no-default-features ${TEST_ARGS} -- --nocapture; \
-    fi
+    fi && \
+    sccache --show-stats
 
 # Stage 3: Runtime
 FROM debian:bookworm-slim
