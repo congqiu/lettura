@@ -67,13 +67,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # For local dev, use TEST_ARGS to filter: --build-arg TEST_ARGS="--lib search"
 FROM backend-builder AS test
 ARG TEST_ARGS=""
+# `test-utils` exposes test-only escape hatches (e.g. `skip_ssrf`) needed by
+# integration tests. Must NOT be enabled for the release build above.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/sccache \
     --mount=type=cache,target=/app/target \
     if [ "$RENDERING" = "1" ]; then \
-      cargo test ${TEST_ARGS} -- --nocapture; \
+      cargo test --features test-utils ${TEST_ARGS} -- --nocapture; \
     else \
-      cargo test --no-default-features ${TEST_ARGS} -- --nocapture; \
+      cargo test --no-default-features --features test-utils ${TEST_ARGS} -- --nocapture; \
     fi && \
     sccache --show-stats
 

@@ -16,6 +16,23 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+/// Classification of fetch pipeline failures.
+///
+/// Returned by [`process`] so the worker can decide between retrying with
+/// backoff (`Transient`) and dead-lettering immediately (`Permanent`).
+#[derive(Debug, thiserror::Error)]
+pub enum FetchError {
+    /// 4xx, SSRF block, invalid URL, permanent extraction failure.
+    /// Worker should not retry; delete the job and mark the entry failed.
+    #[error("permanent: {0}")]
+    Permanent(String),
+
+    /// 5xx, timeout, network reset, render failure.
+    /// Worker should retry with backoff; on max_attempts → dead letter.
+    #[error("transient: {0}")]
+    Transient(String),
+}
+
 /// Minimum text length below which we consider the extracted content too
 /// short and attempt the render fallback (when available and mode != Never).
 const SHORT_CONTENT_THRESHOLD: usize = 100;
@@ -36,12 +53,45 @@ pub struct FetchContext {
     pub rate_limiter: Arc<Mutex<http::DomainRateLimiter>>,
     #[cfg(feature = "rendering")]
     pub render_service: Option<Arc<crate::fetch::render::RenderService>>,
+    /// Test-only escape hatch to bypass SSRF validation. Gated behind
+    /// `cfg(any(test, feature = "test-utils"))` so the field literally does
+    /// not exist in production release builds — there is no code path that
+    /// can silently set it to `true`. NEVER enable the `test-utils` feature
+    /// in a release binary.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub skip_ssrf: bool,
+}
+
+/// Resolve the effective SSRF-skip flag for the current build. In production
+/// (no `test-utils` and not `cfg(test)`) this is a compile-time `false`, so
+/// the optimiser strips the bypass branch entirely.
+#[inline(always)]
+fn skip_ssrf(_ctx: &FetchContext) -> bool {
+    #[cfg(any(test, feature = "test-utils"))]
+    {
+        _ctx.skip_ssrf
+    }
+    #[cfg(not(any(test, feature = "test-utils")))]
+    {
+        false
+    }
 }
 
 /// Process a single fetch job end-to-end: look up the site config, apply URL
 /// rewrite and request overrides, issue the HTTP request, extract content,
 /// save it to the DB + search index, and run tagging rules.
-pub async fn process(ctx: &FetchContext, job: &FetchJob) {
+///
+/// Returns:
+/// - `Ok(())` on success (entry content saved, possibly via render fallback).
+/// - `Err(FetchError::Permanent(_))` for 4xx, SSRF blocks, or permanent
+///   extraction failures — the worker should drop the job and mark the entry
+///   failed.
+/// - `Err(FetchError::Transient(_))` for 5xx, timeouts, network errors, or
+///   render failures — the worker should retry with backoff.
+///
+/// On error the pipeline does NOT write entry failure state itself; that is
+/// the worker's responsibility once it has consumed this `Result`.
+pub async fn process(ctx: &FetchContext, job: &FetchJob) -> Result<(), FetchError> {
     tracing::info!(entry_id = %job.entry_id, url = %job.url, "fetch job started");
 
     // Per-domain politeness: 1 request/sec.
@@ -59,13 +109,14 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
         && sc.render.mode == RenderMode::Force
     {
         // SSRF protection must apply to the render path too.
-        if let Err(e) = crate::fetch::ssrf::validate_url(&job.url) {
+        if !skip_ssrf(ctx)
+            && let Err(e) = crate::fetch::ssrf::validate_url(&job.url)
+        {
             tracing::warn!(entry_id = %job.entry_id, url = %job.url, "SSRF blocked (render): {e}");
-            mark_failed(&ctx.pool, job.entry_id, 0).await;
-            return;
+            return Err(FetchError::Permanent(format!("SSRF blocked: {e}")));
         }
         if try_render_then_extract(ctx, job, sc, 200).await {
-            return;
+            return Ok(());
         }
         tracing::warn!(
             entry_id = %job.entry_id,
@@ -86,29 +137,41 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
     };
 
     // SSRF protection: block requests to private/reserved IPs.
-    if let Err(e) = crate::fetch::ssrf::validate_url(&effective_url) {
+    if !skip_ssrf(ctx)
+        && let Err(e) = crate::fetch::ssrf::validate_url(&effective_url)
+    {
         tracing::warn!(entry_id = %job.entry_id, url = %effective_url, "SSRF blocked: {e}");
-        mark_failed(&ctx.pool, job.entry_id, 0).await;
-        return;
+        return Err(FetchError::Permanent(format!("SSRF blocked: {e}")));
     }
 
     // Build request config from site config overrides.
     let request_config = site_config.as_ref().map(|sc| &sc.request);
 
-    let fetch_result =
-        http::fetch_with_retry(&effective_url, &ctx.client, ctx.max_retries, request_config).await;
+    let fetch_result = http::fetch_with_retry(
+        &effective_url,
+        &ctx.client,
+        ctx.max_retries,
+        request_config,
+        skip_ssrf(ctx),
+    )
+    .await;
 
     match fetch_result {
         Ok(response) => {
             let status = response.status().as_u16() as i16;
             match response.text().await {
-                Ok(body) => {
-                    process_body(ctx, job, body, status, site_config.as_ref()).await;
-                }
+                Ok(body) => process_body(ctx, job, body, status, site_config.as_ref()).await,
                 Err(e) => {
                     tracing::warn!(entry_id = %job.entry_id, status, error = %e, "failed to read response body");
-                    if !fallback_render(ctx, job, site_config.as_ref(), status).await {
-                        mark_failed(&ctx.pool, job.entry_id, status).await;
+                    if fallback_render(ctx, job, site_config.as_ref(), status).await {
+                        Ok(())
+                    } else if (400..500).contains(&status) {
+                        // 4xx response whose body could not be read — treat as
+                        // a permanent failure so the worker does not retry.
+                        Err(FetchError::Permanent(format!("http {status}")))
+                    } else {
+                        // 5xx or other status with unreadable body — retry-eligible.
+                        Err(FetchError::Transient(format!("http {status}")))
                     }
                 }
             }
@@ -124,8 +187,10 @@ pub async fn process(ctx: &FetchContext, job: &FetchJob) {
                 is_connect,
                 "fetch HTTP error after retries"
             );
-            if !fallback_render(ctx, job, site_config.as_ref(), 0).await {
-                mark_failed(&ctx.pool, job.entry_id, 0).await;
+            if fallback_render(ctx, job, site_config.as_ref(), 0).await {
+                Ok(())
+            } else {
+                Err(FetchError::Transient(e.to_string()))
             }
         }
     }
@@ -141,30 +206,41 @@ async fn process_body(
     body: String,
     status: i16,
     site_config: Option<&SiteConfig>,
-) {
+) -> Result<(), FetchError> {
     let response_type = site_config
         .map(|sc| sc.response.response_type)
         .unwrap_or(ResponseType::Html);
+
+    // Classify failures by HTTP status: 4xx → Permanent, otherwise (5xx or
+    // missing config / extraction error on a 2xx body) → Transient. The
+    // status-based split lets the worker route by retry semantics without
+    // duplicating logic here.
+    let classify = |msg: String| -> FetchError {
+        if (400..500).contains(&status) {
+            FetchError::Permanent(msg)
+        } else {
+            FetchError::Transient(msg)
+        }
+    };
 
     match response_type {
         ResponseType::Json => {
             let Some(sc) = site_config else {
                 tracing::warn!(entry_id = %job.entry_id, "JSON response type requires site config");
-                mark_failed(&ctx.pool, job.entry_id, status).await;
-                return;
+                return Err(classify(format!("http {status}")));
             };
             let Some(rules) = sc.response.json.as_ref() else {
                 tracing::warn!(entry_id = %job.entry_id, "JSON response type without json rules");
-                mark_failed(&ctx.pool, job.entry_id, status).await;
-                return;
+                return Err(classify(format!("http {status}")));
             };
             match json_extract::extract(&body, rules) {
                 Ok(result) => {
                     save(ctx, job, &result, status, "site_rule").await;
+                    Ok(())
                 }
                 Err(e) => {
                     tracing::warn!(entry_id = %job.entry_id, error = %e, "JSON extraction failed");
-                    mark_failed(&ctx.pool, job.entry_id, status).await;
+                    Err(classify(format!("http {status}")))
                 }
             }
         }
@@ -184,8 +260,7 @@ async fn process_body(
                     tracing::error!(entry_id = %job.entry_id, error = %e, "extract task panicked");
                     metrics::histogram!("extract_duration_seconds", "method" => "panic")
                         .record(elapsed);
-                    mark_failed(&ctx.pool, job.entry_id, status).await;
-                    return;
+                    return Err(classify(format!("http {status}")));
                 }
             };
             match extract_result {
@@ -208,16 +283,19 @@ async fn process_body(
                     ) && let Some(sc) = site_config
                         && try_render_then_extract(ctx, job, sc, status).await
                     {
-                        return;
+                        return Ok(());
                     }
                     save(ctx, job, &result.inner, status, method).await;
+                    Ok(())
                 }
                 Err(_) => {
                     metrics::histogram!("extract_duration_seconds", "method" => "error")
                         .record(elapsed);
                     tracing::warn!(entry_id = %job.entry_id, status, "all HTML extraction methods failed");
-                    if !fallback_render(ctx, job, site_config, status).await {
-                        mark_failed(&ctx.pool, job.entry_id, status).await;
+                    if fallback_render(ctx, job, site_config, status).await {
+                        Ok(())
+                    } else {
+                        Err(classify(format!("http {status}")))
                     }
                 }
             }
@@ -368,7 +446,10 @@ async fn apply_tagging_rules(
     }
 }
 
-async fn mark_failed(pool: &PgPool, entry_id: Uuid, status: i16) {
+/// Mark an entry as failed (called by the worker on `FetchError::Permanent`
+/// and when retries are exhausted). The pipeline itself no longer invokes
+/// this — it returns `FetchError` instead and lets the worker decide.
+pub(crate) async fn mark_failed(pool: &PgPool, entry_id: Uuid, status: i16) {
     if let Err(e) = entry::update_entry_content(
         pool,
         entry_id,
@@ -499,5 +580,17 @@ mod tests {
     #[test]
     fn force_mode_with_short_content() {
         assert!(should_try_render(50, RenderMode::Force));
+    }
+
+    #[test]
+    fn fetch_error_permanent_display() {
+        let e = FetchError::Permanent("http 404".into());
+        assert_eq!(e.to_string(), "permanent: http 404");
+    }
+
+    #[test]
+    fn fetch_error_transient_display() {
+        let e = FetchError::Transient("timeout".into());
+        assert_eq!(e.to_string(), "transient: timeout");
     }
 }

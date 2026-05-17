@@ -119,6 +119,10 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 | `LETTURA_CHROMIUM_PATH` | 自动搜索 PATH | Chromium 可执行文件绝对路径 |
 | `LETTURA_RENDER_CONCURRENCY` | 2 | 并发渲染上限 |
 | `LETTURA_RENDER_TIMEOUT_MS` | 15000 | 单次渲染总超时（毫秒） |
+| `LETTURA_FETCH_CONCURRENCY` | 5 | 抓取 worker 并发数 |
+| `LETTURA_FETCH_MAX_ATTEMPTS` | 5 | 单 job 最大重试（超过进死信） |
+| `LETTURA_FETCH_LEASE_SECS` | 300 | job 租约初始秒数 |
+| `LETTURA_FETCH_DEAD_TTL_DAYS` | 30 | 死信保留天数 |
 
 ### 站点配置系统
 
@@ -139,6 +143,31 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 
 - 应用: `http://localhost:3330`
 - PostgreSQL: `localhost:5436`（用户名/密码: lettura/lettura）
+
+## 抓取队列
+
+抓取任务存在 PostgreSQL `fetch_jobs` 表（持久化队列），进程崩溃零丢失、多副本可水平扩展。
+
+- worker 用 `SELECT FOR UPDATE SKIP LOCKED` 抢占任务，租约 5 分钟，崩溃后其他 worker 自动接管
+- 失败按 60s → 2min → 4min → 8min 指数 backoff，最多 5 次后进 dead 死信
+- admin endpoint:
+  - `GET /api/v1/admin/fetch-jobs?status=failed|dead|pending|running&limit=N` — 查看队列状态
+  - `POST /api/v1/admin/fetch-jobs/{id}/retry` — 单条重试
+  - `POST /api/v1/admin/fetch-jobs/retry-all-dead` — 一次复活最多 100 条死信
+- **PAT 不支持** admin endpoints（middleware 固定 `is_admin=false`），CLI 复活死信请人工通过 web UI
+- 详见 `docs/specs/2026-05-16-fetch-queue-persistence.md`
+
+### 回退
+
+如需回到 mpsc 实现（不推荐 — mpsc 本身有"重启丢任务"bug），revert 引入这个 feature 的 merge commit（或参考对应 PR 列出的 commit 范围），重新 build + redeploy：
+
+```bash
+git revert -m 1 <merge-commit-hash>
+docker compose build lettura
+docker compose up -d
+```
+
+`fetch_jobs` 表保留，下次再上线时未消费的 job 继续被处理（schema 完全向下兼容）。
 
 ## CLI (`lettura-cli`)
 

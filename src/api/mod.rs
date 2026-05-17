@@ -33,6 +33,7 @@ pub mod entries;
 pub mod error;
 pub mod export;
 pub mod feed;
+pub mod fetch_jobs;
 pub mod health;
 pub mod import;
 pub mod memos;
@@ -98,13 +99,9 @@ pub fn router_with_search(
     let storage: std::sync::Arc<dyn crate::storage::ImageStorage> =
         std::sync::Arc::from(crate::storage::create_storage(&config));
     crate::site_config::store::init_store(config.site_configs_path.clone());
-    let fetch_queue = fetcher::start_fetch_worker(
-        pool.clone(),
-        5,
-        storage.clone(),
-        search_index.clone(),
-        &config,
-    );
+    // Worker lifecycle is owned by main.rs (or by tests that need a real
+    // worker). The router only enqueues jobs via FetchQueue::new(pool).
+    let fetch_queue = fetcher::FetchQueue::new(pool.clone());
 
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();
@@ -231,6 +228,13 @@ pub fn router_with_search(
         .route("/api/v1/admin/reindex", post(admin::reindex))
         .route("/api/v1/admin/backup", get(backup::backup))
         .route("/api/v1/admin/restore", post(backup::restore))
+        // Admin: fetch jobs queue management (JWT-only; PATs have is_admin=false)
+        // retry-all-dead must be registered BEFORE /{id} so axum's matcher
+        // doesn't treat "retry-all-dead" as a UUID path param.
+        .route("/api/v1/admin/fetch-jobs", get(fetch_jobs::list))
+        .route("/api/v1/admin/fetch-jobs/retry-all-dead", post(fetch_jobs::retry_all_dead))
+        .route("/api/v1/admin/fetch-jobs/{id}", get(fetch_jobs::get).delete(fetch_jobs::delete))
+        .route("/api/v1/admin/fetch-jobs/{id}/retry", post(fetch_jobs::retry))
         .route("/api/v1/pages/upload", post(pages::upload_files))
         .route("/api/v1/pages", get(pages::list_pages_handler).post(pages::create_page_handler))
         .route("/api/v1/pages/{id}", patch(pages::update_page_handler).delete(pages::delete_page_handler))

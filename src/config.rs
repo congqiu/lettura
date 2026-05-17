@@ -41,6 +41,11 @@ pub struct Config {
     pub fetch_max_retries: u32,
     pub proxy: Option<String>,
     pub site_configs_path: Option<String>,
+    // Fetch queue worker tuning
+    pub fetch_concurrency: usize,
+    pub fetch_max_attempts: i16,
+    pub fetch_lease_secs: u64,
+    pub fetch_dead_ttl_days: i64,
     // Render fallback (honored when the `rendering` feature is compiled in)
     pub rendering_enabled: String, // "auto" | "true" | "false"
     pub chromium_path: Option<String>,
@@ -124,6 +129,14 @@ impl Config {
             fetch_max_retries: env::var("LETTURA_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
             proxy: env::var("LETTURA_PROXY").ok(),
             site_configs_path: env::var("LETTURA_SITE_CONFIGS_PATH").ok(),
+            fetch_concurrency: env::var("LETTURA_FETCH_CONCURRENCY")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
+            fetch_max_attempts: env::var("LETTURA_FETCH_MAX_ATTEMPTS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
+            fetch_lease_secs: env::var("LETTURA_FETCH_LEASE_SECS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(300),
+            fetch_dead_ttl_days: env::var("LETTURA_FETCH_DEAD_TTL_DAYS")
+                .ok().and_then(|v| v.parse().ok()).unwrap_or(30),
             rendering_enabled: env::var("LETTURA_RENDERING_ENABLED").unwrap_or_else(|_| "auto".to_string()),
             chromium_path: env::var("LETTURA_CHROMIUM_PATH").ok(),
             render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),

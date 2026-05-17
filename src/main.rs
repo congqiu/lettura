@@ -1,5 +1,4 @@
 use axum::response::IntoResponse;
-use std::sync::atomic::Ordering;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -35,8 +34,62 @@ async fn main() {
             std::process::exit(1);
         });
 
-    let (app, search_index, fetch_queue, storage) =
+    // `_fetch_queue` is intentionally unused at the binary level: the router
+    // owns its own clone for handlers, and the queue's depth is reported via
+    // the `fetch_queue_size{status=...}` gauge family sampled directly from
+    // `fetch_jobs` below — no in-process counter needed.
+    let (app, search_index, _fetch_queue, storage) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
+
+    // CancellationToken drives graceful worker shutdown. Currently only the
+    // fetch workers observe it; the image processor and other periodic tasks
+    // will be migrated in a later cleanup pass.
+    let cancel = tokio_util::sync::CancellationToken::new();
+    {
+        let cancel = cancel.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            tracing::info!("shutdown signal received");
+            cancel.cancel();
+        });
+    }
+
+    // Build fetch worker dependencies once and spawn N workers. The workers
+    // attach to the same pg pool, LISTEN for `fetch_jobs_new`, and dequeue
+    // with FOR UPDATE SKIP LOCKED.
+    let http_client = lettura::fetch::http::build_client(&config);
+    #[cfg(feature = "rendering")]
+    let render_service = if config.rendering_runtime_enabled() {
+        Some(std::sync::Arc::new(
+            lettura::fetch::render::RenderService::new(
+                config.chromium_path.clone(),
+                config.render_concurrency,
+                config.render_timeout_ms,
+            ),
+        ))
+    } else {
+        tracing::info!("render fallback disabled via LETTURA_RENDERING_ENABLED");
+        None
+    };
+
+    lettura::tasks::fetch_worker::spawn_workers(
+        lettura::tasks::fetch_worker::WorkerConfig {
+            pool: pool.clone(),
+            image_storage: storage.clone(),
+            search_index: search_index.clone(),
+            client: http_client,
+            max_retries: config.fetch_max_retries,
+            #[cfg(feature = "rendering")]
+            render_service,
+            // `skip_ssrf` only exists when test-utils is enabled. Production
+            // release builds (default features) drop the field entirely so
+            // SSRF validation cannot be turned off by mistake.
+            #[cfg(any(test, feature = "test-utils"))]
+            skip_ssrf: false,
+        },
+        config.fetch_concurrency,
+        cancel.clone(),
+    );
 
     // Start image processor
     lettura::tasks::start_image_processor(pool.clone(), storage.clone(), config.max_image_size);
@@ -91,6 +144,44 @@ async fn main() {
         });
     }
 
+    // Periodic dead-letter cleanup. Hourly DELETE of fetch_jobs whose status
+    // is 'dead' and whose last_error_at is older than
+    // LETTURA_FETCH_DEAD_TTL_DAYS. Cancel-aware so graceful shutdown does not
+    // wait a full hour.
+    {
+        let pool = pool.clone();
+        let cancel = cancel.clone();
+        let ttl_days = config.fetch_dead_ttl_days;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {}
+                }
+                let r = sqlx::query(
+                    "DELETE FROM fetch_jobs WHERE status = 'dead' \
+                     AND last_error_at < NOW() - ($1 || ' days')::interval",
+                )
+                .bind(ttl_days.to_string())
+                .execute(&pool)
+                .await;
+                match r {
+                    Ok(r) if r.rows_affected() > 0 => {
+                        tracing::info!(
+                            deleted = r.rows_affected(),
+                            "cleaned up dead fetch jobs"
+                        );
+                        metrics::counter!("fetch_jobs_purged_total")
+                            .increment(r.rows_affected());
+                    }
+                    Err(e) => tracing::warn!("dead fetch_jobs cleanup failed: {e}"),
+                    _ => {}
+                }
+            }
+        });
+    }
+
     let app = if config.metrics_enabled {
         let recorder_handle = metrics_exporter_prometheus::PrometheusBuilder::new()
             .install_recorder()
@@ -134,7 +225,6 @@ async fn main() {
         };
 
         // Background task to periodically report gauge metrics
-        let fetch_depth = fetch_queue.queue_depth.clone();
         let search_idx = search_index.clone();
         let pool_for_metrics = pool.clone();
         tokio::spawn(async move {
@@ -142,13 +232,30 @@ async fn main() {
                 tokio::time::interval(std::time::Duration::from_secs(config.metrics_interval_secs));
             loop {
                 interval.tick().await;
-                let depth = fetch_depth.load(Ordering::Relaxed) as f64;
-                metrics::gauge!("fetch_queue_depth").set(depth);
                 if let Ok(count) = search_idx.doc_count() {
                     metrics::gauge!("search_index_documents").set(count as f64);
                 }
                 metrics::gauge!("db_pool_size").set(pool_for_metrics.size() as f64);
                 metrics::gauge!("db_pool_idle").set(pool_for_metrics.num_idle() as f64);
+
+                // Per-status queue depth sampled directly from fetch_jobs.
+                // Statuses with zero rows are reset to 0 so a label that
+                // becomes empty does not stick at its last non-zero value.
+                if let Ok(counts) =
+                    lettura::models::fetch_job::count_by_status(&pool_for_metrics).await
+                {
+                    let mut seen = std::collections::HashSet::new();
+                    for (status, n) in counts {
+                        let label = fetch_job_status_label(status);
+                        seen.insert(label);
+                        metrics::gauge!("fetch_queue_size", "status" => label).set(n as f64);
+                    }
+                    for label in ["pending", "running", "failed", "dead"] {
+                        if !seen.contains(label) {
+                            metrics::gauge!("fetch_queue_size", "status" => label).set(0.0);
+                        }
+                    }
+                }
             }
         });
 
@@ -166,12 +273,13 @@ async fn main() {
 
     tracing::info!("listening on {}", config.listen_addr);
     let shutdown_idx = search_index.clone();
+    let shutdown_cancel = cancel.clone();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .with_graceful_shutdown(async move {
-        shutdown_signal().await;
+        shutdown_cancel.cancelled().await;
         // Final flush so writes buffered since the last periodic commit
         // are not lost when the process exits.
         if let Err(e) = shutdown_idx.commit().await {
@@ -182,6 +290,18 @@ async fn main() {
     })
     .await
     .expect("server error");
+}
+
+/// Stable prometheus label for each [`FetchJobStatus`] variant. Kept in sync
+/// with the enum so changes to the type require touching the label table.
+fn fetch_job_status_label(s: lettura::models::fetch_job::FetchJobStatus) -> &'static str {
+    use lettura::models::fetch_job::FetchJobStatus::*;
+    match s {
+        Pending => "pending",
+        Running => "running",
+        Failed => "failed",
+        Dead => "dead",
+    }
 }
 
 async fn shutdown_signal() {

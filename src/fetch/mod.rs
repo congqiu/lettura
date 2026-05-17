@@ -15,3 +15,5 @@ pub mod pipeline;
 pub mod render;
 pub mod rewrite;
 pub mod ssrf;
+
+pub use pipeline::FetchError;

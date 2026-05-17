@@ -2461,6 +2461,7 @@ dependencies = [
  "governor",
  "hex",
  "hmac",
+ "httpmock",
  "jsonwebtoken",
  "metrics",
  "metrics-exporter-prometheus",
@@ -2486,6 +2487,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tower",
  "tower-http",
  "tracing",
@@ -5142,6 +5144,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]

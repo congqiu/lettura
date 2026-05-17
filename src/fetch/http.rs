@@ -161,13 +161,16 @@ pub async fn fetch_with_retry(
     client: &reqwest::Client,
     max_retries: u32,
     request_config: Option<&RequestConfig>,
+    skip_ssrf: bool,
 ) -> Result<reqwest::Response, FetchError> {
     let mut current_url = url.to_string();
     let mut redirects = 0usize;
 
     loop {
         // Pre-flight: resolve DNS and check that no resolved IP is private.
-        dns_check(&current_url).await?;
+        if !skip_ssrf {
+            dns_check(&current_url).await?;
+        }
 
         let response =
             send_with_retry_inner(&current_url, client, max_retries, request_config).await?;
@@ -182,7 +185,9 @@ pub async fn fetch_with_retry(
                 let loc_str = location.to_str().unwrap_or("");
                 let next_url = resolve_redirect_url(&current_url, loc_str);
                 // Validate the redirect target against SSRF rules.
-                if let Err(e) = crate::fetch::ssrf::validate_url(&next_url) {
+                if !skip_ssrf
+                    && let Err(e) = crate::fetch::ssrf::validate_url(&next_url)
+                {
                     tracing::warn!(from = %current_url, to = %next_url, "redirect SSRF blocked: {e}");
                     return Err(FetchError::Ssrf(e));
                 }

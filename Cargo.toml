@@ -17,6 +17,11 @@ edition.workspace = true
 # image significantly.
 default = ["rendering"]
 rendering = ["dep:chromiumoxide", "dep:futures-util"]
+# Exposes test-only escape hatches (e.g. `skip_ssrf`) outside of `cfg(test)`.
+# Enabled implicitly under `cargo test`; downstream integration tests using
+# the same crate must opt in via `--features test-utils`. NEVER enable in
+# release builds — it allows bypassing SSRF validation.
+test-utils = []
 
 [dependencies]
 # Content extraction
@@ -97,7 +102,11 @@ moka = { version = "0.12", features = ["future"] }
 chromiumoxide = { version = "0.7", features = ["tokio-runtime"], default-features = false, optional = true }
 futures-util = { version = "0.3", optional = true }
 
+# Cancellation tokens for graceful worker shutdown.
+tokio-util = { version = "0.7", features = ["rt"] }
+
 [dev-dependencies]
+httpmock = "0.7"
 pretty_assertions = "1"
 # Tests for /api/v1/pages/upload exercise multipart bodies via reqwest.
 reqwest = { version = "0.12", features = ["json", "cookies", "socks", "multipart"] }
