@@ -99,6 +99,7 @@ zip = "2"
 
 # Config
 dotenvy = "0.15"
+envy = "0.4"
 
 # Caching
 moka = { version = "0.12", features = ["future"] }
@@ -106,6 +107,8 @@ moka = { version = "0.12", features = ["future"] }
 # Rendering fallback (optional, enabled by the `rendering` feature)
 chromiumoxide = { version = "0.7", features = ["tokio-runtime"], default-features = false, optional = true }
 futures-util = { version = "0.3", optional = true }
+async-stream = "0.3"
+futures = "0.3"
 
 # Cancellation tokens for graceful worker shutdown.
 tokio-util = { version = "0.7", features = ["rt"] }

@@ -1,156 +1,185 @@
-use std::env;
+use serde::Deserialize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    #[serde(default)]
     pub database_url: String,
+    #[serde(default)]
     pub jwt_secret: String,
+    #[serde(default = "default_listen_addr")]
     pub listen_addr: String,
+    #[serde(default = "default_index_path")]
     pub index_path: String,
     // Storage
-    pub storage_type: String,       // "local" or "oss"
-    pub storage_local_path: String, // local storage directory
+    #[serde(default = "default_storage_type")]
+    pub storage_type: String,
+    #[serde(default = "default_storage_local_path")]
+    pub storage_local_path: String,
+    #[serde(default = "default_pages_storage_path")]
     pub pages_storage_path: String,
     // OSS (S3-compatible)
+    #[serde(default)]
     pub oss_endpoint: String,
+    #[serde(default = "default_oss_region")]
     pub oss_region: String,
+    #[serde(default)]
     pub oss_bucket: String,
+    #[serde(default)]
     pub oss_access_key: String,
+    #[serde(default)]
     pub oss_secret_key: String,
-    pub oss_public_url: String, // custom public URL prefix (optional)
+    #[serde(default)]
+    pub oss_public_url: String,
     // DB connection pool
+    #[serde(default = "default_db_max_connections")]
     pub db_max_connections: u32,
+    #[serde(default = "default_db_min_connections")]
     pub db_min_connections: u32,
+    #[serde(default = "default_db_acquire_timeout_secs")]
     pub db_acquire_timeout_secs: u64,
     // CORS
+    #[serde(default = "default_cors_origins")]
     pub cors_origins: String,
     // Production mode
+    #[serde(default)]
     pub production: bool,
-
-    /// Trust X-Forwarded-For / X-Real-IP headers for rate limiting.
-    /// Only enable when running behind a trusted reverse proxy.
+    #[serde(default)]
     pub trust_proxy: bool,
-
-    /// Disable new user registration
+    #[serde(default = "default_true")]
     pub disable_registration: bool,
     // Metrics
+    #[serde(default)]
     pub metrics_enabled: bool,
+    #[serde(default)]
     pub metrics_bearer_token: Option<String>,
     // Fetch
+    #[serde(default = "default_user_agent")]
     pub user_agent: String,
+    #[serde(default = "default_fetch_timeout_secs")]
     pub fetch_timeout_secs: u64,
+    #[serde(default = "default_fetch_max_retries")]
     pub fetch_max_retries: u32,
+    #[serde(default)]
     pub proxy: Option<String>,
+    #[serde(default)]
     pub site_configs_path: Option<String>,
     // Fetch queue worker tuning
+    #[serde(default = "default_fetch_concurrency")]
     pub fetch_concurrency: usize,
+    #[serde(default = "default_fetch_max_attempts")]
     pub fetch_max_attempts: i16,
+    #[serde(default = "default_fetch_lease_secs")]
     pub fetch_lease_secs: u64,
+    #[serde(default = "default_fetch_dead_ttl_days")]
     pub fetch_dead_ttl_days: i64,
-    // Render fallback (honored when the `rendering` feature is compiled in)
-    pub rendering_enabled: String, // "auto" | "true" | "false"
+    // Render fallback
+    #[serde(default = "default_rendering_enabled")]
+    pub rendering_enabled: String,
+    #[serde(default)]
     pub chromium_path: Option<String>,
+    #[serde(default = "default_render_concurrency")]
     pub render_concurrency: usize,
+    #[serde(default = "default_render_timeout_ms")]
     pub render_timeout_ms: u64,
-    // Public base URL for skill endpoint and other public resources
+    // Public base URL
+    #[serde(default)]
     pub public_base_url: Option<String>,
     // Operational tuning
+    #[serde(default = "default_import_max_body_bytes")]
     pub import_max_body_bytes: usize,
+    #[serde(default = "default_pages_max_upload_bytes")]
     pub pages_max_upload_bytes: usize,
+    #[serde(default = "default_max_image_size")]
     pub max_image_size: usize,
+    #[serde(default = "default_auth_rate_limit")]
     pub auth_rate_limit: u32,
+    #[serde(default = "default_global_rate_limit")]
     pub global_rate_limit: u32,
+    #[serde(default = "default_search_commit_interval_secs")]
     pub search_commit_interval_secs: u64,
+    #[serde(default = "default_token_cleanup_interval_secs")]
     pub token_cleanup_interval_secs: u64,
+    #[serde(default = "default_metrics_interval_secs")]
     pub metrics_interval_secs: u64,
 }
 
+// Default value functions
+fn default_listen_addr() -> String { "0.0.0.0:3330".to_string() }
+fn default_index_path() -> String { "/data/tantivy".to_string() }
+fn default_storage_type() -> String { "local".to_string() }
+fn default_storage_local_path() -> String { "/data/storage".to_string() }
+fn default_pages_storage_path() -> String { "/data/pages".to_string() }
+fn default_oss_region() -> String { "auto".to_string() }
+fn default_db_max_connections() -> u32 { 10 }
+fn default_db_min_connections() -> u32 { 2 }
+fn default_db_acquire_timeout_secs() -> u64 { 30 }
+fn default_cors_origins() -> String { "*".to_string() }
+fn default_true() -> bool { true }
+fn default_user_agent() -> String {
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
+}
+fn default_fetch_timeout_secs() -> u64 { 30 }
+fn default_fetch_max_retries() -> u32 { 3 }
+fn default_fetch_concurrency() -> usize { 5 }
+fn default_fetch_max_attempts() -> i16 { 5 }
+fn default_fetch_lease_secs() -> u64 { 300 }
+fn default_fetch_dead_ttl_days() -> i64 { 30 }
+fn default_rendering_enabled() -> String { "auto".to_string() }
+fn default_render_concurrency() -> usize { 2 }
+fn default_render_timeout_ms() -> u64 { 15000 }
+fn default_import_max_body_bytes() -> usize { 50 * 1024 * 1024 }
+fn default_pages_max_upload_bytes() -> usize { 10 * 1024 * 1024 }
+fn default_max_image_size() -> usize { 10 * 1024 * 1024 }
+fn default_auth_rate_limit() -> u32 { 10 }
+fn default_global_rate_limit() -> u32 { 100 }
+fn default_search_commit_interval_secs() -> u64 { 3 }
+fn default_token_cleanup_interval_secs() -> u64 { 3600 }
+fn default_metrics_interval_secs() -> u64 { 15 }
+
 impl Config {
     pub fn from_env() -> Result<Self, String> {
-        let jwt_secret =
-            env::var("JWT_SECRET").map_err(|_| "JWT_SECRET must be set".to_string())?;
+        // envy::prefixed strips "LETTURA_" from env var names before matching
+        // struct fields, so LETTURA_FETCH_TIMEOUT → fetch_timeout.
+        let mut config: Config = envy::prefixed("LETTURA_")
+            .from_env()
+            .map_err(|e| format!("config error: {e}"))?;
 
-        if jwt_secret == "change-me-in-production" {
-            return Err(
-                "JWT_SECRET must not be the default value 'change-me-in-production'".to_string(),
-            );
+        // Backward compat: accept DATABASE_URL / JWT_SECRET without LETTURA_ prefix
+        if config.database_url.is_empty() {
+            config.database_url = std::env::var("DATABASE_URL")
+                .map_err(|_| "DATABASE_URL (or LETTURA_DATABASE_URL) must be set".to_string())?;
+        }
+        if config.jwt_secret.is_empty() {
+            config.jwt_secret = std::env::var("JWT_SECRET")
+                .map_err(|_| "JWT_SECRET (or LETTURA_JWT_SECRET) must be set".to_string())?;
         }
 
-        if jwt_secret.len() < 32 {
-            return Err(format!(
-                "JWT_SECRET must be at least 32 characters (got {})",
-                jwt_secret.len()
-            ));
+        // Backward compat: CORS_ORIGINS without LETTURA_ prefix overrides the
+        // default. envy::prefixed("LETTURA_") doesn't see CORS_ORIGINS at all,
+        // so without this override the default "*" would always win — and
+        // production-mode validation below would then reject every prod boot.
+        // Empty string is treated as explicit "no origins" (old behavior).
+        if let Ok(v) = std::env::var("CORS_ORIGINS") {
+            config.cors_origins = v;
         }
 
-        let cors_origins = env::var("CORS_ORIGINS").unwrap_or_else(|_| "*".to_string());
-
-        let production = env::var("LETTURA_PRODUCTION")
-            .ok()
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false);
-
-        // Reject wildcard CORS in production for security
-        if production && cors_origins == "*" {
-            return Err("CORS_ORIGINS must not be '*' in production mode. Set CORS_ORIGINS to specific allowed origins.".to_string());
+        // Validation: JWT_SECRET
+        if config.jwt_secret == "change-me-in-production" {
+            return Err("JWT_SECRET must not be the default value 'change-me-in-production'".to_string());
         }
-
-        // Reject obvious weak defaults
-        if jwt_secret == "change-me-to-a-random-secret-at-least-32-characters-long" {
+        if config.jwt_secret.len() < 32 {
+            return Err(format!("JWT_SECRET must be at least 32 characters (got {})", config.jwt_secret.len()));
+        }
+        if config.jwt_secret == "change-me-to-a-random-secret-at-least-32-characters-long" {
             return Err("JWT_SECRET must be changed from the default value".to_string());
         }
 
-        Ok(Self {
-            database_url: env::var("DATABASE_URL").map_err(|_| "DATABASE_URL must be set".to_string())?,
-            jwt_secret,
-            listen_addr: env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:3330".to_string()),
-            index_path: env::var("INDEX_PATH").unwrap_or_else(|_| "/data/tantivy".to_string()),
-            storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
-            storage_local_path: env::var("STORAGE_LOCAL_PATH").unwrap_or_else(|_| "/data/storage".to_string()),
-            pages_storage_path: env::var("PAGES_STORAGE_PATH").unwrap_or_else(|_| "/data/pages".to_string()),
-            oss_endpoint: env::var("OSS_ENDPOINT").unwrap_or_default(),
-            oss_region: env::var("OSS_REGION").unwrap_or_else(|_| "auto".to_string()),
-            oss_bucket: env::var("OSS_BUCKET").unwrap_or_default(),
-            oss_access_key: env::var("OSS_ACCESS_KEY").unwrap_or_default(),
-            oss_secret_key: env::var("OSS_SECRET_KEY").unwrap_or_default(),
-            oss_public_url: env::var("OSS_PUBLIC_URL").unwrap_or_default(),
-            db_max_connections: env::var("DB_MAX_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
-            db_min_connections: env::var("DB_MIN_CONNECTIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
-            db_acquire_timeout_secs: env::var("DB_ACQUIRE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
-            cors_origins,
-            production,
-            trust_proxy: env::var("LETTURA_TRUST_PROXY").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
-            disable_registration: env::var("LETTURA_DISABLE_REGISTRATION").ok().map(|v| v == "true" || v == "1").unwrap_or(true),
-            metrics_enabled: env::var("METRICS_ENABLED").ok().map(|v| v == "true" || v == "1").unwrap_or(false),
-            metrics_bearer_token: env::var("LETTURA_METRICS_BEARER_TOKEN").ok(),
-            user_agent: env::var("LETTURA_USER_AGENT").unwrap_or_else(|_| {
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
-            }),
-            fetch_timeout_secs: env::var("LETTURA_FETCH_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(30),
-            fetch_max_retries: env::var("LETTURA_FETCH_MAX_RETRIES").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
-            proxy: env::var("LETTURA_PROXY").ok(),
-            site_configs_path: env::var("LETTURA_SITE_CONFIGS_PATH").ok(),
-            fetch_concurrency: env::var("LETTURA_FETCH_CONCURRENCY")
-                .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
-            fetch_max_attempts: env::var("LETTURA_FETCH_MAX_ATTEMPTS")
-                .ok().and_then(|v| v.parse().ok()).unwrap_or(5),
-            fetch_lease_secs: env::var("LETTURA_FETCH_LEASE_SECS")
-                .ok().and_then(|v| v.parse().ok()).unwrap_or(300),
-            fetch_dead_ttl_days: env::var("LETTURA_FETCH_DEAD_TTL_DAYS")
-                .ok().and_then(|v| v.parse().ok()).unwrap_or(30),
-            rendering_enabled: env::var("LETTURA_RENDERING_ENABLED").unwrap_or_else(|_| "auto".to_string()),
-            chromium_path: env::var("LETTURA_CHROMIUM_PATH").ok(),
-            render_concurrency: env::var("LETTURA_RENDER_CONCURRENCY").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
-            render_timeout_ms: env::var("LETTURA_RENDER_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(15000),
-            public_base_url: env::var("LETTURA_PUBLIC_BASE_URL").ok(),
-            import_max_body_bytes: env::var("LETTURA_IMPORT_MAX_BODY_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(50 * 1024 * 1024),
-            pages_max_upload_bytes: env::var("LETTURA_PAGES_MAX_UPLOAD_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
-            max_image_size: env::var("LETTURA_MAX_IMAGE_MB").ok().and_then(|v| v.parse().ok()).map(|mb: usize| mb * 1024 * 1024).unwrap_or(10 * 1024 * 1024),
-            auth_rate_limit: env::var("LETTURA_AUTH_RATE_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
-            global_rate_limit: env::var("LETTURA_GLOBAL_RATE_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(100),
-            search_commit_interval_secs: env::var("LETTURA_SEARCH_COMMIT_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(3),
-            token_cleanup_interval_secs: env::var("LETTURA_TOKEN_CLEANUP_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(3600),
-            metrics_interval_secs: env::var("LETTURA_METRICS_INTERVAL").ok().and_then(|v| v.parse().ok()).unwrap_or(15),
-        })
+        // Validation: CORS in production
+        if config.production && config.cors_origins == "*" {
+            return Err("CORS_ORIGINS must not be '*' in production mode. Set CORS_ORIGINS to specific allowed origins.".to_string());
+        }
+
+        Ok(config)
     }
 
     /// Returns true when rendering should be attempted at runtime. Always false
@@ -172,8 +201,6 @@ mod tests {
     use super::*;
     use std::env;
 
-    // Helper to set all required env vars with a given JWT_SECRET value.
-    // SAFETY: tests run with --test-threads=1 so no concurrent env mutation.
     fn set_env(jwt_secret: &str) {
         unsafe {
             env::set_var("DATABASE_URL", "postgres://localhost/test");
@@ -181,38 +208,15 @@ mod tests {
         }
     }
 
-    // Helper to clean up env vars after each test.
-    // SAFETY: tests run with --test-threads=1 so no concurrent env mutation.
     fn cleanup_env() {
+        // Only clean up vars that tests actually set
+        let vars = [
+            "DATABASE_URL", "JWT_SECRET",
+            "LETTURA_RENDER_CONCURRENCY", "LETTURA_RENDERING_ENABLED",
+            "LETTURA_PRODUCTION", "CORS_ORIGINS",
+        ];
         unsafe {
-            env::remove_var("DATABASE_URL");
-            env::remove_var("JWT_SECRET");
-            env::remove_var("LISTEN_ADDR");
-            env::remove_var("INDEX_PATH");
-            env::remove_var("STORAGE_TYPE");
-            env::remove_var("STORAGE_LOCAL_PATH");
-            env::remove_var("OSS_ENDPOINT");
-            env::remove_var("OSS_REGION");
-            env::remove_var("OSS_BUCKET");
-            env::remove_var("OSS_ACCESS_KEY");
-            env::remove_var("OSS_SECRET_KEY");
-            env::remove_var("OSS_PUBLIC_URL");
-            env::remove_var("DB_MAX_CONNECTIONS");
-            env::remove_var("DB_MIN_CONNECTIONS");
-            env::remove_var("DB_ACQUIRE_TIMEOUT");
-            env::remove_var("CORS_ORIGINS");
-            env::remove_var("LETTURA_PRODUCTION");
-            env::remove_var("METRICS_ENABLED");
-            env::remove_var("PAGES_STORAGE_PATH");
-            env::remove_var("LETTURA_USER_AGENT");
-            env::remove_var("LETTURA_FETCH_TIMEOUT");
-            env::remove_var("LETTURA_FETCH_MAX_RETRIES");
-            env::remove_var("LETTURA_PROXY");
-            env::remove_var("LETTURA_SITE_CONFIGS_PATH");
-            env::remove_var("LETTURA_RENDERING_ENABLED");
-            env::remove_var("LETTURA_CHROMIUM_PATH");
-            env::remove_var("LETTURA_RENDER_CONCURRENCY");
-            env::remove_var("LETTURA_RENDER_TIMEOUT_MS");
+            for v in &vars { env::remove_var(v); }
         }
     }
 
