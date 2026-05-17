@@ -11,6 +11,7 @@ pub mod middleware;
 pub mod models;
 pub mod rate_limit;
 pub mod search;
+pub mod services;
 pub mod site_config;
 pub mod spa;
 pub mod state;
