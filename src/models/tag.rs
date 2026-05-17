@@ -54,9 +54,13 @@ pub async fn list_tags(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ModelEr
 }
 
 /// List tags with caching. Use this for read-heavy paths like the tag list API.
-pub async fn list_tags_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, ModelError> {
+pub async fn list_tags_cached(
+    pool: &PgPool,
+    caches: &crate::cache::Caches,
+    user_id: Uuid,
+) -> Result<Vec<Tag>, ModelError> {
     // Try cache first
-    if let Some(cached) = crate::cache::TAG_CACHE.get(user_id).await {
+    if let Some(cached) = caches.tags.get(user_id).await {
         return Ok(cached);
     }
 
@@ -64,13 +68,14 @@ pub async fn list_tags_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<Tag>, 
     let tags = list_tags(pool, user_id).await?;
 
     // Update cache
-    crate::cache::TAG_CACHE.insert(user_id, tags.clone()).await;
+    caches.tags.insert(user_id, tags.clone()).await;
 
     Ok(tags)
 }
 
 pub async fn find_or_create_tag(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     label: &str,
 ) -> Result<Tag, ModelError> {
@@ -96,14 +101,15 @@ pub async fn find_or_create_tag(
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache since we added a new tag
-    crate::cache::TAG_CACHE.invalidate(user_id).await;
-    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+    caches.tags.invalidate(user_id).await;
+    caches.tag_stats.invalidate(user_id).await;
 
     Ok(tag)
 }
 
 pub async fn add_tag_to_entry(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     entry_id: Uuid,
     tag_id: Uuid,
@@ -114,12 +120,13 @@ pub async fn add_tag_to_entry(
         .execute(pool)
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
-    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+    caches.tag_stats.invalidate(user_id).await;
     Ok(())
 }
 
 pub async fn remove_tag_from_entry(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     entry_id: Uuid,
     tag_id: Uuid,
@@ -131,12 +138,17 @@ pub async fn remove_tag_from_entry(
         .await
         .map_err(|e| ModelError::Database(e.to_string()))?;
     if result.rows_affected() > 0 {
-        crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+        caches.tag_stats.invalidate(user_id).await;
     }
     Ok(result.rows_affected() > 0)
 }
 
-pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bool, ModelError> {
+pub async fn delete_tag(
+    pool: &PgPool,
+    caches: &crate::cache::Caches,
+    user_id: Uuid,
+    tag_id: Uuid,
+) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM tags WHERE id = $1 AND user_id = $2")
         .bind(tag_id)
         .bind(user_id)
@@ -146,8 +158,8 @@ pub async fn delete_tag(pool: &PgPool, user_id: Uuid, tag_id: Uuid) -> Result<bo
 
     if result.rows_affected() > 0 {
         // Invalidate cache since we deleted a tag
-        crate::cache::TAG_CACHE.invalidate(user_id).await;
-        crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+        caches.tags.invalidate(user_id).await;
+        caches.tag_stats.invalidate(user_id).await;
         Ok(true)
     } else {
         Ok(false)
@@ -162,6 +174,7 @@ pub enum RenameError {
 
 pub async fn rename_tag(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     tag_id: Uuid,
     user_id: Uuid,
     new_label: &str,
@@ -197,8 +210,8 @@ pub async fn rename_tag(
     .ok_or_else(|| RenameError::Database("tag not found".to_string()))?;
 
     // Invalidate caches
-    crate::cache::TAG_CACHE.invalidate(user_id).await;
-    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+    caches.tags.invalidate(user_id).await;
+    caches.tag_stats.invalidate(user_id).await;
 
     Ok(tag)
 }
@@ -221,6 +234,7 @@ pub async fn list_tags_for_entry(pool: &PgPool, entry_id: Uuid) -> Result<Vec<Ta
 /// is a no-op.
 pub async fn ensure_and_link(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     entry_ids: &[Uuid],
     labels: &[String],
@@ -288,8 +302,8 @@ pub async fn ensure_and_link(
         .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache since we may have created new tags
-    crate::cache::TAG_CACHE.invalidate(user_id).await;
-    crate::cache::TAG_STATS_CACHE.invalidate(user_id).await;
+    caches.tags.invalidate(user_id).await;
+    caches.tag_stats.invalidate(user_id).await;
 
     Ok(())
 }
@@ -356,13 +370,17 @@ impl TagStats {
     }
 
     /// Cache-first wrapper for list.
-    pub async fn list_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<TagStats>, ModelError> {
-        if let Some(cached) = crate::cache::TAG_STATS_CACHE.get(user_id).await {
+    pub async fn list_cached(
+        pool: &PgPool,
+        caches: &crate::cache::Caches,
+        user_id: Uuid,
+    ) -> Result<Vec<TagStats>, ModelError> {
+        if let Some(cached) = caches.tag_stats.get(user_id).await {
             return Ok(cached);
         }
 
         let stats = Self::list(pool, user_id).await?;
-        crate::cache::TAG_STATS_CACHE
+        caches.tag_stats
             .insert(user_id, stats.clone())
             .await;
         Ok(stats)

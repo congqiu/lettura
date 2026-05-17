@@ -24,7 +24,7 @@ pub async fn create_rule(
     auth: AuthUser,
     ValidatedJson(params): ValidatedJson<CreateTaggingRule>,
 ) -> Result<Json<tagging_rule::TaggingRule>, ApiError> {
-    let rule = tagging_rule::create_rule(&state.pool, auth.user_id, &params).await?;
+    let rule = tagging_rule::create_rule(&state.pool, &state.caches, auth.user_id, &params).await?;
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),
@@ -44,7 +44,7 @@ pub async fn update_rule(
     Path(rule_id): Path<Uuid>,
     Json(params): Json<UpdateTaggingRule>,
 ) -> Result<Json<tagging_rule::TaggingRule>, ApiError> {
-    let updated = tagging_rule::update_rule(&state.pool, auth.user_id, rule_id, &params).await?;
+    let updated = tagging_rule::update_rule(&state.pool, &state.caches, auth.user_id, rule_id, &params).await?;
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),
@@ -63,7 +63,7 @@ pub async fn delete_rule(
     auth: AuthUser,
     Path(rule_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let deleted = tagging_rule::delete_rule(&state.pool, auth.user_id, rule_id).await?;
+    let deleted = tagging_rule::delete_rule(&state.pool, &state.caches, auth.user_id, rule_id).await?;
     if !deleted {
         return Err(ApiError::NotFound("rule not found".to_string()));
     }

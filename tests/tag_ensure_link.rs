@@ -28,7 +28,7 @@ async fn ensure_and_link_creates_missing_tags_and_links_all_pairs() {
 
     let labels = vec!["rust".to_string(), "tokio".to_string()];
     let entry_ids = vec![e1.id, e2.id];
-    tag::ensure_and_link(&app.pool, user_id, &entry_ids, &labels)
+    tag::ensure_and_link(&app.pool, &app.caches, user_id, &entry_ids, &labels)
         .await
         .unwrap();
 
@@ -53,10 +53,10 @@ async fn ensure_and_link_is_idempotent() {
         .await
         .unwrap();
 
-    tag::ensure_and_link(&app.pool, user_id, &[e1.id], &["rust".into()])
+    tag::ensure_and_link(&app.pool, &app.caches, user_id, &[e1.id], &["rust".into()])
         .await
         .unwrap();
-    tag::ensure_and_link(&app.pool, user_id, &[e1.id], &["rust".into()])
+    tag::ensure_and_link(&app.pool, &app.caches, user_id, &[e1.id], &["rust".into()])
         .await
         .unwrap();
     let t = tag::list_tags_for_entry(&app.pool, e1.id).await.unwrap();
@@ -77,10 +77,10 @@ async fn ensure_and_link_empty_inputs_noop() {
         .await
         .unwrap();
 
-    tag::ensure_and_link(&app.pool, user_id, &[], &["rust".into()])
+    tag::ensure_and_link(&app.pool, &app.caches, user_id, &[], &["rust".into()])
         .await
         .unwrap();
-    tag::ensure_and_link(&app.pool, user_id, &[e1.id], &[])
+    tag::ensure_and_link(&app.pool, &app.caches, user_id, &[e1.id], &[])
         .await
         .unwrap();
 

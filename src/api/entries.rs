@@ -65,7 +65,7 @@ pub async fn create_entry(
 
     // Union-merge tags (single transaction, batch insert).
     if !req.tag.is_empty() {
-        tag::ensure_and_link(&state.pool, auth.user_id, &[r.entry.id], &req.tag).await?;
+        tag::ensure_and_link(&state.pool, &state.caches, auth.user_id, &[r.entry.id], &req.tag).await?;
     }
 
     // Fetch tag labels for response

@@ -38,7 +38,11 @@ async fn main() {
     // owns its own clone for handlers, and the queue's depth is reported via
     // the `fetch_queue_size{status=...}` gauge family sampled directly from
     // `fetch_jobs` below — no in-process counter needed.
-    let (app, search_index, _fetch_queue, storage) =
+    //
+    // `caches` is the *same* Arc that the router puts into AppState; passing
+    // it to spawn_workers below makes cache invalidations from background
+    // tagging visible to HTTP handlers immediately.
+    let (app, search_index, _fetch_queue, storage, caches) =
         lettura::api::router_with_handles(pool.clone(), config.clone());
 
     // CancellationToken drives graceful shutdown of every long-running task.
@@ -80,6 +84,7 @@ async fn main() {
             search_index: search_index.clone(),
             client: http_client,
             max_retries: config.fetch_max_retries,
+            caches: caches.clone(),
             #[cfg(feature = "rendering")]
             render_service,
             // `skip_ssrf` only exists when test-utils is enabled. Production

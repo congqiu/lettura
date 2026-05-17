@@ -51,6 +51,10 @@ pub struct FetchContext {
     pub client: reqwest::Client,
     pub max_retries: u32,
     pub rate_limiter: Arc<Mutex<http::DomainRateLimiter>>,
+    /// Same Arc as `AppState.caches`. `apply_tagging_rules` invalidates
+    /// `tags` / `tag_stats` here, and handlers reading via state.caches see
+    /// the invalidation immediately.
+    pub caches: Arc<crate::cache::Caches>,
     #[cfg(feature = "rendering")]
     pub render_service: Option<Arc<crate::fetch::render::RenderService>>,
     /// Test-only escape hatch to bypass SSRF validation. Gated behind
@@ -400,7 +404,7 @@ async fn save(
         tracing::error!("Failed to index entry {}: {e}", job.entry_id);
     }
 
-    apply_tagging_rules(&ctx.pool, job.user_id, job.entry_id, &job.url, result).await;
+    apply_tagging_rules(&ctx.pool, &ctx.caches, job.user_id, job.entry_id, &job.url, result).await;
 
     tracing::debug!(
         entry_id = %job.entry_id,
@@ -412,13 +416,14 @@ async fn save(
 
 async fn apply_tagging_rules(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     entry_id: Uuid,
     url: &str,
     result: &ExtractResult,
 ) {
     // Use cached version - this is called on every fetch
-    let rules = match crate::models::tagging_rule::list_rules_cached(pool, user_id).await {
+    let rules = match crate::models::tagging_rule::list_rules_cached(pool, caches, user_id).await {
         Ok(r) => r,
         Err(_) => return,
     };
@@ -435,9 +440,9 @@ async fn apply_tagging_rules(
         if crate::models::tagging_rule::evaluate_rule(&rule.rule, &fields) {
             for tag_label in &rule.tags {
                 if let Ok(tag) =
-                    crate::models::tag::find_or_create_tag(pool, user_id, tag_label).await
+                    crate::models::tag::find_or_create_tag(pool, caches, user_id, tag_label).await
                     && let Err(e) =
-                        crate::models::tag::add_tag_to_entry(pool, user_id, entry_id, tag.id).await
+                        crate::models::tag::add_tag_to_entry(pool, caches, user_id, entry_id, tag.id).await
                 {
                     tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
                 }

@@ -45,9 +45,13 @@ pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<SiteRule>, M
 }
 
 /// List rules with caching. Note: site rules include both user-specific and global rules.
-pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<SiteRule>, ModelError> {
+pub async fn list_rules_cached(
+    pool: &PgPool,
+    caches: &crate::cache::Caches,
+    user_id: Uuid,
+) -> Result<Vec<SiteRule>, ModelError> {
     // Try cache first
-    if let Some(cached) = crate::cache::SITE_RULE_CACHE.get(user_id).await {
+    if let Some(cached) = caches.site_rules.get(user_id).await {
         return Ok(cached);
     }
 
@@ -55,7 +59,7 @@ pub async fn list_rules_cached(pool: &PgPool, user_id: Uuid) -> Result<Vec<SiteR
     let rules = list_rules(pool, user_id).await?;
 
     // Update cache
-    crate::cache::SITE_RULE_CACHE
+    caches.site_rules
         .insert(user_id, rules.clone())
         .await;
 
@@ -79,6 +83,7 @@ pub async fn find_by_domain(
 
 pub async fn create_rule(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     params: &CreateSiteRule,
 ) -> Result<SiteRule, ModelError> {
@@ -95,13 +100,14 @@ pub async fn create_rule(
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache
-    crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+    caches.site_rules.invalidate(user_id).await;
 
     Ok(rule)
 }
 
 pub async fn update_rule(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     rule_id: Uuid,
     params: &UpdateSiteRule,
@@ -135,7 +141,7 @@ pub async fn update_rule(
     .fetch_one(pool).await.map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache
-    crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+    caches.site_rules.invalidate(user_id).await;
 
     Ok(updated)
 }
@@ -160,7 +166,12 @@ pub async fn import_rule(pool: &PgPool, rule: &SiteRule, user_id: Uuid) -> Resul
     Ok(())
 }
 
-pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ModelError> {
+pub async fn delete_rule(
+    pool: &PgPool,
+    caches: &crate::cache::Caches,
+    user_id: Uuid,
+    rule_id: Uuid,
+) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM site_rules WHERE id = $1 AND user_id = $2")
         .bind(rule_id)
         .bind(user_id)
@@ -170,7 +181,7 @@ pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<
 
     if result.rows_affected() > 0 {
         // Invalidate cache
-        crate::cache::SITE_RULE_CACHE.invalidate(user_id).await;
+        caches.site_rules.invalidate(user_id).await;
         Ok(true)
     } else {
         Ok(false)

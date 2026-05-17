@@ -51,6 +51,8 @@ pub fn router(pool: PgPool, config: Config) -> Router {
 }
 
 /// Build router and return handles to internal components for metrics/monitoring.
+/// `caches` is returned so the binary can share the same instance with spawned
+/// workers (cache invalidations from background tagging must reach handlers).
 pub fn router_with_handles(
     pool: PgPool,
     config: Config,
@@ -59,9 +61,10 @@ pub fn router_with_handles(
     SearchIndex,
     fetcher::FetchQueue,
     std::sync::Arc<dyn crate::storage::ImageStorage>,
+    std::sync::Arc<crate::cache::Caches>,
 ) {
-    let (router, search, fq, storage) = router_with_search(pool, config, None);
-    (router, search, fq, storage)
+    let (router, search, fq, storage, caches) = router_with_search(pool, config, None);
+    (router, search, fq, storage, caches)
 }
 
 /// Redirect handler for legacy `/api/{path}` routes.
@@ -91,6 +94,7 @@ pub fn router_with_search(
     SearchIndex,
     fetcher::FetchQueue,
     std::sync::Arc<dyn crate::storage::ImageStorage>,
+    std::sync::Arc<crate::cache::Caches>,
 ) {
     let search_index = search.unwrap_or_else(|| {
         SearchIndex::open(std::path::Path::new(&config.index_path))
@@ -103,9 +107,16 @@ pub fn router_with_search(
     // worker). The router only enqueues jobs via FetchQueue::new(pool).
     let fetch_queue = fetcher::FetchQueue::new(pool.clone());
 
+    // Caches are per-instance (no global static). Owned by AppState so handler
+    // code reaches them via &state.caches; the same Arc is also shared with
+    // any spawned worker via WorkerConfig so cache invalidations from
+    // background tagging apply consistently.
+    let caches = std::sync::Arc::new(crate::cache::Caches::new());
+
     let search_clone = search_index.clone();
     let fq_clone = fetch_queue.clone();
     let storage_clone = storage.clone();
+    let caches_clone = caches.clone();
 
     let state = AppState {
         pool,
@@ -113,6 +124,7 @@ pub fn router_with_search(
         fetch_queue,
         search_index,
         storage,
+        caches,
     };
 
     // Auth routes with strict rate limiting (10 req/min for brute-force protection)
@@ -347,7 +359,7 @@ pub fn router_with_search(
             rate_limit_middleware,
         ));
 
-    (router, search_clone, fq_clone, storage_clone)
+    (router, search_clone, fq_clone, storage_clone, caches_clone)
 }
 
 async fn serve_storage(

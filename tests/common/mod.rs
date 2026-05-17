@@ -10,6 +10,7 @@ pub struct TestApp {
     pub db_name: String,
     pub search_index: SearchIndex,
     pub config: Config,
+    pub caches: std::sync::Arc<lettura::cache::Caches>,
     base_url: String,
 }
 
@@ -81,7 +82,7 @@ impl TestApp {
             metrics_interval_secs: 15,
         };
 
-        let (app, _, _, _) = lettura::api::router_with_search(
+        let (app, _, _, _, caches) = lettura::api::router_with_search(
             pool.clone(),
             config.clone(),
             Some(search_index.clone()),
@@ -105,6 +106,7 @@ impl TestApp {
             db_name,
             search_index,
             config: config.clone(),
+            caches,
             base_url,
         }
     }

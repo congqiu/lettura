@@ -45,10 +45,11 @@ pub async fn list_rules(pool: &PgPool, user_id: Uuid) -> Result<Vec<TaggingRule>
 /// on every fetch operation.
 pub async fn list_rules_cached(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
 ) -> Result<Vec<TaggingRule>, ModelError> {
     // Try cache first
-    if let Some(cached) = crate::cache::TAGGING_RULE_CACHE.get(user_id).await {
+    if let Some(cached) = caches.tagging_rules.get(user_id).await {
         return Ok(cached);
     }
 
@@ -56,7 +57,7 @@ pub async fn list_rules_cached(
     let rules = list_rules(pool, user_id).await?;
 
     // Update cache
-    crate::cache::TAGGING_RULE_CACHE
+    caches.tagging_rules
         .insert(user_id, rules.clone())
         .await;
 
@@ -65,6 +66,7 @@ pub async fn list_rules_cached(
 
 pub async fn create_rule(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     params: &CreateTaggingRule,
 ) -> Result<TaggingRule, ModelError> {
@@ -80,13 +82,14 @@ pub async fn create_rule(
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache
-    crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+    caches.tagging_rules.invalidate(user_id).await;
 
     Ok(rule)
 }
 
 pub async fn update_rule(
     pool: &PgPool,
+    caches: &crate::cache::Caches,
     user_id: Uuid,
     rule_id: Uuid,
     params: &UpdateTaggingRule,
@@ -118,7 +121,7 @@ pub async fn update_rule(
     .map_err(|e| ModelError::Database(e.to_string()))?;
 
     // Invalidate cache
-    crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+    caches.tagging_rules.invalidate(user_id).await;
 
     Ok(updated)
 }
@@ -145,7 +148,12 @@ pub async fn import_rule(
     Ok(())
 }
 
-pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<bool, ModelError> {
+pub async fn delete_rule(
+    pool: &PgPool,
+    caches: &crate::cache::Caches,
+    user_id: Uuid,
+    rule_id: Uuid,
+) -> Result<bool, ModelError> {
     let result = sqlx::query("DELETE FROM tagging_rules WHERE id = $1 AND user_id = $2")
         .bind(rule_id)
         .bind(user_id)
@@ -155,7 +163,7 @@ pub async fn delete_rule(pool: &PgPool, user_id: Uuid, rule_id: Uuid) -> Result<
 
     if result.rows_affected() > 0 {
         // Invalidate cache
-        crate::cache::TAGGING_RULE_CACHE.invalidate(user_id).await;
+        caches.tagging_rules.invalidate(user_id).await;
         Ok(true)
     } else {
         Ok(false)

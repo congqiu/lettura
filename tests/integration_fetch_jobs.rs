@@ -523,6 +523,7 @@ async fn db_worker_processes_job_and_routes_transient_failure() {
                 .build()
                 .unwrap(),
             max_retries: 0,
+            caches: app.caches.clone(),
             #[cfg(feature = "rendering")]
             render_service: None,
             #[cfg(feature = "test-utils")]
@@ -629,6 +630,7 @@ async fn cancel_during_processing_releases_job() {
             search_index: app.search_index.clone(),
             client: reqwest::Client::new(),
             max_retries: 1,
+            caches: app.caches.clone(),
             #[cfg(feature = "rendering")]
             render_service: None,
             // Loopback URLs from httpmock would otherwise be blocked by SSRF.

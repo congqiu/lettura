@@ -2,9 +2,14 @@
 //!
 //! Provides user-scoped caching for frequently accessed data like tags,
 //! tagging rules, and site rules. Uses TTL-based expiration and LRU eviction.
+//!
+//! Caches are owned by [`Caches`] and reached via `AppState` / passed down
+//! to model functions. Tests get their own instance per `TestApp::new`, so
+//! state never leaks across test cases. In a future multi-replica deployment
+//! the per-instance ownership also lets us swap an implementation (e.g.
+//! Redis-backed) without changing call sites.
 
 use moka::future::Cache;
-use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -63,29 +68,44 @@ impl<T: Clone + Send + Sync + 'static> UserCache<T> {
 }
 
 // ============================================================================
-// Cache instances for various data types
+// Cache bundle owned by AppState
 // ============================================================================
 
 use crate::models::site_rule::SiteRule;
 use crate::models::tag::{Tag, TagStats};
 use crate::models::tagging_rule::TaggingRule;
 
-/// Cache for user tags (5 minute TTL, 1000 users max).
-pub static TAG_CACHE: once_cell::sync::Lazy<Arc<UserCache<Tag>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
+/// Per-instance cache bundle. Held by `AppState` as `Arc<Caches>` so handler
+/// and model code can pass `&state.caches` down without paying for clones.
+pub struct Caches {
+    /// User tags (5 min TTL, 1000 users max).
+    pub tags: UserCache<Tag>,
+    /// Tag stats (5 min TTL, 1000 users max).
+    pub tag_stats: UserCache<TagStats>,
+    /// Tagging rules (5 min TTL, 1000 users max). Highest-traffic — queried
+    /// on every fetch pipeline run.
+    pub tagging_rules: UserCache<TaggingRule>,
+    /// Site rules (5 min TTL, 500 users max).
+    pub site_rules: UserCache<SiteRule>,
+}
 
-/// Cache for tag stats (5 minute TTL, 1000 users max).
-pub static TAG_STATS_CACHE: once_cell::sync::Lazy<Arc<UserCache<TagStats>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
+impl Caches {
+    pub fn new() -> Self {
+        let ttl = Duration::from_secs(300);
+        Self {
+            tags: UserCache::new(1000, ttl),
+            tag_stats: UserCache::new(1000, ttl),
+            tagging_rules: UserCache::new(1000, ttl),
+            site_rules: UserCache::new(500, ttl),
+        }
+    }
+}
 
-/// Cache for tagging rules (5 minute TTL, 1000 users max).
-/// This is the highest priority cache as it's queried on every fetch.
-pub static TAGGING_RULE_CACHE: once_cell::sync::Lazy<Arc<UserCache<TaggingRule>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(1000, Duration::from_secs(300))));
-
-/// Cache for site rules (5 minute TTL, 500 users max).
-pub static SITE_RULE_CACHE: once_cell::sync::Lazy<Arc<UserCache<SiteRule>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(UserCache::new(500, Duration::from_secs(300))));
+impl Default for Caches {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {

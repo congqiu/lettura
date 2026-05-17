@@ -131,6 +131,7 @@ pub async fn import_wallabag(
                     && !tag_labels.is_empty()
                     && let Err(e) = crate::models::tag::ensure_and_link(
                         &state.pool,
+                        &state.caches,
                         auth.user_id,
                         &[new_entry.id],
                         tag_labels,
@@ -454,7 +455,7 @@ pub async fn import_lettura(
 
     // Import tags (deduplicated by label/slug).
     for t in &data.tags {
-        match crate::models::tag::find_or_create_tag(&state.pool, auth.user_id, &t.label).await {
+        match crate::models::tag::find_or_create_tag(&state.pool, &state.caches, auth.user_id, &t.label).await {
             Ok(tag) => {
                 tag_id_map.insert(t.id, tag.id);
             }
@@ -470,6 +471,7 @@ pub async fn import_lettura(
             (entry_id_map.get(&et.entry_id), tag_id_map.get(&et.tag_id))
             && let Err(e) = crate::models::tag::add_tag_to_entry(
                 &state.pool,
+                &state.caches,
                 auth.user_id,
                 new_entry_id,
                 new_tag_id,

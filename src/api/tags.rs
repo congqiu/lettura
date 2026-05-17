@@ -17,7 +17,7 @@ pub async fn list_tags(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<tag::Tag>>, ApiError> {
-    let tags = tag::list_tags_cached(&state.pool, auth.user_id).await?;
+    let tags = tag::list_tags_cached(&state.pool, &state.caches, auth.user_id).await?;
     Ok(Json(tags))
 }
 
@@ -25,7 +25,7 @@ pub async fn tags_stats(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<tag::TagStats>>, ApiError> {
-    let stats = tag::TagStats::list_cached(&state.pool, auth.user_id).await?;
+    let stats = tag::TagStats::list_cached(&state.pool, &state.caches, auth.user_id).await?;
     Ok(Json(stats))
 }
 
@@ -41,7 +41,7 @@ pub async fn rename_tag_handler(
     Path(tag_id): Path<Uuid>,
     ValidatedJson(req): ValidatedJson<RenameTagRequest>,
 ) -> Result<Json<tag::Tag>, ApiError> {
-    let updated = tag::rename_tag(&state.pool, tag_id, auth.user_id, &req.label)
+    let updated = tag::rename_tag(&state.pool, &state.caches, tag_id, auth.user_id, &req.label)
         .await
         .map_err(|e| match e {
             tag::RenameError::Conflict => {
@@ -94,8 +94,8 @@ pub async fn add_tag_to_entry(
     entry::find_entry_by_id(&state.pool, auth.user_id, entry_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
-    let t = tag::find_or_create_tag(&state.pool, auth.user_id, &req.label).await?;
-    tag::add_tag_to_entry(&state.pool, auth.user_id, entry_id, t.id).await?;
+    let t = tag::find_or_create_tag(&state.pool, &state.caches, auth.user_id, &req.label).await?;
+    tag::add_tag_to_entry(&state.pool, &state.caches, auth.user_id, entry_id, t.id).await?;
 
     audit_log::log_success(
         &state.pool,
@@ -120,7 +120,7 @@ pub async fn remove_tag_from_entry(
     entry::find_entry_by_id(&state.pool, auth.user_id, entry_id)
         .await?
         .ok_or_else(|| ApiError::NotFound("entry not found".to_string()))?;
-    tag::remove_tag_from_entry(&state.pool, auth.user_id, entry_id, tag_id).await?;
+    tag::remove_tag_from_entry(&state.pool, &state.caches, auth.user_id, entry_id, tag_id).await?;
 
     audit_log::log_success(
         &state.pool,
@@ -141,7 +141,7 @@ pub async fn delete_tag(
     auth: AuthUser,
     Path(tag_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let deleted = tag::delete_tag(&state.pool, auth.user_id, tag_id).await?;
+    let deleted = tag::delete_tag(&state.pool, &state.caches, auth.user_id, tag_id).await?;
     if !deleted {
         return Err(ApiError::NotFound("tag not found".to_string()));
     }
@@ -172,7 +172,7 @@ pub async fn remove_tag_from_entry_by_label(
             .map_err(|e| ApiError::Internal(e.to_string()))?
             .ok_or_else(|| ApiError::NotFound(format!("tag with label '{label}'")))?;
 
-    if tag::remove_tag_from_entry(&state.pool, auth.user_id, entry_id, tag_id)
+    if tag::remove_tag_from_entry(&state.pool, &state.caches, auth.user_id, entry_id, tag_id)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?
     {

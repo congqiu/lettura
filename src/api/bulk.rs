@@ -79,7 +79,7 @@ pub async fn bulk_tag_add(
             ids,
         }));
     }
-    tag::ensure_and_link(&state.pool, auth.user_id, &ids, &req.add).await?;
+    tag::ensure_and_link(&state.pool, &state.caches, auth.user_id, &ids, &req.add).await?;
     let count = ids.len();
 
     audit_log::log_success(
@@ -128,7 +128,7 @@ pub async fn bulk_untag(
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?
             {
-                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0)
+                tag::remove_tag_from_entry(&state.pool, &state.caches, auth.user_id, *id, t.0)
                     .await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
@@ -291,11 +291,11 @@ pub async fn bulk_tag_by_ids(
     if req.tags.is_empty() {
         return Err(ApiError::BadRequest("tags cannot be empty".into()));
     }
-    tag::ensure_and_link(&state.pool, auth.user_id, &req.entry_ids, &req.tags).await?;
+    tag::ensure_and_link(&state.pool, &state.caches, auth.user_id, &req.entry_ids, &req.tags).await?;
     let count = req.entry_ids.len();
 
     // Invalidate tag stats cache since tag counts may have changed
-    crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
+    state.caches.tag_stats.invalidate(auth.user_id).await;
 
     audit_log::log_success(
         &state.pool,
@@ -337,7 +337,7 @@ pub async fn bulk_untag_by_ids(
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?
             {
-                tag::remove_tag_from_entry(&state.pool, auth.user_id, *id, t.0)
+                tag::remove_tag_from_entry(&state.pool, &state.caches, auth.user_id, *id, t.0)
                     .await
                     .map_err(|e| ApiError::Internal(e.to_string()))?;
             }
@@ -346,7 +346,7 @@ pub async fn bulk_untag_by_ids(
     let count = req.entry_ids.len();
 
     // Invalidate tag stats cache since tag counts may have changed
-    crate::cache::TAG_STATS_CACHE.invalidate(auth.user_id).await;
+    state.caches.tag_stats.invalidate(auth.user_id).await;
 
     audit_log::log_success(
         &state.pool,

@@ -29,6 +29,10 @@ pub struct WorkerConfig {
     pub search_index: SearchIndex,
     pub client: reqwest::Client,
     pub max_retries: u32,
+    /// Shared with `AppState.caches` so cache invalidations performed by
+    /// background tagging (via `apply_tagging_rules`) are visible to
+    /// concurrent HTTP handlers.
+    pub caches: Arc<crate::cache::Caches>,
     #[cfg(feature = "rendering")]
     pub render_service: Option<Arc<crate::fetch::render::RenderService>>,
     /// Test-only escape hatch propagated to [`FetchContext::skip_ssrf`].
@@ -79,6 +83,7 @@ async fn worker_loop(cfg: WorkerConfig, worker_id: String, cancel: CancellationT
         client: cfg.client.clone(),
         max_retries: cfg.max_retries,
         rate_limiter: Arc::new(Mutex::new(crate::fetch::http::DomainRateLimiter::new())),
+        caches: cfg.caches.clone(),
         #[cfg(feature = "rendering")]
         render_service: cfg.render_service.clone(),
         #[cfg(any(test, feature = "test-utils"))]
