@@ -2,54 +2,47 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-16
+
 ### Added
-- PWA offline save queue: automatically queues URL saves when network is down and retries on reconnect (`offlineQueue.ts` + `NetworkStatus` component).
-- Floating text-selection toolbar on article pages: select text to reveal a mini toolbar with one-tap "添加批注".
-- Chrome extension fully rewritten in React: tabbed login (password / token), page preview, clear save-state feedback, shared design tokens.
-- Design system documentation (`DESIGN.md`) covering color system, typography scale, component patterns, and animation specs.
-- PWA Workbox runtime caching: `NetworkFirst` for API endpoints, `StaleWhileRevalidate` for images.
-- Personal Access Tokens (PAT) management UI and API (`POST/GET /api/v1/tokens`, `DELETE /api/v1/tokens/:id`). Tokens authenticate alongside JWT via `Authorization: Bearer lta_...`. Fine-grained scope: `read` (GET-only) or `write` (full API).
-- `lettura-cli` AI-first CLI with subcommands: `login`, `whoami`, `config`, `list`, `search`, `get` (markdown/json/html/text), `save` (with `--wait`), `tag` / `untag` / `archive` / `star` (single + batch via `--filter`), `tags`, `skill print` / `skill install`.
-- Filter DSL for `list` / batch operations: AND-combined conditions like `tag:rust,untagged,since:7d`.
-- Bulk endpoints `POST /api/v1/entries/bulk/{tag,untag,archive,star}` with required `dry_run` preview step.
-- Skill source `skills/lettura.md`, served publicly at `GET /skills/lettura.md` with server-version + base-URL substitution, and bundled into the CLI binary via rust-embed (`lettura-cli skill install`).
-- GitHub Actions release workflow building `lettura-cli` for linux-x86_64, darwin-x86_64, and darwin-aarch64; `scripts/install-cli.sh` downloads the matching tarball.
-- Cursor-based keyset pagination for `GET /api/v1/entries` (`cursor` query param, `X-Next-Cursor` response header). Cursor mode bypasses the page≤50 guard.
-- Audit log system: migration 015 (`audit_logs` table + ENUMs + indexes), `GET /api/v1/audit-logs` with filtering and pagination, fire-and-forget helper, instrumentation across all major write endpoints.
-- `lettura-cli audit-logs` subcommand for querying audit logs from the terminal.
-- `dev.sh dev` command for combined backend (Docker) + frontend (Vite) development with unified logs.
+- add pages subcommands and expand contract tests
+- implement pages command with upload support
+- add release.sh script for version bumping and changelog generation
+- localize all UI text to Chinese
+- add PAT token authentication with tab-based login UI
+- overhaul visual design system, layout and mobile experience
+- add refresh token replay detection, manual SSRF redirect validation, and harden multiple attack surfaces
+- improve search layout, scrollbar styling, and code block overflow
+- add input length limits, regex size limit, reduce import body max
+- fix RSS CDATA injection, add CSP and Permissions-Policy headers
+- hide internal error details from health endpoint, add bearer token auth for metrics
+- hash page passwords with argon2, use constant-time comparison, remove password from share URLs
+- revoke all refresh tokens on password change, harden refresh token rotation
+- reject wildcard CORS in production mode
+- add SSRF protection — block private IP ranges in fetch pipeline
+- add swipe gestures, share target, and mobile Sheet
+- responsive layout, safe area, and mobile navigation
+- add title and tag options to createEntry API
+- make operational parameters configurable via env vars
 
 ### Changed
-- Complete design-system overhaul: indigo-600 primary, warm stone backgrounds, strict 6-level typography scale (`text-display` → `text-label`), semantic CSS tokens.
-- `--accent` token changed from amber-500 to warm gray (`30 6% 92%`); amber/yellow is now reserved exclusively for bookmark/star actions.
-- `EntryCard` compact redesign: thumbnail hidden on mobile (`hidden sm:block w-24 h-16`), icon-only ghost action buttons, metadata uses `gap-x-3` spacing instead of `·` separators, max 3 tags with `+N` overflow.
-- `EntryListPage` bulk-action bar replaced with compact icon-only toolbar.
-- `EntryDetailPage` action toolbar converged into subtle icon row; reading width fixed at `max-w-170` (680 px); floating selection toolbar for annotation capture.
-- `MobileBottomNav` promotes "归档" to a primary tab (was hidden in "more" overflow).
-- `SettingsPage` reorganized into grouped sections: 标签与自动化 / 数据管理 / 开发者.
-- `AnnotationsSidebar` removed manual "捕获" button; quote is now auto-populated from the floating selection toolbar via `key` remount pattern.
-- Tag management UI unified into a single flex list (replaced separate desktop table + mobile card implementations); pill badges for counts, icon-only edit/delete with opacity hover.
-- Entry save (`POST /api/v1/entries`) is now idempotent: same URL returns existing entry with `already_existed: true`, tag set merged as union.
-- `GET /api/v1/entries` list endpoint gained filters: `tag`, `exclude_tag`, `untagged`, `domain`, `since`, `before`, `is_read` (alias for `is_archived`).
-- Repo is now a Cargo workspace (`.` and `cli/`); server crate is still `lettura`.
-- Search index switched to buffered writes with a 3-second background flush and graceful-shutdown flush, eliminating per-write fsync. Permanent-delete and admin reindex still commit synchronously.
-- `process_images` downloads images in parallel (max 8 in flight) and applies URL replacements longest-first to avoid substring collisions.
-- Web client `staleTime` raised to 30s and `refetchOnWindowFocus` disabled by default. Mutations still call `invalidateQueries` so cache stays fresh after writes; visible behavior change is that switching tabs no longer triggers an immediate refetch.
-- `process_body` in the fetch pipeline now takes `body` by value, eliminating a full `to_string()` clone for large HTML pages before `spawn_blocking`.
-- `parse_retry_after_header` now supports RFC 7231 HTTP-date form (e.g. "Wed, 21 Oct 2099 07:28:00 GMT") in addition to the seconds-from-now form.
-- Web client token-refresh interceptor now skips auth endpoints (login/register) to prevent infinite retry loops on 401 responses.
+- 拆分设置页为独立面板组件并优化交互体验
+- overhaul design system and unify component patterns
+- 消除所有 clippy 警告，参数结构体化替代多参数函数 #none
+- 简化 expires_at 类型并统一 API 响应 #none
+- extract auth_source_str, add log_success helper, fix tag cache invalidation
 
 ### Fixed
-- Design token contrast fixes: `success`/`warning` foreground colors for light backgrounds, dark-mode card contrast, eliminated hardcoded `green-*`/`amber-*` in components.
-- `admin reindex` now commits the index clear before the rebuild, preventing a half-cleared index if the rebuild phase fails.
-- PAT `last_used_at` update no longer aborts the request on transient DB errors.
-
-### Security
-- PAT tokens stored as SHA-256 hash only; only the first 12 bytes (`lta_…`) kept in plaintext for UI display.
-- PAT and feed tokens now use `OsRng` with rejection sampling for uniform character distribution (replaces biased modulo over `thread_rng`).
-- Path-traversal hardening on `/storage/*` and `/p/<slug>/<file>`: reject parent/root/empty path segments and percent-encoded escapes.
-- Prometheus metric labels normalize `/p/<slug>` → `/p/{slug}` and `/feed/<token>` → `/feed/{token}` to prevent unbounded label cardinality and feed-token leakage.
-
+- 隐藏 password hash 并统一 API 响应类型 #none
+- resolve CI failures and update dependencies
+- read version from package.json instead of hardcoding
+- map image_process_status as PG enum instead of String
+- add host_permissions to fix CORS errors on API requests
+- harden zip path validation, default registration to disabled, and inject ConnectInfo for rate limiting
+- harden SSRF, rate limiting, HSTS, cookies, and deployment defaults
+- bind postgres to localhost, fix .env.example, restrict DOMPurify, use unified API client
+- remove unused imports and fix useRef argument
+- pin pnpm version to resolve corepack prepare error
 ## [0.1.0] - 2026-03-29
 
 ### Added

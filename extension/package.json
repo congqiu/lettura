@@ -1,6 +1,6 @@
 {
   "name": "lettura-extension",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "description": "Save articles to your Lettura instance",
   "type": "module",
   "scripts": {
@@ -9,8 +9,14 @@
     "postbuild": "node scripts/postbuild.mjs",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
   }
