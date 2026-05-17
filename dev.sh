@@ -105,10 +105,18 @@ cmd_psql() {
 # Prefers host cargo if available (faster, no docker overhead). Falls back to
 # the lettura-bb-sccache builder container if cargo is missing.
 cmd_codegen() {
+  local target=web/src/api/openapi.json
+  local tmp
+  tmp=$(mktemp) || { err "mktemp failed"; exit 1; }
+  trap 'rm -f "$tmp"' RETURN
+
+  # Write to a tempfile first; only mv to $target on success. Otherwise a
+  # cargo failure (network timeout, compile error) would leave $target as
+  # 0 bytes via shell stdout redirect, breaking the next codegen run.
   log "Dumping OpenAPI schema from Rust..."
+  local rc=0
   if command -v cargo >/dev/null 2>&1; then
-    cargo run --bin dump_openapi --no-default-features --quiet \
-      > web/src/api/openapi.json
+    cargo run --bin dump_openapi --no-default-features --quiet > "$tmp" || rc=$?
   else
     warn "host cargo not found, using docker builder"
     docker run --rm \
@@ -116,9 +124,15 @@ cmd_codegen() {
       -v lettura-target:/app/target \
       -v lettura-cargo-registry:/usr/local/cargo/registry \
       -w /app lettura-bb-sccache \
-      cargo run --bin dump_openapi --no-default-features --quiet \
-      > web/src/api/openapi.json
+      cargo run --bin dump_openapi --no-default-features --quiet > "$tmp" || rc=$?
   fi
+
+  if [[ $rc -ne 0 ]] || [[ ! -s "$tmp" ]]; then
+    err "cargo dump_openapi failed (rc=$rc, $(wc -c < "$tmp") bytes) — $target unchanged"
+    exit 1
+  fi
+
+  mv "$tmp" "$target"
   log "Generating web/src/api/schema.ts..."
   (cd web && pnpm codegen)
   log "Done. Commit web/src/api/openapi.json + web/src/api/schema.ts."
