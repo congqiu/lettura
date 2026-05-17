@@ -144,6 +144,14 @@ JWT_SECRET=your-secret-at-least-32-characters-long
 - 应用: `http://localhost:3330`
 - PostgreSQL: `localhost:5436`（用户名/密码: lettura/lettura）
 
+## Admin 备份格式
+
+`GET /api/v1/admin/backup` 输出 NDJSON 流（`application/x-ndjson`），每行一个 JSON 对象，格式为 `{"type":"metadata","version":"2.0","created_at":"..."}` / `{"type":"user",...}` / `{"type":"entry",...}` 等。不再把全量数据加载进内存。
+
+`POST /api/v1/admin/restore?confirm=true` 同时支持 v2.0 NDJSON 和 v1.0 legacy JSON bundle 格式。自动检测：首行为 `{"type":"metadata",...}` → NDJSON；首行为 `{` 但不含 `type` 字段 → legacy JSON。
+
+用户级导出（`GET /api/v1/export`）和导入（`POST /api/v1/import/lettura`）仍使用 v1.0 JSON bundle 格式，不受影响。
+
 ## 抓取队列
 
 抓取任务存在 PostgreSQL `fetch_jobs` 表（持久化队列），进程崩溃零丢失、多副本可水平扩展。

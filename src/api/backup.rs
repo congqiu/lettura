@@ -1,7 +1,9 @@
+use axum::body::{Body, Bytes};
 use axum::extract::{Query, State};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
+use futures::Stream;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -12,7 +14,7 @@ use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
-// Backup data structures
+// Backup data structures (used for restore parsing)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,7 +32,7 @@ pub struct BackupData {
 }
 
 /// User without password_hash (security: never export credentials).
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupUser {
     pub id: Uuid,
     pub username: String,
@@ -41,7 +43,7 @@ pub struct BackupUser {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupEntry {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -61,6 +63,7 @@ pub struct BackupEntry {
     pub preview_picture: Option<String>,
     pub domain_name: Option<String>,
     pub published_by: Option<String>,
+    #[schema(value_type = serde_json::Value)]
     pub metadata: serde_json::Value,
     pub is_archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
@@ -72,7 +75,7 @@ pub struct BackupEntry {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupTag {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -81,26 +84,27 @@ pub struct BackupTag {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupEntryTag {
     pub entry_id: Uuid,
     pub tag_id: Uuid,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupAnnotation {
     pub id: Uuid,
     pub entry_id: Uuid,
     pub user_id: Uuid,
     pub quote: String,
     pub text: String,
+    #[schema(value_type = serde_json::Value)]
     pub ranges: serde_json::Value,
     pub is_orphaned: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupMemo {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -110,17 +114,18 @@ pub struct BackupMemo {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupTaggingRule {
     pub id: Uuid,
     pub user_id: Uuid,
+    #[schema(value_type = serde_json::Value)]
     pub rule: serde_json::Value,
     pub tags: Vec<String>,
     pub priority: i32,
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct BackupSiteRule {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
@@ -132,104 +137,281 @@ pub struct BackupSiteRule {
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/v1/admin/backup
+// NDJSON line types for streaming backup
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type")]
+enum NdjsonLine {
+    #[serde(rename = "metadata")]
+    Metadata { version: String, created_at: DateTime<Utc> },
+    #[serde(rename = "user")]
+    User(BackupUser),
+    #[serde(rename = "entry")]
+    Entry(BackupEntry),
+    #[serde(rename = "tag")]
+    Tag(BackupTag),
+    #[serde(rename = "entry_tag")]
+    EntryTag(BackupEntryTag),
+    #[serde(rename = "annotation")]
+    Annotation(BackupAnnotation),
+    #[serde(rename = "memo")]
+    Memo(BackupMemo),
+    #[serde(rename = "tagging_rule")]
+    TaggingRule(BackupTaggingRule),
+    #[serde(rename = "site_rule")]
+    SiteRule(BackupSiteRule),
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/admin/backup — streaming NDJSON
+// ---------------------------------------------------------------------------
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/backup",
+    operation_id = "admin_backup",
+    tag = "admin",
+    responses(
+        (status = 200, description = "NDJSON stream of backup data", content_type = "application/x-ndjson"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn backup(State(state): State<AppState>, auth: AuthUser) -> Result<Response, ApiError> {
     if !auth.is_admin {
         return Err(ApiError::Forbidden("admin required".to_string()));
     }
 
-    let users = sqlx::query_as::<_, BackupUser>(
-        "SELECT id, username, email, is_admin, feed_token, created_at, updated_at FROM users ORDER BY created_at",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let user_count = users.len();
+    let filename = format!("lettura-backup-{}.ndjson", Utc::now().format("%Y-%m-%d"));
 
-    let entries = sqlx::query_as::<_, BackupEntry>("SELECT * FROM entries ORDER BY created_at")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let entry_count = entries.len();
-
-    let tags = sqlx::query_as::<_, BackupTag>("SELECT * FROM tags ORDER BY created_at")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let entry_tags =
-        sqlx::query_as::<_, BackupEntryTag>("SELECT * FROM entry_tags ORDER BY entry_id, tag_id")
-            .fetch_all(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let annotations =
-        sqlx::query_as::<_, BackupAnnotation>("SELECT * FROM annotations ORDER BY created_at")
-            .fetch_all(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let memos = sqlx::query_as::<_, BackupMemo>("SELECT * FROM memos ORDER BY created_at")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let tagging_rules =
-        sqlx::query_as::<_, BackupTaggingRule>("SELECT * FROM tagging_rules ORDER BY created_at")
-            .fetch_all(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let site_rules =
-        sqlx::query_as::<_, BackupSiteRule>("SELECT * FROM site_rules ORDER BY created_at")
-            .fetch_all(&state.pool)
-            .await
-            .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    let backup_data = BackupData {
-        version: "1.0".to_string(),
-        created_at: Utc::now(),
-        users,
-        entries,
-        tags,
-        entry_tags,
-        annotations,
-        memos,
-        tagging_rules,
-        site_rules,
-    };
-
-    let json = serde_json::to_string_pretty(&backup_data)
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    tracing::info!("admin backup created");
-
-    audit_log::log_success(
-        &state.pool,
-        Some(auth.user_id),
-        auth_source_str(&auth),
-        AuditAction::AdminBackup,
-        Some(AuditResourceType::System),
-        None,
-        serde_json::json!({"users": user_count, "entries": entry_count}),
-    )
-    .await;
-
-    let filename = format!("lettura-backup-{}.json", Utc::now().format("%Y-%m-%d"));
+    let auth_source = auth_source_str(&auth);
+    let stream = backup_ndjson_stream(state.pool.clone(), auth.user_id, auth_source);
 
     Ok((
         [
-            (header::CONTENT_TYPE, "application/json".to_string()),
+            (header::CONTENT_TYPE, "application/x-ndjson".to_string()),
             (
                 header::CONTENT_DISPOSITION,
                 format!("attachment; filename=\"{filename}\""),
             ),
         ],
-        json,
+        Body::from_stream(stream),
     )
         .into_response())
+}
+
+fn backup_ndjson_stream(
+    pool: sqlx::PgPool,
+    admin_user_id: Uuid,
+    auth_source: String,
+) -> impl Stream<Item = Result<Bytes, std::io::Error>> {
+    async_stream::stream! {
+        let mut buf = Vec::with_capacity(8192);
+
+        // metadata line
+        let meta = NdjsonLine::Metadata {
+            version: "2.0".to_string(),
+            created_at: Utc::now(),
+        };
+        serde_json::to_writer(&mut buf, &meta).unwrap();
+        buf.push(b'\n');
+        yield Ok(Bytes::from(buf.clone()));
+        buf.clear();
+
+        // users
+        {
+            let mut rows = sqlx::query_as::<_, BackupUser>(
+                "SELECT id, username, email, is_admin, feed_token, created_at, updated_at FROM users ORDER BY created_at",
+            )
+            .fetch(&pool);
+
+            while let Some(user) = rows.next().await {
+                let user = match user {
+                    Ok(u) => u,
+                    Err(e) => {
+                        tracing::error!("backup stream: users query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::User(user);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // entries
+        {
+            let mut rows = sqlx::query_as::<_, BackupEntry>("SELECT * FROM entries ORDER BY created_at")
+                .fetch(&pool);
+
+            while let Some(entry) = rows.next().await {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(e) => {
+                        tracing::error!("backup stream: entries query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::Entry(entry);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // tags
+        {
+            let mut rows = sqlx::query_as::<_, BackupTag>("SELECT * FROM tags ORDER BY created_at")
+                .fetch(&pool);
+
+            while let Some(tag) = rows.next().await {
+                let tag = match tag {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::error!("backup stream: tags query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::Tag(tag);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // entry_tags
+        {
+            let mut rows = sqlx::query_as::<_, BackupEntryTag>(
+                "SELECT * FROM entry_tags ORDER BY entry_id, tag_id",
+            )
+            .fetch(&pool);
+
+            while let Some(et) = rows.next().await {
+                let et = match et {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("backup stream: entry_tags query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::EntryTag(et);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // annotations
+        {
+            let mut rows = sqlx::query_as::<_, BackupAnnotation>(
+                "SELECT * FROM annotations ORDER BY created_at",
+            )
+            .fetch(&pool);
+
+            while let Some(ann) = rows.next().await {
+                let ann = match ann {
+                    Ok(a) => a,
+                    Err(e) => {
+                        tracing::error!("backup stream: annotations query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::Annotation(ann);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // memos
+        {
+            let mut rows = sqlx::query_as::<_, BackupMemo>("SELECT * FROM memos ORDER BY created_at")
+                .fetch(&pool);
+
+            while let Some(memo) = rows.next().await {
+                let memo = match memo {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::error!("backup stream: memos query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::Memo(memo);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // tagging_rules
+        {
+            let mut rows = sqlx::query_as::<_, BackupTaggingRule>(
+                "SELECT * FROM tagging_rules ORDER BY created_at",
+            )
+            .fetch(&pool);
+
+            while let Some(rule) = rows.next().await {
+                let rule = match rule {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("backup stream: tagging_rules query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::TaggingRule(rule);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // site_rules
+        {
+            let mut rows = sqlx::query_as::<_, BackupSiteRule>(
+                "SELECT * FROM site_rules ORDER BY created_at",
+            )
+            .fetch(&pool);
+
+            while let Some(rule) = rows.next().await {
+                let rule = match rule {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("backup stream: site_rules query error: {e}");
+                        break;
+                    }
+                };
+                let line = NdjsonLine::SiteRule(rule);
+                serde_json::to_writer(&mut buf, &line).unwrap();
+                buf.push(b'\n');
+                yield Ok(Bytes::from(buf.clone()));
+                buf.clear();
+            }
+        }
+
+        // audit log
+        audit_log::log_success(
+            &pool,
+            Some(admin_user_id),
+            auth_source,
+            AuditAction::AdminBackup,
+            Some(AuditResourceType::System),
+            None,
+            serde_json::json!({"format": "ndjson", "version": "2.0"}),
+        )
+        .await;
+
+        tracing::info!("admin backup (ndjson) completed");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -245,11 +427,24 @@ pub struct RestoreParams {
     pub confirm: Option<bool>,
 }
 
+/// Intermediate struct for parsing NDJSON lines
+#[derive(Deserialize)]
+struct NdjsonLineIn {
+    #[serde(rename = "type")]
+    line_type: String,
+    // We ignore the rest — each line is parsed into the appropriate struct below
+}
+
+/// Hard cap on restore body. Set well above typical personal backups
+/// (a 5k-entry NDJSON dump is ~4 MB) but well below host RAM exhaustion
+/// even on small instances. Adjust if a real user hits the limit.
+const MAX_RESTORE_BODY_BYTES: u64 = 500 * 1024 * 1024; // 500 MiB
+
 pub async fn restore(
     State(state): State<AppState>,
     auth: AuthUser,
     Query(params): Query<RestoreParams>,
-    axum::Json(data): axum::Json<BackupData>,
+    body: axum::body::Body,
 ) -> Result<axum::Json<serde_json::Value>, ApiError> {
     if !auth.is_admin {
         return Err(ApiError::Forbidden("admin required".to_string()));
@@ -259,6 +454,152 @@ pub async fn restore(
             "must include ?confirm=true to proceed with restore".to_string(),
         ));
     }
+
+    // Bypass axum's DefaultBodyLimit (2 MiB) — a realistic backup easily
+    // exceeds it. We still enforce an explicit ceiling so a malicious admin
+    // PAT can't OOM the process. Real streaming line-by-line parse is a
+    // follow-up; see docs/specs/2026-05-17-remaining-optimizations.md F.
+    let bytes = match axum::body::to_bytes(body, MAX_RESTORE_BODY_BYTES as usize).await {
+        Ok(b) => b,
+        Err(e) => {
+            return Err(ApiError::BadRequest(format!(
+                "request body too large (max {} MiB) or read failed: {e}",
+                MAX_RESTORE_BODY_BYTES / 1024 / 1024
+            )));
+        }
+    };
+
+    let text = String::from_utf8(bytes.to_vec())
+        .map_err(|e| ApiError::BadRequest(format!("invalid UTF-8 in request body: {e}")))?;
+
+    // Detect format: if first non-whitespace char is '[' → old JSON bundle; otherwise NDJSON
+    let trimmed = text.trim_start();
+    if trimmed.starts_with('{') {
+        // Could be old-format JSON bundle (BackupData) or NDJSON starting with metadata object
+        // Peek at the first line to decide
+        let first_line = trimmed.lines().next().unwrap_or("");
+        if let Ok(typed) = serde_json::from_str::<NdjsonLineIn>(first_line) {
+            if typed.line_type == "metadata" {
+                return restore_ndjson(&state, &text, &auth).await;
+            }
+        }
+        // Fall through to old format
+        return restore_legacy_json(&state, &text, &auth).await;
+    }
+
+    Err(ApiError::BadRequest(
+        "unrecognized backup format — expected NDJSON or legacy JSON bundle".to_string(),
+    ))
+}
+
+async fn restore_ndjson(
+    state: &AppState,
+    text: &str,
+    auth: &AuthUser,
+) -> Result<axum::Json<serde_json::Value>, ApiError> {
+    let mut users: Vec<BackupUser> = Vec::new();
+    let mut entries: Vec<BackupEntry> = Vec::new();
+    let mut tags: Vec<BackupTag> = Vec::new();
+    let mut entry_tags: Vec<BackupEntryTag> = Vec::new();
+    let mut annotations: Vec<BackupAnnotation> = Vec::new();
+    let mut memos: Vec<BackupMemo> = Vec::new();
+    let mut tagging_rules: Vec<BackupTaggingRule> = Vec::new();
+    let mut site_rules: Vec<BackupSiteRule> = Vec::new();
+    let mut version = String::new();
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let typed: NdjsonLineIn = match serde_json::from_str(line) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("restore: skipping unparseable NDJSON line: {e}");
+                continue;
+            }
+        };
+        match typed.line_type.as_str() {
+            "metadata" => {
+                if let Ok(meta) = serde_json::from_str::<NdjsonMetadataLine>(line) {
+                    version = meta.version;
+                }
+            }
+            "user" => {
+                if let Ok(u) = serde_json::from_str(line) {
+                    users.push(u);
+                }
+            }
+            "entry" => {
+                if let Ok(e) = serde_json::from_str(line) {
+                    entries.push(e);
+                }
+            }
+            "tag" => {
+                if let Ok(t) = serde_json::from_str(line) {
+                    tags.push(t);
+                }
+            }
+            "entry_tag" => {
+                if let Ok(et) = serde_json::from_str(line) {
+                    entry_tags.push(et);
+                }
+            }
+            "annotation" => {
+                if let Ok(a) = serde_json::from_str(line) {
+                    annotations.push(a);
+                }
+            }
+            "memo" => {
+                if let Ok(m) = serde_json::from_str(line) {
+                    memos.push(m);
+                }
+            }
+            "tagging_rule" => {
+                if let Ok(r) = serde_json::from_str(line) {
+                    tagging_rules.push(r);
+                }
+            }
+            "site_rule" => {
+                if let Ok(r) = serde_json::from_str(line) {
+                    site_rules.push(r);
+                }
+            }
+            other => {
+                tracing::warn!("restore: unknown NDJSON line type: {other}");
+            }
+        }
+    }
+
+    if !version.starts_with('2') {
+        return Err(ApiError::BadRequest(format!(
+            "unsupported backup version: {version}"
+        )));
+    }
+
+    do_restore(state, auth, &BackupData {
+        version,
+        created_at: Utc::now(),
+        users,
+        entries,
+        tags,
+        entry_tags,
+        annotations,
+        memos,
+        tagging_rules,
+        site_rules,
+    })
+    .await
+}
+
+async fn restore_legacy_json(
+    state: &AppState,
+    text: &str,
+    auth: &AuthUser,
+) -> Result<axum::Json<serde_json::Value>, ApiError> {
+    let data: BackupData = serde_json::from_str(text)
+        .map_err(|e| ApiError::BadRequest(format!("invalid backup JSON: {e}")))?;
+
     if data.version != "1.0" {
         return Err(ApiError::BadRequest(format!(
             "unsupported backup version: {}",
@@ -266,6 +607,14 @@ pub async fn restore(
         )));
     }
 
+    do_restore(state, auth, &data).await
+}
+
+async fn do_restore(
+    state: &AppState,
+    auth: &AuthUser,
+    data: &BackupData,
+) -> Result<axum::Json<serde_json::Value>, ApiError> {
     let mut tx = state
         .pool
         .begin()
@@ -319,7 +668,6 @@ pub async fn restore(
         .bind(u.id)
         .bind(&u.username)
         .bind(&u.email)
-        // Placeholder hash — user must reset password after restore
         .bind("!restored")
         .bind(u.is_admin)
         .bind(&u.feed_token)
@@ -508,7 +856,7 @@ pub async fn restore(
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),
-        auth_source_str(&auth),
+        auth_source_str(auth),
         AuditAction::AdminRestore,
         Some(AuditResourceType::System),
         None,
@@ -528,6 +876,15 @@ pub async fn restore(
         "site_rules": data.site_rules.len(),
     })))
 }
+
+// Helper struct for parsing metadata NDJSON line
+#[derive(Deserialize)]
+struct NdjsonMetadataLine {
+    version: String,
+}
+
+// Need futures::StreamExt for .next() on sqlx streams
+use futures::StreamExt;
 
 #[cfg(test)]
 mod tests {
@@ -554,8 +911,6 @@ mod tests {
 
     #[test]
     fn backup_user_excludes_password_hash() {
-        // BackupUser has no password_hash field — this is a compile-time guarantee.
-        // We just verify serialization roundtrip works.
         let user = BackupUser {
             id: Uuid::new_v4(),
             username: "admin".to_string(),
@@ -569,6 +924,32 @@ mod tests {
         assert!(!json.contains("password_hash"));
         let parsed: BackupUser = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.username, "admin");
+    }
+
+    #[test]
+    fn ndjson_line_serialization() {
+        let meta = NdjsonLine::Metadata {
+            version: "2.0".to_string(),
+            created_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&meta).unwrap();
+        assert!(json.contains(r#""type":"metadata""#));
+        assert!(json.contains(r#""version":"2.0""#));
+    }
+
+    #[test]
+    fn ndjson_restore_parses_metadata() {
+        let line = r#"{"type":"metadata","version":"2.0","created_at":"2026-01-01T00:00:00Z"}"#;
+        let parsed: NdjsonMetadataLine = serde_json::from_str(line).unwrap();
+        assert_eq!(parsed.version, "2.0");
+    }
+
+    #[test]
+    fn ndjson_restore_rejects_v1() {
+        // v1 NDJSON metadata should be rejected
+        let line = r#"{"type":"metadata","version":"1.0","created_at":"2026-01-01T00:00:00Z"}"#;
+        let parsed: NdjsonMetadataLine = serde_json::from_str(line).unwrap();
+        assert!(!parsed.version.starts_with('2'));
     }
 
     #[test]

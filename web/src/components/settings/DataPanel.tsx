@@ -1,6 +1,6 @@
 import { useState, useCallback, type ComponentType } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import api from '@/api/client';
+import { apiPostRaw, apiGet } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Download, FileJson, Bookmark, Database, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -13,6 +13,8 @@ interface PreviewInfo {
   valid: number;
   invalid: number;
   details?: string;
+  /** If true, the file is NDJSON admin backup format — cannot be imported here */
+  ndjsonFormat?: boolean;
 }
 
 const EXPORT_SCOPE_LABELS: Record<ExportScope, string> = {
@@ -61,14 +63,40 @@ function parsePreviewFromText(text: string, type: ImportType): PreviewInfo {
     });
     return { total: links.length, valid: links.length, invalid: 0 };
   }
-  // lettura
+  // lettura — supports both legacy JSON bundle and NDJSON format
   try {
+    const trimmed = text.trimStart();
+    // NDJSON: first line is a metadata object with "type":"metadata"
+    if (trimmed.startsWith('{')) {
+      const firstLine = trimmed.split('\n')[0] ?? '';
+      try {
+        const firstObj = JSON.parse(firstLine);
+        if (firstObj.type === 'metadata') {
+          // Parse NDJSON format
+          let entries = 0, tags = 0, annotations = 0, memos = 0;
+          for (const line of trimmed.split('\n')) {
+            const s = line.trim();
+            if (!s) continue;
+            try {
+              const obj = JSON.parse(s);
+              if (obj.type === 'entry') entries++;
+              else if (obj.type === 'tag') tags++;
+              else if (obj.type === 'annotation') annotations++;
+              else if (obj.type === 'memo') memos++;
+            } catch { /* skip malformed lines */ }
+          }
+          const details = `包含 ${entries} 篇文章${tags > 0 ? `、${tags} 个标签` : ''}${annotations > 0 ? `、${annotations} 条批注` : ''}${memos > 0 ? `、${memos} 条备忘录` : ''}。此为管理员备份格式（NDJSON），需通过管理员恢复功能导入`;
+          return { total: entries, valid: 0, invalid: entries, details, ndjsonFormat: true };
+        }
+      } catch { /* not NDJSON, fall through */ }
+    }
+    // Legacy JSON bundle format
     const data = JSON.parse(text);
     const entries = Array.isArray(data?.entries) ? data.entries : [];
-    const tags = Array.isArray(data?.tags) ? data.tags.length : 0;
-    const annotations = Array.isArray(data?.annotations) ? data.annotations.length : 0;
-    const memos = Array.isArray(data?.memos) ? data.memos.length : 0;
-    const details = `包含 ${entries.length} 篇文章${tags > 0 ? `、${tags} 个标签` : ''}${annotations > 0 ? `、${annotations} 条批注` : ''}${memos > 0 ? `、${memos} 条备忘录` : ''}`;
+    const tagCount = Array.isArray(data?.tags) ? data.tags.length : 0;
+    const annotationCount = Array.isArray(data?.annotations) ? data.annotations.length : 0;
+    const memoCount = Array.isArray(data?.memos) ? data.memos.length : 0;
+    const details = `包含 ${entries.length} 篇文章${tagCount > 0 ? `、${tagCount} 个标签` : ''}${annotationCount > 0 ? `、${annotationCount} 条批注` : ''}${memoCount > 0 ? `、${memoCount} 条备忘录` : ''}`;
     return { total: entries.length, valid: entries.length, invalid: 0, details };
   } catch {
     return { total: 0, valid: 0, invalid: 0 };
@@ -159,17 +187,18 @@ export default function DataPanel() {
   };
 
   const onImportError = (err: unknown) => {
-    const resp = (err as { response?: { data?: { error?: string; message?: string } } })?.response?.data;
-    const msg = resp?.message || resp?.error || '导入失败，请检查文件格式';
-    setImportResult({ message: msg, type: 'error' });
+    if (err instanceof Error && 'body' in err) {
+      const body = (err as { body: { message?: string; error?: string } }).body;
+      const msg = body?.message || body?.error || '导入失败，请检查文件格式';
+      setImportResult({ message: msg, type: 'error' });
+    } else {
+      setImportResult({ message: '导入失败，请检查文件格式', type: 'error' });
+    }
   };
 
   const importWallabag = useMutation({
     mutationFn: async (text: string) => {
-      const res = await api.post('/import/wallabag', text, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return res.data as { imported: number; skipped: number; total: number };
+      return apiPostRaw<{ imported: number; skipped: number; total: number }>('/import/wallabag', text, { 'Content-Type': 'application/json' });
     },
     onSuccess: (data) => onImportSuccess(buildImportMessage(data, '篇', '文件')),
     onError: onImportError,
@@ -177,10 +206,7 @@ export default function DataPanel() {
 
   const importBrowser = useMutation({
     mutationFn: async (text: string) => {
-      const res = await api.post('/import/browser', text, {
-        headers: { 'Content-Type': 'text/html' },
-      });
-      return res.data as { imported: number; skipped: number; total: number };
+      return apiPostRaw<{ imported: number; skipped: number; total: number }>('/import/browser', text, { 'Content-Type': 'text/html' });
     },
     onSuccess: (data) => onImportSuccess(buildImportMessage(data, '条书签', '文件')),
     onError: onImportError,
@@ -188,10 +214,7 @@ export default function DataPanel() {
 
   const importLettura = useMutation({
     mutationFn: async (text: string) => {
-      const res = await api.post('/import/lettura', text, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return res.data as { imported: number; skipped: number; total: number };
+      return apiPostRaw<{ imported: number; skipped: number; total: number }>('/import/lettura', text, { 'Content-Type': 'application/json' });
     },
     onSuccess: (data) => onImportSuccess(buildImportMessage(data, '篇', '备份')),
     onError: onImportError,
@@ -212,7 +235,7 @@ export default function DataPanel() {
   const isImporting = importWallabag.isPending || importBrowser.isPending || importLettura.isPending;
 
   const getFileAccept = () => {
-    if (importType === 'wallabag' || importType === 'lettura') return '.json';
+    if (importType === 'wallabag' || importType === 'lettura') return '.json,.ndjson';
     return '.html,.htm';
   };
 
@@ -236,9 +259,9 @@ export default function DataPanel() {
 
   const exportAll = useMutation({
     mutationFn: async (scope: ExportScope) => {
-      const res = await api.get('/export', { params: { scope } });
+      const data = await apiGet('/export', { scope });
       const filename = `lettura-export-${scope}-${new Date().toISOString().slice(0, 10)}.json`;
-      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -284,7 +307,7 @@ export default function DataPanel() {
               />
               <Button
                 onClick={handleImport}
-                disabled={!importFile || !importText || isImporting || (preview !== null && preview.valid === 0)}
+                disabled={!importFile || !importText || isImporting || (preview !== null && preview.valid === 0) || (preview?.ndjsonFormat ?? false)}
                 className="rounded-lg h-9"
               >
                 {isImporting ? '导入中...' : '确认导入'}
