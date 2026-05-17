@@ -13,7 +13,7 @@ use crate::models::{
 };
 use crate::state::AppState;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct BulkTagRequest {
     pub filter: ListParams,
     #[serde(default)]
@@ -23,7 +23,7 @@ pub struct BulkTagRequest {
     pub max: Option<i64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct BulkUntagRequest {
     pub filter: ListParams,
     #[serde(default)]
@@ -33,7 +33,7 @@ pub struct BulkUntagRequest {
     pub max: Option<i64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct BulkStateRequest {
     pub filter: ListParams,
     pub value: bool,
@@ -42,7 +42,7 @@ pub struct BulkStateRequest {
     pub max: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct BulkResult {
     pub matched: usize,
     pub updated: usize,
@@ -62,6 +62,17 @@ fn check_max(ids: &[uuid::Uuid], max: Option<i64>) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/tag",
+    tag = "bulk",
+    request_body = BulkTagRequest,
+    responses(
+        (status = 200, description = "Bulk tag result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_tag_add(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -100,6 +111,17 @@ pub async fn bulk_tag_add(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/untag",
+    tag = "bulk",
+    request_body = BulkUntagRequest,
+    responses(
+        (status = 200, description = "Bulk untag result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_untag(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -154,6 +176,17 @@ pub async fn bulk_untag(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/archive",
+    tag = "bulk",
+    request_body = BulkStateRequest,
+    responses(
+        (status = 200, description = "Bulk archive result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_archive(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -202,6 +235,17 @@ pub async fn bulk_archive(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/star",
+    tag = "bulk",
+    request_body = BulkStateRequest,
+    responses(
+        (status = 200, description = "Bulk star result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_star(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -252,7 +296,7 @@ pub async fn bulk_star(
 
 // --- Bulk-by-IDs endpoints ---
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct BulkTagByIdsRequest {
     #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
@@ -260,7 +304,7 @@ pub struct BulkTagByIdsRequest {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct BulkUntagByIdsRequest {
     #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
@@ -268,18 +312,30 @@ pub struct BulkUntagByIdsRequest {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct BulkDeleteByIdsRequest {
     #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct BulkArchiveByIdsRequest {
     #[validate(length(min = 1, max = 100, message = "entry_ids must have 1-100 items"))]
     pub entry_ids: Vec<uuid::Uuid>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/tag-by-ids",
+    tag = "bulk",
+    request_body = BulkTagByIdsRequest,
+    responses(
+        (status = 200, description = "Bulk tag by IDs result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_tag_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -315,6 +371,18 @@ pub async fn bulk_tag_by_ids(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/untag-by-ids",
+    tag = "bulk",
+    request_body = BulkUntagByIdsRequest,
+    responses(
+        (status = 200, description = "Bulk untag by IDs result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_untag_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -366,6 +434,18 @@ pub async fn bulk_untag_by_ids(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/delete-by-ids",
+    tag = "bulk",
+    request_body = BulkDeleteByIdsRequest,
+    responses(
+        (status = 200, description = "Bulk delete by IDs result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_delete_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -402,6 +482,18 @@ pub async fn bulk_delete_by_ids(
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/bulk/archive-by-ids",
+    tag = "bulk",
+    request_body = BulkArchiveByIdsRequest,
+    responses(
+        (status = 200, description = "Bulk archive by IDs result", body = BulkResult),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn bulk_archive_by_ids(
     State(state): State<AppState>,
     auth: AuthUser,

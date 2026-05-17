@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "audit_action", rename_all = "snake_case")]
 pub enum AuditAction {
@@ -64,7 +64,7 @@ pub enum AuditAction {
     UploadPageFiles,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "audit_resource_type", rename_all = "snake_case")]
 pub enum AuditResourceType {
@@ -80,7 +80,7 @@ pub enum AuditResourceType {
     System,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+#[derive(Debug, Clone, sqlx::FromRow, Serialize, utoipa::ToSchema)]
 pub struct AuditLog {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
@@ -89,6 +89,7 @@ pub struct AuditLog {
     pub resource_type: Option<AuditResourceType>,
     pub resource_id: Option<Uuid>,
     pub status: String,
+    #[schema(value_type = serde_json::Value)]
     pub details: serde_json::Value,
     pub error_message: Option<String>,
     pub ip_address: Option<String>,
@@ -97,13 +98,16 @@ pub struct AuditLog {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuditDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = serde_json::Value)]
     pub before: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = serde_json::Value)]
     pub after: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = serde_json::Value)]
     pub extras: Option<serde_json::Value>,
 }
 

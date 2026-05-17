@@ -54,7 +54,7 @@ fn extract_ua(headers: &HeaderMap) -> Option<String> {
         .map(|s| s.chars().take(255).collect())
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct RegisterRequest {
     #[validate(length(min = 1, max = 50, message = "username must be 1-50 characters"))]
     pub username: String,
@@ -64,18 +64,18 @@ pub struct RegisterRequest {
     pub password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
@@ -83,11 +83,23 @@ pub struct AuthResponse {
     pub expires_in: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct MessageResponse {
     pub message: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/register",
+    tag = "auth",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "Registration successful", body = AuthResponse),
+        (status = 403, description = "Registration is disabled"),
+        (status = 409, description = "Email or username already exists"),
+        (status = 422, description = "Validation error"),
+    ),
+)]
 #[tracing::instrument(skip(state, headers, req), err)]
 pub async fn register(
     State(state): State<AppState>,
@@ -138,6 +150,16 @@ pub async fn register(
     issue_tokens(&state, new_user.id, new_user.is_admin, None).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+    ),
+)]
 #[tracing::instrument(skip(state, headers, req), err)]
 pub async fn login(
     State(state): State<AppState>,
@@ -212,6 +234,16 @@ pub async fn login(
     issue_tokens(&state, found.id, found.is_admin, None).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    tag = "auth",
+    request_body = RefreshRequest,
+    responses(
+        (status = 200, description = "Token refreshed", body = AuthResponse),
+        (status = 401, description = "Invalid refresh token"),
+    ),
+)]
 pub async fn refresh(
     State(state): State<AppState>,
     Json(req): Json<RefreshRequest>,
@@ -249,6 +281,17 @@ pub async fn refresh(
     issue_tokens(&state, found.id, found.is_admin, Some(stored.family)).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    tag = "auth",
+    request_body = RefreshRequest,
+    responses(
+        (status = 200, description = "Logged out", body = MessageResponse),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn logout(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -304,11 +347,21 @@ async fn issue_tokens(
     }))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct FeedTokenResponse {
     pub feed_token: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/regenerate-feed-token",
+    tag = "auth",
+    responses(
+        (status = 200, description = "Feed token regenerated", body = FeedTokenResponse),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn regenerate_feed_token(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -331,7 +384,7 @@ pub async fn regenerate_feed_token(
     }))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct MeResponse {
     pub user_id: uuid::Uuid,
     pub username: String,
@@ -340,6 +393,16 @@ pub struct MeResponse {
     pub auth_source: &'static str,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/me",
+    tag = "auth",
+    responses(
+        (status = 200, description = "Current user info", body = MeResponse),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn me(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -365,7 +428,7 @@ pub async fn me(
     }))
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct ChangePasswordRequest {
     #[validate(length(min = 8, max = 128, message = "password must be 8-128 characters"))]
     pub current_password: String,
@@ -373,6 +436,19 @@ pub struct ChangePasswordRequest {
     pub new_password: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/change-password",
+    tag = "auth",
+    request_body = ChangePasswordRequest,
+    responses(
+        (status = 200, description = "Password changed", body = MessageResponse),
+        (status = 400, description = "Current password is incorrect"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn change_password(
     State(state): State<AppState>,
     auth: AuthUser,

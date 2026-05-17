@@ -60,9 +60,10 @@ export default function RuleDialog({ open, onOpenChange, initialData }: Props) {
   useEffect(() => {
     if (open) {
       if (initialData) {
-        setRuleField(initialData.rule.field);
-        setRuleOperator(initialData.rule.operator);
-        setRuleValue(initialData.rule.value);
+        const rule = initialData.rule as { field: string; operator: string; value: string };
+        setRuleField(rule.field);
+        setRuleOperator(rule.operator);
+        setRuleValue(rule.value);
         setRuleTags(initialData.tags.join(', '));
       } else {
         setRuleField('title');

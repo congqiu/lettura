@@ -11,6 +11,18 @@ use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/entries/{entry_id}/annotations",
+    tag = "annotations",
+    params(("entry_id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Annotations for the entry", body = Vec<annotation::Annotation>),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_annotations(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -23,6 +35,20 @@ pub async fn list_annotations(
     Ok(Json(annotations))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/{entry_id}/annotations",
+    tag = "annotations",
+    params(("entry_id" = Uuid, Path, description = "Entry ID")),
+    request_body = annotation::CreateAnnotation,
+    responses(
+        (status = 201, description = "Annotation created", body = annotation::Annotation),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn create_annotation(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -46,6 +72,19 @@ pub async fn create_annotation(
     Ok(Json(ann))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/annotations/{id}",
+    tag = "annotations",
+    params(("id" = Uuid, Path, description = "Annotation ID")),
+    request_body = annotation::UpdateAnnotation,
+    responses(
+        (status = 200, description = "Annotation updated", body = annotation::Annotation),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Annotation not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn update_annotation(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -66,6 +105,18 @@ pub async fn update_annotation(
     Ok(Json(updated))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/annotations/{id}",
+    tag = "annotations",
+    params(("id" = Uuid, Path, description = "Annotation ID")),
+    responses(
+        (status = 200, description = "Annotation deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Annotation not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_annotation(
     State(state): State<AppState>,
     auth: AuthUser,

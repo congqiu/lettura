@@ -6,26 +6,29 @@ use validator::Validate;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct TaggingRule {
     pub id: Uuid,
     pub user_id: Uuid,
+    #[schema(value_type = serde_json::Value)]
     pub rule: serde_json::Value,
     pub tags: Vec<String>,
     pub priority: i32,
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateTaggingRule {
+    #[schema(value_type = serde_json::Value)]
     pub rule: serde_json::Value,
     #[validate(length(min = 1, message = "tags must not be empty"))]
     pub tags: Vec<String>,
     pub priority: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateTaggingRule {
+    #[schema(value_type = Option<serde_json::Value>)]
     pub rule: Option<serde_json::Value>,
     pub tags: Option<Vec<String>>,
     pub priority: Option<i32>,

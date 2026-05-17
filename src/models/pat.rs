@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::error::ModelError;
 
 /// Scope for a Personal Access Token.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, utoipa::ToSchema)]
 pub enum Scope {
     Read,
     Write,
@@ -21,7 +21,7 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct PersonalAccessToken {
     pub id: Uuid,
     pub user_id: Uuid,

@@ -15,7 +15,7 @@ use crate::tasks::fetcher::FetchJob;
 
 use super::validate::{ValidatedJson, deserialize_bool_from_string};
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
 pub struct ListQueryParams {
     #[serde(flatten)]
     pub inner: ListParams,
@@ -23,7 +23,7 @@ pub struct ListQueryParams {
     pub deleted: Option<bool>,
 }
 
-#[derive(serde::Deserialize, Validate)]
+#[derive(serde::Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateEntryRequest {
     #[validate(url(message = "invalid URL format"))]
     pub url: String,
@@ -34,7 +34,7 @@ pub struct CreateEntryRequest {
     pub tag: Vec<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct CreateEntryResponse {
     #[serde(flatten)]
     pub entry: entry::Entry,
@@ -43,6 +43,18 @@ pub struct CreateEntryResponse {
     pub status: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries",
+    tag = "entries",
+    request_body = CreateEntryRequest,
+    responses(
+        (status = 201, description = "Entry created or existing returned", body = CreateEntryResponse),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 #[tracing::instrument(skip(state, req), err)]
 pub async fn create_entry(
     State(state): State<AppState>,
@@ -118,6 +130,18 @@ pub async fn create_entry(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/entries/{id}",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Entry details", body = entry::Entry),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn get_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -129,6 +153,17 @@ pub async fn get_entry(
     Ok(Json(found))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/entries",
+    tag = "entries",
+    params(ListQueryParams),
+    responses(
+        (status = 200, description = "Paginated list of entries", body = Vec<entry::EntrySummary>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 #[tracing::instrument(skip(state), err)]
 pub async fn list_entries(
     State(state): State<AppState>,
@@ -164,7 +199,7 @@ pub async fn list_entries(
     if let Some(ref query) = params.inner.search
         && !query.is_empty()
     {
-        let ids = match state.search_index.search(query, Some(auth.user_id), 100) {
+        let ids = match state.search_index.search(query, Some(auth.user_id), 100).await {
             Ok(ids) => ids,
             Err(e) => {
                 tracing::warn!("Search query {:?} failed: {e}", query);
@@ -197,6 +232,19 @@ pub async fn list_entries(
     Ok(response)
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/entries/{id}",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    request_body = UpdateEntryParams,
+    responses(
+        (status = 200, description = "Updated entry", body = entry::Entry),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn update_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -227,6 +275,18 @@ pub async fn update_entry(
     Ok(Json(updated))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/entries/{id}",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Entry soft-deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -256,6 +316,18 @@ pub async fn delete_entry(
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/{id}/restore",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Entry restored"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn restore_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -294,6 +366,18 @@ pub async fn restore_entry(
     Ok(Json(serde_json::json!({"message": "restored"})))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/entries/{id}/permanent",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Entry permanently deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn permanently_delete_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -324,6 +408,18 @@ pub async fn permanently_delete_entry(
     Ok(Json(serde_json::json!({"message": "permanently deleted"})))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/{id}/refetch",
+    tag = "entries",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Refetch queued"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn refetch_entry(
     State(state): State<AppState>,
     auth: AuthUser,

@@ -13,7 +13,7 @@ use crate::tasks::fetcher::FetchJob;
 
 // --- Wallabag JSON Import ---
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct WallabagEntry {
     pub url: Option<String>,
     pub title: Option<String>,
@@ -23,6 +23,17 @@ pub struct WallabagEntry {
     pub tags: Option<Vec<String>>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/import/wallabag",
+    tag = "import",
+    request_body = Vec<WallabagEntry>,
+    responses(
+        (status = 200, description = "Import result"),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn import_wallabag(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -177,6 +188,17 @@ pub async fn import_wallabag(
 
 // --- Browser Bookmarks HTML Import ---
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/import/browser",
+    tag = "import",
+    request_body = String,
+    responses(
+        (status = 200, description = "Import result"),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn import_browser(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -294,7 +316,7 @@ pub async fn import_browser(
 
 // --- Lettura Export Import ---
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct LetturaExport {
     pub version: String,
     #[serde(default)]
@@ -313,6 +335,17 @@ pub struct LetturaExport {
     pub site_rules: Vec<crate::models::site_rule::SiteRule>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/import/lettura",
+    tag = "import",
+    request_body = LetturaExport,
+    responses(
+        (status = 200, description = "Import result"),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn import_lettura(
     State(state): State<AppState>,
     auth: AuthUser,

@@ -15,18 +15,18 @@ use crate::state::AppState;
 /// Capped so a single operator action cannot flood the worker pool.
 const RETRY_ALL_DEAD_LIMIT: i64 = 100;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 pub struct ListQuery {
     pub status: Option<String>,
     pub limit: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ListResponse {
     pub items: Vec<FetchJobRow>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct RetryAllResponse {
     pub retried: u64,
     pub remaining_dead: i64,
@@ -56,6 +56,18 @@ fn parse_status(s: &str) -> Option<FetchJobStatus> {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/fetch-jobs",
+    tag = "admin",
+    params(ListQuery),
+    responses(
+        (status = 200, description = "List of fetch jobs", body = ListResponse),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -69,6 +81,21 @@ pub async fn list(
     Ok(Json(ListResponse { items }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/fetch-jobs/{id}",
+    tag = "admin",
+    params(
+        ("id" = Uuid, Path, description = "Fetch job ID"),
+    ),
+    responses(
+        (status = 200, description = "Fetch job details", body = FetchJobRow),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Fetch job not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn get(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -82,6 +109,20 @@ pub async fn get(
     Ok(Json(row))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/admin/fetch-jobs/{id}",
+    tag = "admin",
+    params(
+        ("id" = Uuid, Path, description = "Fetch job ID"),
+    ),
+    responses(
+        (status = 204, description = "Fetch job deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -94,6 +135,21 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/fetch-jobs/{id}/retry",
+    tag = "admin",
+    params(
+        ("id" = Uuid, Path, description = "Fetch job ID"),
+    ),
+    responses(
+        (status = 200, description = "Fetch job retried", body = FetchJobRow),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Fetch job not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn retry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -106,6 +162,17 @@ pub async fn retry(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/fetch-jobs/retry-all-dead",
+    tag = "admin",
+    responses(
+        (status = 200, description = "Dead jobs retried", body = RetryAllResponse),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn retry_all_dead(
     State(state): State<AppState>,
     auth: AuthUser,

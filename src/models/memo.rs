@@ -6,7 +6,7 @@ use validator::Validate;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct Memo {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -16,7 +16,7 @@ pub struct Memo {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateMemo {
     #[validate(length(min = 1, message = "content is required"))]
     pub content: String,

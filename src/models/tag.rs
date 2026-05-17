@@ -14,7 +14,7 @@ pub struct Tag {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct TagStats {
     pub id: Uuid,
     pub label: String,
@@ -23,7 +23,7 @@ pub struct TagStats {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct TagLabel {
     pub id: Uuid,
     pub label: String,

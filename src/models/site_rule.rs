@@ -6,7 +6,7 @@ use validator::Validate;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct SiteRule {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
@@ -17,7 +17,7 @@ pub struct SiteRule {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateSiteRule {
     #[validate(length(min = 1, message = "domain is required"))]
     pub domain: String,
@@ -27,7 +27,7 @@ pub struct CreateSiteRule {
     pub strip_selectors: Option<Vec<String>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateSiteRule {
     pub content_selector: Option<String>,
     pub title_selector: Option<String>,

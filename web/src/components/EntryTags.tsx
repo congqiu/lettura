@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { addTagToEntry, removeTagFromEntry, fetchTagStats, type Tag, type TagStats } from '../api/tags';
-import api from '../api/client';
+import { apiGet } from '../api/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,10 +26,7 @@ export default function EntryTags({ entryId }: { entryId: string }) {
   // Fetch entry-specific tags
   const { data: entryTags = [] } = useQuery({
     queryKey: ['entry-tags', entryId],
-    queryFn: async (): Promise<Tag[]> => {
-      const res = await api.get(`/entries/${entryId}/tags`);
-      return res.data;
-    },
+    queryFn: () => apiGet<Tag[]>(`/entries/${entryId}/tags`),
   });
 
   // Fetch all tag stats for autocomplete

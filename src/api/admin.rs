@@ -8,6 +8,17 @@ use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::user::User;
 use crate::state::AppState;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/users",
+    tag = "admin",
+    responses(
+        (status = 200, description = "List of user summaries", body = Vec<UserSummary>),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_users(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -46,7 +57,7 @@ pub async fn list_users(
     Ok(Json(summaries))
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct UserSummary {
     pub id: uuid::Uuid,
     pub username: String,
@@ -55,6 +66,23 @@ pub struct UserSummary {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub struct ReindexResponse {
+    pub message: String,
+    pub indexed: usize,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/reindex",
+    tag = "admin",
+    responses(
+        (status = 200, description = "Reindex complete", body = ReindexResponse),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Admin role required"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn reindex(
     State(state): State<AppState>,
     auth: AuthUser,

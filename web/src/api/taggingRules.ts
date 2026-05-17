@@ -1,42 +1,21 @@
-import api from './client';
+import { apiGet, apiPost, apiPatch, apiDel } from './client';
+import type { components } from './schema';
 
-export interface TaggingRule {
-  id: string;
-  rule: {
-    field: string;
-    operator: string;
-    value: string;
-  };
-  tags: string[];
-  priority: number;
-  created_at: string;
-}
-
-export interface CreateTaggingRuleData {
-  rule: {
-    field: string;
-    operator: string;
-    value: string;
-  };
-  tags: string[];
-  priority?: number;
-}
+export type TaggingRule = components['schemas']['TaggingRule'];
+export type CreateTaggingRuleData = components['schemas']['CreateTaggingRule'];
 
 export async function listRules(): Promise<TaggingRule[]> {
-  const res = await api.get('/tagging-rules');
-  return res.data;
+  return apiGet<TaggingRule[]>('/tagging-rules');
 }
 
 export async function createRule(data: CreateTaggingRuleData): Promise<TaggingRule> {
-  const res = await api.post('/tagging-rules', data);
-  return res.data;
+  return apiPost<TaggingRule>('/tagging-rules', data);
 }
 
 export async function updateRule(id: string, data: Partial<CreateTaggingRuleData>): Promise<TaggingRule> {
-  const res = await api.patch(`/tagging-rules/${id}`, data);
-  return res.data;
+  return apiPatch<TaggingRule>(`/tagging-rules/${id}`, data);
 }
 
 export async function deleteRule(id: string): Promise<void> {
-  await api.delete(`/tagging-rules/${id}`);
+  await apiDel(`/tagging-rules/${id}`);
 }

@@ -30,7 +30,7 @@ fn validate_scope(s: &str) -> Result<(), validator::ValidationError> {
     }
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateTokenRequest {
     #[validate(length(min = 1, max = 64))]
     pub name: String,
@@ -39,7 +39,7 @@ pub struct CreateTokenRequest {
     pub expires_in_days: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct CreateTokenResponse {
     pub id: uuid::Uuid,
     pub name: String,
@@ -48,6 +48,19 @@ pub struct CreateTokenResponse {
     pub token: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/tokens",
+    tag = "tokens",
+    request_body = CreateTokenRequest,
+    responses(
+        (status = 201, description = "Token created", body = CreateTokenResponse),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Token management requires interactive login"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn create_token(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -109,6 +122,17 @@ pub async fn create_token(
     ))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tokens",
+    tag = "tokens",
+    responses(
+        (status = 200, description = "List of personal access tokens", body = Vec<pat::PersonalAccessToken>),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Token management requires interactive login"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_tokens(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -122,6 +146,21 @@ pub async fn list_tokens(
     Ok(Json(rows))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/tokens/{id}",
+    tag = "tokens",
+    params(
+        ("id" = uuid::Uuid, Path, description = "Token ID"),
+    ),
+    responses(
+        (status = 204, description = "Token deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 403, description = "Token management requires interactive login"),
+        (status = 404, description = "Token not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_token(
     State(state): State<AppState>,
     auth: AuthUser,

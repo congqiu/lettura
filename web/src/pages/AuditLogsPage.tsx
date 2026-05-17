@@ -58,6 +58,9 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   bulk_untag: '批量移除标签',
   bulk_archive: '批量归档',
   bulk_star: '批量收藏',
+  bulk_soft_delete: '批量删除',
+  rename_tag: '重命名标签',
+  upload_page_files: '上传页面文件',
 };
 
 const PAGE_SIZE = 30;

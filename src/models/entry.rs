@@ -50,7 +50,7 @@ pub mod cursor {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct Entry {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -70,6 +70,7 @@ pub struct Entry {
     pub preview_picture: Option<String>,
     pub domain_name: Option<String>,
     pub published_by: Option<String>,
+    #[schema(value_type = serde_json::Value)]
     pub metadata: serde_json::Value,
     pub is_archived: bool,
     pub archived_at: Option<DateTime<Utc>>,
@@ -81,13 +82,13 @@ pub struct Entry {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct EntryTagLink {
     pub entry_id: Uuid,
     pub tag_id: Uuid,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct EntrySummary {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -201,7 +202,7 @@ pub async fn find_entry_by_id(
     .map_err(|e| ModelError::Database(e.to_string()))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ListParams {
     #[serde(
         default,
@@ -382,7 +383,7 @@ fn build_where_clause(
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateEntryParams {
     pub title: Option<String>,
     pub content: Option<String>,

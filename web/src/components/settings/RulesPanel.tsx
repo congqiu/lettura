@@ -30,9 +30,10 @@ const OPERATOR_LABELS: Record<string, string> = {
 };
 
 function formatRuleSummary(rule: TaggingRule) {
-  const fieldLabel = FIELD_LABELS[rule.rule.field] || rule.rule.field;
-  const opLabel = OPERATOR_LABELS[rule.rule.operator] || rule.rule.operator;
-  return `${fieldLabel} ${opLabel} "${rule.rule.value}"`;
+  const r = rule.rule as { field: string; operator: string; value: string };
+  const fieldLabel = FIELD_LABELS[r.field] || r.field;
+  const opLabel = OPERATOR_LABELS[r.operator] || r.operator;
+  return `${fieldLabel} ${opLabel} "${r.value}"`;
 }
 
 export default function RulesPanel() {

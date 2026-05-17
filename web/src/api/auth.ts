@@ -1,22 +1,16 @@
-import api from './client';
+import { apiPost } from './client';
+import type { components } from './schema';
 
-export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
-}
+export type AuthResponse = components['schemas']['AuthResponse'];
 
 export async function register(username: string, email: string, password: string): Promise<AuthResponse> {
-  const res = await api.post('/auth/register', { username, email, password });
-  return res.data;
+  return apiPost('/auth/register', { username, email, password });
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const res = await api.post('/auth/login', { email, password });
-  return res.data;
+  return apiPost('/auth/login', { email, password });
 }
 
 export async function logout(refreshToken: string): Promise<void> {
-  await api.post('/auth/logout', { refresh_token: refreshToken });
+  await apiPost('/auth/logout', { refresh_token: refreshToken });
 }

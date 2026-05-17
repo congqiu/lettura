@@ -12,7 +12,7 @@ use crate::models::audit_log::{
 };
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct ListAuditLogsQuery {
     #[serde(default)]
     action: Option<AuditAction>,
@@ -65,7 +65,7 @@ mod tests {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ListAuditLogsResponse {
     data: Vec<AuditLog>,
     total: i64,
@@ -73,6 +73,17 @@ pub struct ListAuditLogsResponse {
     offset: i64,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/audit-logs",
+    tag = "audit-logs",
+    params(ListAuditLogsQuery),
+    responses(
+        (status = 200, description = "List of audit log entries", body = ListAuditLogsResponse),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_audit_logs(
     auth: AuthUser,
     State(state): State<AppState>,

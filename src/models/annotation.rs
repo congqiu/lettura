@@ -6,30 +6,33 @@ use validator::Validate;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct Annotation {
     pub id: Uuid,
     pub entry_id: Uuid,
     pub user_id: Uuid,
     pub quote: String,
     pub text: String,
+    #[schema(value_type = serde_json::Value)]
     pub ranges: serde_json::Value,
     pub is_orphaned: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateAnnotation {
     #[validate(length(min = 1, message = "quote is required"))]
     pub quote: String,
     pub text: Option<String>,
+    #[schema(value_type = serde_json::Value)]
     pub ranges: serde_json::Value,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct UpdateAnnotation {
     pub text: Option<String>,
+    #[schema(value_type = Option<serde_json::Value>)]
     pub ranges: Option<serde_json::Value>,
 }
 

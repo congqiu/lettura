@@ -6,6 +6,42 @@ use uuid::Uuid;
 
 use super::error::ModelError;
 
+/// Schema-only type that mirrors the JSON shape returned by the API.
+/// The actual `Page` struct has a `password` field, but the custom
+/// `Serialize` impl converts it to `has_password: bool`. This type
+/// describes what the client actually sees.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PageResponse {
+    pub id: Uuid,
+    pub slug: String,
+    pub user_id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub entry_file: String,
+    pub has_password: bool,
+    pub status: String,
+    pub file_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Schema-only type that mirrors the JSON shape returned by the list API.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PageSummaryResponse {
+    pub id: Uuid,
+    pub slug: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub has_password: bool,
+    pub status: String,
+    pub file_count: i32,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Page {
     pub id: Uuid,

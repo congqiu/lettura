@@ -31,6 +31,16 @@ pub async fn list_tags(
     Ok(Json(tags))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tags/stats",
+    tag = "tags",
+    responses(
+        (status = 200, description = "Tag statistics with entry counts", body = Vec<tag::TagStats>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn tags_stats(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -39,12 +49,26 @@ pub async fn tags_stats(
     Ok(Json(stats))
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct RenameTagRequest {
     #[validate(length(min = 1, max = 100, message = "label must be 1-100 characters"))]
     pub label: String,
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/tags/{id}",
+    tag = "tags",
+    params(("id" = Uuid, Path, description = "Tag ID")),
+    request_body = RenameTagRequest,
+    responses(
+        (status = 200, description = "Tag renamed", body = tag::Tag),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Tag not found"),
+        (status = 409, description = "A tag with this name already exists"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn rename_tag_handler(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -77,6 +101,18 @@ pub async fn rename_tag_handler(
     Ok(Json(updated))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/entries/{id}/tags",
+    tag = "tags",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    responses(
+        (status = 200, description = "Tags for the entry", body = Vec<tag::Tag>),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_tags_for_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -89,12 +125,25 @@ pub async fn list_tags_for_entry(
     Ok(Json(tags))
 }
 
-#[derive(Deserialize, Validate)]
+#[derive(Deserialize, Validate, utoipa::ToSchema)]
 pub struct AddTagRequest {
     #[validate(length(min = 1, max = 100, message = "label must be 1-100 characters"))]
     pub label: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/entries/{id}/tags",
+    tag = "tags",
+    params(("id" = Uuid, Path, description = "Entry ID")),
+    request_body = AddTagRequest,
+    responses(
+        (status = 200, description = "Tag added to entry", body = tag::Tag),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn add_tag_to_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -122,6 +171,21 @@ pub async fn add_tag_to_entry(
     Ok(Json(t))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/entries/{entry_id}/tags/{tag_id}",
+    tag = "tags",
+    params(
+        ("entry_id" = Uuid, Path, description = "Entry ID"),
+        ("tag_id" = Uuid, Path, description = "Tag ID"),
+    ),
+    responses(
+        (status = 200, description = "Tag removed from entry"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry or tag not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn remove_tag_from_entry(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -146,6 +210,18 @@ pub async fn remove_tag_from_entry(
     Ok(Json(serde_json::json!({"message": "removed"})))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/tags/{id}",
+    tag = "tags",
+    params(("id" = Uuid, Path, description = "Tag ID")),
+    responses(
+        (status = 200, description = "Tag deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Tag not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_tag(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -168,6 +244,21 @@ pub async fn delete_tag(
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/entries/{entry_id}/tags/{label}",
+    tag = "tags",
+    params(
+        ("entry_id" = Uuid, Path, description = "Entry ID"),
+        ("label" = String, Path, description = "Tag label"),
+    ),
+    responses(
+        (status = 204, description = "Tag removed from entry by label"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Entry or tag not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn remove_tag_from_entry_by_label(
     State(state): State<AppState>,
     auth: AuthUser,

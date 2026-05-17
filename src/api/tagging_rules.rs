@@ -11,6 +11,17 @@ use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tagging-rules",
+    operation_id = "list_tagging_rules",
+    tag = "tagging-rules",
+    responses(
+        (status = 200, description = "List of tagging rules", body = Vec<tagging_rule::TaggingRule>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_rules(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -19,6 +30,19 @@ pub async fn list_rules(
     Ok(Json(rules))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/tagging-rules",
+    operation_id = "create_tagging_rule",
+    tag = "tagging-rules",
+    request_body = tagging_rule::CreateTaggingRule,
+    responses(
+        (status = 201, description = "Tagging rule created", body = tagging_rule::TaggingRule),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn create_rule(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -38,6 +62,20 @@ pub async fn create_rule(
     Ok(Json(rule))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/tagging-rules/{id}",
+    operation_id = "update_tagging_rule",
+    tag = "tagging-rules",
+    params(("id" = Uuid, Path, description = "Tagging rule ID")),
+    request_body = tagging_rule::UpdateTaggingRule,
+    responses(
+        (status = 200, description = "Tagging rule updated", body = tagging_rule::TaggingRule),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn update_rule(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -58,6 +96,19 @@ pub async fn update_rule(
     Ok(Json(updated))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/tagging-rules/{id}",
+    operation_id = "delete_tagging_rule",
+    tag = "tagging-rules",
+    params(("id" = Uuid, Path, description = "Tagging rule ID")),
+    responses(
+        (status = 200, description = "Tagging rule deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_rule(
     State(state): State<AppState>,
     auth: AuthUser,

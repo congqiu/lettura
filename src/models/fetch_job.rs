@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::models::error::ModelError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, Serialize, utoipa::ToSchema)]
 #[sqlx(type_name = "fetch_job_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum FetchJobStatus {
@@ -15,7 +15,7 @@ pub enum FetchJobStatus {
     Dead,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, utoipa::ToSchema)]
 pub struct FetchJobRow {
     pub id: Uuid,
     pub entry_id: Uuid,

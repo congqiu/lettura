@@ -8,7 +8,7 @@ use crate::auth::middleware::AuthUser;
 use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportScope {
     #[default]
@@ -40,12 +40,23 @@ impl ExportScope {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct ExportQuery {
     #[serde(default)]
     scope: ExportScope,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/export",
+    tag = "export",
+    params(ExportQuery),
+    responses(
+        (status = 200, description = "Full data export"),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn export_all(
     State(state): State<AppState>,
     auth: AuthUser,

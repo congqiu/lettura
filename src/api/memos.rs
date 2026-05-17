@@ -12,6 +12,16 @@ use crate::tasks::fetcher::FetchJob;
 
 use super::validate::ValidatedJson;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/memos",
+    tag = "memos",
+    responses(
+        (status = 200, description = "List of memos", body = Vec<memo::Memo>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_memos(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -20,6 +30,18 @@ pub async fn list_memos(
     Ok(Json(memos))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/memos",
+    tag = "memos",
+    request_body = memo::CreateMemo,
+    responses(
+        (status = 201, description = "Memo created", body = memo::Memo),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn create_memo(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -39,6 +61,18 @@ pub async fn create_memo(
     Ok(Json(m))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/memos/{id}",
+    tag = "memos",
+    params(("id" = Uuid, Path, description = "Memo ID")),
+    responses(
+        (status = 200, description = "Memo deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Memo not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_memo(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -61,6 +95,18 @@ pub async fn delete_memo(
     Ok(Json(serde_json::json!({"message": "deleted"})))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/memos/{id}/promote",
+    tag = "memos",
+    params(("id" = Uuid, Path, description = "Memo ID")),
+    responses(
+        (status = 200, description = "Memo promoted to entry"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Memo not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn promote_memo(
     State(state): State<AppState>,
     auth: AuthUser,

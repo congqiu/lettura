@@ -38,7 +38,7 @@ pub async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<He
         }
     };
 
-    let search_result = state.search_index.doc_count();
+    let search_result = state.search_index.doc_count().await;
     let search_ok = search_result.is_ok();
     let search_msg = match &search_result {
         Ok(count) => format!("ok ({count} docs)"),

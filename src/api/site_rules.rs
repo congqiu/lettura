@@ -11,6 +11,17 @@ use crate::state::AppState;
 
 use super::validate::ValidatedJson;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/site-rules",
+    operation_id = "list_site_rules",
+    tag = "site-rules",
+    responses(
+        (status = 200, description = "List of site rules", body = Vec<site_rule::SiteRule>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_rules(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -19,6 +30,19 @@ pub async fn list_rules(
     Ok(Json(rules))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/site-rules",
+    operation_id = "create_site_rule",
+    tag = "site-rules",
+    request_body = site_rule::CreateSiteRule,
+    responses(
+        (status = 201, description = "Site rule created", body = site_rule::SiteRule),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 422, description = "Validation error"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn create_rule(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -38,6 +62,20 @@ pub async fn create_rule(
     Ok(Json(rule))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/site-rules/{id}",
+    operation_id = "update_site_rule",
+    tag = "site-rules",
+    params(("id" = Uuid, Path, description = "Site rule ID")),
+    request_body = site_rule::UpdateSiteRule,
+    responses(
+        (status = 200, description = "Site rule updated", body = site_rule::SiteRule),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn update_rule(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -58,6 +96,19 @@ pub async fn update_rule(
     Ok(Json(updated))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/site-rules/{id}",
+    operation_id = "delete_site_rule",
+    tag = "site-rules",
+    params(("id" = Uuid, Path, description = "Site rule ID")),
+    responses(
+        (status = 200, description = "Site rule deleted"),
+        (status = 401, description = "Missing or invalid auth"),
+        (status = 404, description = "Rule not found"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn delete_rule(
     State(state): State<AppState>,
     auth: AuthUser,

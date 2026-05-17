@@ -20,6 +20,774 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["admin_backup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/fetch-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/fetch-jobs/retry-all-dead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retry_all_dead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/fetch-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get"];
+        put?: never;
+        post?: never;
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/fetch-jobs/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reindex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/annotations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_annotation"];
+        options?: never;
+        head?: never;
+        patch: operations["update_annotation"];
+        trace?: never;
+    };
+    "/api/v1/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_audit_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["change_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/regenerate-feed-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["regenerate_feed_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_entries"];
+        put?: never;
+        post: operations["create_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/archive-by-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_archive_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/delete-by-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_delete_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_star"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/tag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_tag_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/tag-by-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_tag_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/untag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_untag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/bulk/untag-by-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bulk_untag_by_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{entry_id}/annotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_annotations"];
+        put?: never;
+        post: operations["create_annotation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{entry_id}/tags/{label}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_tag_from_entry_by_label"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{entry_id}/tags/{tag_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_tag_from_entry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_entry"];
+        put?: never;
+        post?: never;
+        delete: operations["delete_entry"];
+        options?: never;
+        head?: never;
+        patch: operations["update_entry"];
+        trace?: never;
+    };
+    "/api/v1/entries/{id}/permanent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["permanently_delete_entry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{id}/refetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refetch_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restore_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries/{id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_tags_for_entry"];
+        put?: never;
+        post: operations["add_tag_to_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export_all"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_browser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/lettura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_lettura"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/import/wallabag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_wallabag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_memos"];
+        put?: never;
+        post: operations["create_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_memo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/memos/{id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["promote_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_pages_handler"];
+        put?: never;
+        post: operations["create_page_handler"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_page_handler"];
+        options?: never;
+        head?: never;
+        patch: operations["update_page_handler"];
+        trace?: never;
+    };
+    "/api/v1/pages/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restore_page_handler"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pages/{id}/share-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_share_url_handler"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/site-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_site_rules"];
+        put?: never;
+        post: operations["create_site_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/site-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_site_rule"];
+        options?: never;
+        head?: never;
+        patch: operations["update_site_rule"];
+        trace?: never;
+    };
+    "/api/v1/tagging-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_tagging_rules"];
+        put?: never;
+        post: operations["create_tagging_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tagging-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_tagging_rule"];
+        options?: never;
+        head?: never;
+        patch: operations["update_tagging_rule"];
+        trace?: never;
+    };
     "/api/v1/tags": {
         parameters: {
             query?: never;
@@ -36,10 +804,451 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tags/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["tags_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tags/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_tag"];
+        options?: never;
+        head?: never;
+        patch: operations["rename_tag_handler"];
+        trace?: never;
+    };
+    "/api/v1/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_tokens"];
+        put?: never;
+        post: operations["create_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_token"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddTagRequest: {
+            label: string;
+        };
+        Annotation: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            id: string;
+            is_orphaned: boolean;
+            quote: string;
+            ranges: unknown;
+            text: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        /** @enum {string} */
+        AuditAction: "register" | "login" | "logout" | "refresh_token" | "change_password" | "regenerate_feed_token" | "create_pat" | "delete_pat" | "create_entry" | "update_entry" | "soft_delete_entry" | "restore_entry" | "permanent_delete_entry" | "archive_entry" | "unarchive_entry" | "star_entry" | "unstar_entry" | "refetch_entry" | "create_tag" | "delete_tag" | "add_tag_to_entry" | "remove_tag_from_entry" | "create_annotation" | "update_annotation" | "delete_annotation" | "create_memo" | "delete_memo" | "promote_memo" | "create_tagging_rule" | "update_tagging_rule" | "delete_tagging_rule" | "create_site_rule" | "update_site_rule" | "delete_site_rule" | "import_wallabag" | "import_browser" | "import_lettura" | "export_all" | "create_page" | "update_page" | "delete_page" | "restore_page" | "admin_backup" | "admin_restore" | "admin_reindex" | "admin_list_users" | "bulk_tag_add" | "bulk_untag" | "bulk_archive" | "bulk_star" | "bulk_soft_delete" | "rename_tag" | "upload_page_files";
+        AuditDetails: {
+            after?: unknown;
+            before?: unknown;
+            extras?: unknown;
+        };
+        AuditLog: {
+            action: components["schemas"]["AuditAction"];
+            auth_source: string;
+            /** Format: date-time */
+            created_at: string;
+            details: unknown;
+            error_message?: string | null;
+            /** Format: uuid */
+            id: string;
+            ip_address?: string | null;
+            /** Format: uuid */
+            request_id?: string | null;
+            /** Format: uuid */
+            resource_id?: string | null;
+            resource_type?: null | components["schemas"]["AuditResourceType"];
+            status: string;
+            user_agent?: string | null;
+            /** Format: uuid */
+            user_id?: string | null;
+        };
+        /** @enum {string} */
+        AuditResourceType: "user" | "entry" | "tag" | "annotation" | "memo" | "tagging_rule" | "site_rule" | "page" | "pat" | "system";
+        AuthResponse: {
+            access_token: string;
+            /** Format: int64 */
+            expires_in: number;
+            refresh_token: string;
+            token_type: string;
+        };
+        BackupAnnotation: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            id: string;
+            is_orphaned: boolean;
+            quote: string;
+            ranges: unknown;
+            text: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        BackupEntry: {
+            /** Format: date-time */
+            archived_at?: string | null;
+            content?: string | null;
+            content_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            deleted_at?: string | null;
+            domain_name?: string | null;
+            extract_method: string;
+            given_url: string;
+            hashed_given_url: string;
+            hashed_url: string;
+            /** Format: int32 */
+            http_status?: number | null;
+            /** Format: uuid */
+            id: string;
+            is_archived: boolean;
+            is_content_edited: boolean;
+            is_starred: boolean;
+            language?: string | null;
+            metadata: unknown;
+            preview_picture?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            published_by?: string | null;
+            /** Format: int32 */
+            reading_time?: number | null;
+            /** Format: date-time */
+            starred_at?: string | null;
+            text_content?: string | null;
+            title?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            url: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        BackupEntryTag: {
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            tag_id: string;
+        };
+        BackupMemo: {
+            content: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            promoted_entry_id?: string | null;
+            source_url?: string | null;
+            /** Format: uuid */
+            user_id: string;
+        };
+        BackupSiteRule: {
+            content_selector: string;
+            /** Format: date-time */
+            created_at: string;
+            domain: string;
+            /** Format: uuid */
+            id: string;
+            strip_selectors?: string[] | null;
+            title_selector?: string | null;
+            /** Format: uuid */
+            user_id?: string | null;
+        };
+        BackupTag: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            label: string;
+            slug: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        BackupTaggingRule: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            rule: unknown;
+            tags: string[];
+            /** Format: uuid */
+            user_id: string;
+        };
+        /** @description User without password_hash (security: never export credentials). */
+        BackupUser: {
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            feed_token: string;
+            /** Format: uuid */
+            id: string;
+            is_admin: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            username: string;
+        };
+        BulkArchiveByIdsRequest: {
+            entry_ids: string[];
+        };
+        BulkDeleteByIdsRequest: {
+            entry_ids: string[];
+        };
+        BulkResult: {
+            ids: string[];
+            matched: number;
+            updated: number;
+        };
+        BulkStateRequest: {
+            dry_run?: boolean;
+            filter: components["schemas"]["ListParams"];
+            /** Format: int64 */
+            max?: number | null;
+            value: boolean;
+        };
+        BulkTagByIdsRequest: {
+            entry_ids: string[];
+            tags: string[];
+        };
+        BulkTagRequest: {
+            add?: string[];
+            dry_run?: boolean;
+            filter: components["schemas"]["ListParams"];
+            /** Format: int64 */
+            max?: number | null;
+        };
+        BulkUntagByIdsRequest: {
+            entry_ids: string[];
+            tags: string[];
+        };
+        BulkUntagRequest: {
+            dry_run?: boolean;
+            filter: components["schemas"]["ListParams"];
+            /** Format: int64 */
+            max?: number | null;
+            remove?: string[];
+        };
+        ChangePasswordRequest: {
+            current_password: string;
+            new_password: string;
+        };
+        CreateAnnotation: {
+            quote: string;
+            ranges: unknown;
+            text?: string | null;
+        };
+        CreateEntryRequest: {
+            tag?: string[];
+            title?: string | null;
+            url: string;
+        };
+        CreateEntryResponse: components["schemas"]["Entry"] & {
+            already_existed: boolean;
+            status: string;
+            tags: string[];
+        };
+        CreateMemo: {
+            content: string;
+            source_url?: string | null;
+        };
+        CreatePageRequest: {
+            description?: string | null;
+            entry_file: string;
+            expires_at?: string | null;
+            password?: string | null;
+            title: string;
+            upload_id: string;
+        };
+        CreateSiteRule: {
+            content_selector: string;
+            domain: string;
+            strip_selectors?: string[] | null;
+            title_selector?: string | null;
+        };
+        CreateTaggingRule: {
+            /** Format: int32 */
+            priority?: number | null;
+            rule: unknown;
+            tags: string[];
+        };
+        CreateTokenRequest: {
+            /** Format: int64 */
+            expires_in_days?: number | null;
+            name: string;
+            scope: string;
+        };
+        CreateTokenResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            scope: string;
+            /** @description Plaintext token — only returned on creation, never again. */
+            token: string;
+        };
+        Entry: {
+            /** Format: date-time */
+            archived_at?: string | null;
+            content?: string | null;
+            content_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            deleted_at?: string | null;
+            domain_name?: string | null;
+            extract_method: string;
+            given_url: string;
+            hashed_given_url: string;
+            hashed_url: string;
+            /** Format: int32 */
+            http_status?: number | null;
+            /** Format: uuid */
+            id: string;
+            is_archived: boolean;
+            is_content_edited: boolean;
+            is_starred: boolean;
+            language?: string | null;
+            metadata: unknown;
+            preview_picture?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            published_by?: string | null;
+            /** Format: int32 */
+            reading_time?: number | null;
+            /** Format: date-time */
+            starred_at?: string | null;
+            text_content?: string | null;
+            title?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            url: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        EntrySummary: {
+            content_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            deleted_at?: string | null;
+            domain_name?: string | null;
+            extract_method: string;
+            /** Format: uuid */
+            id: string;
+            is_archived: boolean;
+            is_starred: boolean;
+            language?: string | null;
+            preview_picture?: string | null;
+            published_by?: string | null;
+            /** Format: int32 */
+            reading_time?: number | null;
+            tags: components["schemas"]["TagLabel"][];
+            title?: string | null;
+            url: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        EntryTagLink: {
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            tag_id: string;
+        };
+        /** @enum {string} */
+        ExportScope: "all" | "unread" | "archived" | "starred";
+        FeedTokenResponse: {
+            feed_token: string;
+        };
+        FetchJobRow: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            entry_id: string;
+            /** Format: uuid */
+            id: string;
+            last_error?: string | null;
+            /** Format: date-time */
+            last_error_at?: string | null;
+            leased_by?: string | null;
+            /** Format: date-time */
+            leased_until?: string | null;
+            /** Format: int32 */
+            max_attempts: number;
+            /** Format: int32 */
+            priority: number;
+            /** Format: date-time */
+            refetch_requested_at?: string | null;
+            /** Format: date-time */
+            run_after: string;
+            status: components["schemas"]["FetchJobStatus"];
+            /** Format: date-time */
+            updated_at: string;
+            url: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        /** @enum {string} */
+        FetchJobStatus: "pending" | "running" | "failed" | "dead";
         HealthResponse: {
             /** @description Database probe result. */
             db: string;
@@ -47,6 +1256,217 @@ export interface components {
             search: string;
             /** @description Overall service status: "ok" | "degraded" | "error". */
             status: string;
+        };
+        LetturaExport: {
+            annotations?: components["schemas"]["Annotation"][];
+            entries?: components["schemas"]["Entry"][];
+            entry_tags?: components["schemas"]["EntryTagLink"][];
+            memos?: components["schemas"]["Memo"][];
+            site_rules?: components["schemas"]["SiteRule"][];
+            tagging_rules?: components["schemas"]["TaggingRule"][];
+            tags?: components["schemas"]["Tag"][];
+            version: string;
+        };
+        ListAuditLogsResponse: {
+            data: components["schemas"]["AuditLog"][];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ListParams: {
+            /**
+             * Format: date-time
+             * @description Return entries created strictly before this timestamp.
+             */
+            before?: string | null;
+            /**
+             * @description Opaque cursor for keyset pagination. When present, page/OFFSET is ignored
+             *     and the result is keyed on `(created_at, id) < cursor` ordering.
+             */
+            cursor?: string | null;
+            domain?: string | null;
+            /** @description Comma-separated tag labels to exclude; entry must NOT have any of these tags. */
+            exclude_tag?: string | null;
+            /** @description Field-projection hint — placeholder for Task 15, not used in query construction. */
+            fields?: string | null;
+            is_archived?: boolean | null;
+            /**
+             * @description Alias for `is_archived` (CLI Filter DSL compatibility).
+             *     `is_read=true` → `is_archived = true`, `is_read=false` → `is_archived = false`.
+             */
+            is_read?: boolean | null;
+            is_starred?: boolean | null;
+            /** Format: int64 */
+            page?: number | null;
+            /** Format: int64 */
+            per_page?: number | null;
+            /** @description Search query. Handled by tantivy in the API handler; unused in list_entries itself. */
+            search?: string | null;
+            /**
+             * Format: date-time
+             * @description Return entries created at or after this timestamp.
+             */
+            since?: string | null;
+            /** @description Comma-separated tag labels; AND semantics (entry must have ALL listed tags). */
+            tag?: string | null;
+            /** @description When true, return only entries with no tags. */
+            untagged?: boolean | null;
+        };
+        ListResponse: {
+            items: components["schemas"]["FetchJobRow"][];
+        };
+        LoginRequest: {
+            email: string;
+            password: string;
+        };
+        MeResponse: {
+            auth_source: string;
+            email: string;
+            is_admin: boolean;
+            /** Format: uuid */
+            user_id: string;
+            username: string;
+        };
+        Memo: {
+            content: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            promoted_entry_id?: string | null;
+            source_url?: string | null;
+            /** Format: uuid */
+            user_id: string;
+        };
+        MessageResponse: {
+            message: string;
+        };
+        /** @description Schema type for the delete page response. */
+        PageDeleteResponse: {
+            success: boolean;
+        };
+        /** @description Schema type for the list pages response. */
+        PageListResponse: {
+            items: components["schemas"]["PageSummaryResponse"][];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            page: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /**
+         * @description Schema-only type that mirrors the JSON shape returned by the API.
+         *     The actual `Page` struct has a `password` field, but the custom
+         *     `Serialize` impl converts it to `has_password: bool`. This type
+         *     describes what the client actually sees.
+         */
+        PageResponse: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            deleted_at?: string | null;
+            description?: string | null;
+            entry_file: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: int32 */
+            file_count: number;
+            has_password: boolean;
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            status: string;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        /** @description Schema type for the restore page response. */
+        PageRestoreResponse: {
+            /** Format: uuid */
+            id: string;
+            success: boolean;
+        };
+        /** @description Schema-only type that mirrors the JSON shape returned by the list API. */
+        PageSummaryResponse: {
+            /** Format: date-time */
+            created_at: string;
+            description?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: int32 */
+            file_count: number;
+            has_password: boolean;
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            status: string;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PersonalAccessToken: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            last_used_at?: string | null;
+            name: string;
+            scope: string;
+            token_prefix: string;
+            /** Format: uuid */
+            user_id: string;
+        };
+        RefreshRequest: {
+            refresh_token: string;
+        };
+        RegisterRequest: {
+            email: string;
+            password: string;
+            username: string;
+        };
+        ReindexResponse: {
+            indexed: number;
+            message: string;
+        };
+        RenameTagRequest: {
+            label: string;
+        };
+        RetryAllResponse: {
+            /** Format: int64 */
+            remaining_dead: number;
+            /** Format: int64 */
+            retried: number;
+        };
+        /**
+         * @description Scope for a Personal Access Token.
+         * @enum {string}
+         */
+        Scope: "Read" | "Write";
+        ShareUrlResponse: {
+            has_password: boolean;
+            url: string;
+        };
+        SiteRule: {
+            content_selector: string;
+            /** Format: date-time */
+            created_at: string;
+            domain: string;
+            /** Format: uuid */
+            id: string;
+            strip_selectors?: string[] | null;
+            title_selector?: string | null;
+            /** Format: uuid */
+            user_id?: string | null;
         };
         Tag: {
             /** Format: date-time */
@@ -57,6 +1477,89 @@ export interface components {
             slug: string;
             /** Format: uuid */
             user_id: string;
+        };
+        TagLabel: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+        };
+        TagStats: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            entry_count: number;
+            /** Format: uuid */
+            id: string;
+            label: string;
+            slug: string;
+        };
+        TaggingRule: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            rule: unknown;
+            tags: string[];
+            /** Format: uuid */
+            user_id: string;
+        };
+        UpdateAnnotation: {
+            ranges?: unknown;
+            text?: string | null;
+        };
+        UpdateEntryParams: {
+            content?: string | null;
+            is_archived?: boolean | null;
+            is_starred?: boolean | null;
+            title?: string | null;
+        };
+        UpdatePageRequest: {
+            description?: string | null;
+            entry_file?: string | null;
+            expires_at?: string | null;
+            password?: string | null;
+            status?: string | null;
+            title?: string | null;
+            upload_id?: string | null;
+        };
+        UpdateSiteRule: {
+            content_selector?: string | null;
+            strip_selectors?: string[] | null;
+            title_selector?: string | null;
+        };
+        UpdateTaggingRule: {
+            /** Format: int32 */
+            priority?: number | null;
+            rule?: unknown;
+            tags?: string[] | null;
+        };
+        UploadResponse: {
+            default_entry: string;
+            file_count: number;
+            html_files: string[];
+            suggested_title: string;
+            upload_id: string;
+        };
+        UserSummary: {
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            /** Format: uuid */
+            id: string;
+            is_admin: boolean;
+            username: string;
+        };
+        WallabagEntry: {
+            content?: string | null;
+            /** Format: int32 */
+            is_archived?: number | null;
+            /** Format: int32 */
+            is_starred?: number | null;
+            tags?: string[] | null;
+            title?: string | null;
+            url?: string | null;
         };
     };
     responses: never;
@@ -96,6 +1599,2214 @@ export interface operations {
             };
         };
     };
+    admin_backup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description NDJSON stream of backup data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-ndjson": unknown;
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of fetch jobs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    retry_all_dead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dead jobs retried */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryAllResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Fetch job ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fetch job details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchJobRow"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Fetch job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Fetch job ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fetch job deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Fetch job ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fetch job retried */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchJobRow"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Fetch job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reindex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reindex complete */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReindexResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of user summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin role required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_annotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Annotation ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Annotation deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Annotation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_annotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Annotation ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAnnotation"];
+            };
+        };
+        responses: {
+            /** @description Annotation updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Annotation"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Annotation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_audit_logs: {
+        parameters: {
+            query?: {
+                action?: null | components["schemas"]["AuditAction"];
+                resource_type?: null | components["schemas"]["AuditResourceType"];
+                resource_id?: string | null;
+                status?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of audit log entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAuditLogsResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    change_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Current password is incorrect */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Login successful */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Logged out */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user info */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Token refreshed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Invalid refresh token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    regenerate_feed_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Feed token regenerated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedTokenResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Registration successful */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Registration is disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Email or username already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_entries: {
+        parameters: {
+            query: {
+                inner: components["schemas"]["ListParams"];
+                deleted?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntrySummary"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entry created or existing returned */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateEntryResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStateRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk archive result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_archive_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkArchiveByIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk archive by IDs result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_delete_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDeleteByIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk delete by IDs result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_star: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStateRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk star result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_tag_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkTagRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk tag result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_tag_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkTagByIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk tag by IDs result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_untag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUntagRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk untag result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_untag_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUntagByIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Bulk untag by IDs result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_annotations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Annotations for the entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Annotation"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_annotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAnnotation"];
+            };
+        };
+        responses: {
+            /** @description Annotation created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Annotation"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_tag_from_entry_by_label: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                entry_id: string;
+                /** @description Tag label */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tag removed from entry by label */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry or tag not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_tag_from_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                entry_id: string;
+                /** @description Tag ID */
+                tag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tag removed from entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry or tag not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entry details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entry"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entry soft-deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEntryParams"];
+            };
+        };
+        responses: {
+            /** @description Updated entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entry"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    permanently_delete_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entry permanently deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    refetch_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Refetch queued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restore_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entry restored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tags_for_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tags for the entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tag"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_tag_to_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entry ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTagRequest"];
+            };
+        };
+        responses: {
+            /** @description Tag added to entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tag"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Entry not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export_all: {
+        parameters: {
+            query?: {
+                scope?: components["schemas"]["ExportScope"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full data export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    import_browser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/plain": string;
+            };
+        };
+        responses: {
+            /** @description Import result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    import_lettura: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LetturaExport"];
+            };
+        };
+        responses: {
+            /** @description Import result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    import_wallabag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WallabagEntry"][];
+            };
+        };
+        responses: {
+            /** @description Import result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_memos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of memos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMemo"];
+            };
+        };
+        responses: {
+            /** @description Memo created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memo"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Memo ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Memo deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Memo not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    promote_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Memo ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Memo promoted to entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Memo not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_pages_handler: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                page?: number | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of pages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageListResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_page_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePageRequest"];
+            };
+        };
+        responses: {
+            /** @description Page created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload session expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_page_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Page ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageDeleteResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Page not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_page_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Page ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePageRequest"];
+            };
+        };
+        responses: {
+            /** @description Page updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Page not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restore_page_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Page ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page restored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageRestoreResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Page not found or not deleted */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_share_url_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Page ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Share URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareUrlResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Page not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_site_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of site rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteRule"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_site_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSiteRule"];
+            };
+        };
+        responses: {
+            /** @description Site rule created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteRule"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_site_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Site rule deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_site_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Site rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSiteRule"];
+            };
+        };
+        responses: {
+            /** @description Site rule updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteRule"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tagging_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of tagging rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaggingRule"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_tagging_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaggingRule"];
+            };
+        };
+        responses: {
+            /** @description Tagging rule created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaggingRule"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_tagging_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tagging rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tagging rule deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_tagging_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tagging rule ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaggingRule"];
+            };
+        };
+        responses: {
+            /** @description Tagging rule updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaggingRule"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Rule not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_tags: {
         parameters: {
             query?: never;
@@ -116,6 +3827,237 @@ export interface operations {
             };
             /** @description Missing or invalid auth */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    tags_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tag statistics with entry counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagStats"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_tag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tag ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tag deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Tag not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rename_tag_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tag ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameTagRequest"];
+            };
+        };
+        responses: {
+            /** @description Tag renamed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tag"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Tag not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A tag with this name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of personal access tokens */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonalAccessToken"][];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token management requires interactive login */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Token created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateTokenResponse"];
+                };
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token management requires interactive login */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Token ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid auth */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token management requires interactive login */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

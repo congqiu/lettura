@@ -1,19 +1,10 @@
-import api from './client';
+import { apiGet, apiPost, apiPatch, apiDel } from './client';
+import type { components } from './schema';
 
-export interface Annotation {
-  id: string;
-  entry_id: string;
-  quote: string;
-  text: string;
-  ranges: unknown[];
-  is_orphaned: boolean;
-  created_at: string;
-  updated_at: string;
-}
+export type Annotation = components['schemas']['Annotation'];
 
 export async function listAnnotations(entryId: string): Promise<Annotation[]> {
-  const res = await api.get(`/entries/${entryId}/annotations`);
-  return res.data;
+  return apiGet<Annotation[]>(`/entries/${entryId}/annotations`);
 }
 
 export async function createAnnotation(
@@ -22,15 +13,13 @@ export async function createAnnotation(
   text: string,
   ranges: unknown[] = []
 ): Promise<Annotation> {
-  const res = await api.post(`/entries/${entryId}/annotations`, { quote, text, ranges });
-  return res.data;
+  return apiPost<Annotation>(`/entries/${entryId}/annotations`, { quote, text, ranges });
 }
 
 export async function updateAnnotation(id: string, text: string): Promise<Annotation> {
-  const res = await api.patch(`/annotations/${id}`, { text });
-  return res.data;
+  return apiPatch<Annotation>(`/annotations/${id}`, { text });
 }
 
 export async function deleteAnnotation(id: string): Promise<void> {
-  await api.delete(`/annotations/${id}`);
+  await apiDel(`/annotations/${id}`);
 }

@@ -7,17 +7,18 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import GenerateTokenDialog from './GenerateTokenDialog';
 import { listTokens, deleteToken } from '@/api/tokens';
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
   return new Date(value).toLocaleString();
 }
 
-function formatExpiry(value: string | null): string {
+function formatExpiry(value: string | null | undefined): string {
   if (!value) return '永不过期';
   return new Date(value).toLocaleString();
 }
 
-function formatScope(scope: 'read' | 'write'): string {
+function formatScope(scope: string | null | undefined): string {
+  if (!scope) return '—';
   return scope === 'write' ? '读写' : '只读';
 }
 

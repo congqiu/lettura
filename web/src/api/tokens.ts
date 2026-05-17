@@ -1,38 +1,18 @@
-import api from './client';
+import { apiGet, apiPost, apiDel } from './client';
+import type { components } from './schema';
 
-export interface TokenRow {
-  id: string;
-  name: string;
-  scope: 'read' | 'write';
-  token_prefix: string;
-  last_used_at: string | null;
-  expires_at: string | null;
-  created_at: string;
-}
-
-export interface CreatedToken {
-  id: string;
-  name: string;
-  scope: 'read' | 'write';
-  token: string;
-}
-
-export interface CreateTokenPayload {
-  name: string;
-  scope: 'read' | 'write';
-  expires_in_days: number | null;
-}
+export type TokenRow = components['schemas']['PersonalAccessToken'];
+export type CreatedToken = components['schemas']['CreateTokenResponse'];
+export type CreateTokenPayload = components['schemas']['CreateTokenRequest'];
 
 export async function listTokens(): Promise<TokenRow[]> {
-  const res = await api.get('/tokens');
-  return res.data;
+  return apiGet<TokenRow[]>('/tokens');
 }
 
 export async function createToken(body: CreateTokenPayload): Promise<CreatedToken> {
-  const res = await api.post('/tokens', body);
-  return res.data;
+  return apiPost<CreatedToken>('/tokens', body);
 }
 
 export async function deleteToken(id: string): Promise<void> {
-  await api.delete(`/tokens/${id}`);
+  await apiDel(`/tokens/${id}`);
 }
