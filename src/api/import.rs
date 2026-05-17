@@ -393,10 +393,8 @@ pub async fn import_lettura(
                 // Sanitize HTML content: the export JSON comes from the caller
                 // and may have been tampered with even when the original export
                 // path produced sanitized HTML. Always re-clean on input.
-                let sanitized_content = e
-                    .content
-                    .as_deref()
-                    .map(crate::extract::sanitize::sanitize);
+                let sanitized_content =
+                    e.content.as_deref().map(crate::extract::sanitize::sanitize);
 
                 if let Err(err) = entry::update_entry_content(
                     &state.pool,
@@ -426,8 +424,8 @@ pub async fn import_lettura(
                 // Preserve original archived_at / starred_at timestamps —
                 // calling update_entry would stamp them with now() and lose
                 // backup fidelity.
-                if e.is_archived || e.is_starred {
-                    if let Err(err) = entry::restore_import_status(
+                if (e.is_archived || e.is_starred)
+                    && let Err(err) = entry::restore_import_status(
                         &state.pool,
                         auth.user_id,
                         new_entry.id,
@@ -437,20 +435,15 @@ pub async fn import_lettura(
                         e.starred_at,
                     )
                     .await
-                    {
-                        tracing::warn!(
-                            "import_lettura: failed to restore status for entry {}: {err}",
-                            new_entry.id
-                        );
-                    }
+                {
+                    tracing::warn!(
+                        "import_lettura: failed to restore status for entry {}: {err}",
+                        new_entry.id
+                    );
                 }
 
-                let has_content = e
-                    .content
-                    .as_deref()
-                    .is_some_and(|s| !s.trim().is_empty())
-                    || e
-                        .text_content
+                let has_content = e.content.as_deref().is_some_and(|s| !s.trim().is_empty())
+                    || e.text_content
                         .as_deref()
                         .is_some_and(|s| !s.trim().is_empty());
 
@@ -488,7 +481,14 @@ pub async fn import_lettura(
 
     // Import tags (deduplicated by label/slug).
     for t in &data.tags {
-        match crate::models::tag::find_or_create_tag(&state.pool, &state.caches, auth.user_id, &t.label).await {
+        match crate::models::tag::find_or_create_tag(
+            &state.pool,
+            &state.caches,
+            auth.user_id,
+            &t.label,
+        )
+        .await
+        {
             Ok(tag) => {
                 tag_id_map.insert(t.id, tag.id);
             }

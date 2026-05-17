@@ -185,9 +185,7 @@ pub async fn fetch_with_retry(
                 let loc_str = location.to_str().unwrap_or("");
                 let next_url = resolve_redirect_url(&current_url, loc_str);
                 // Validate the redirect target against SSRF rules.
-                if !skip_ssrf
-                    && let Err(e) = crate::fetch::ssrf::validate_url(&next_url)
-                {
+                if !skip_ssrf && let Err(e) = crate::fetch::ssrf::validate_url(&next_url) {
                     tracing::warn!(from = %current_url, to = %next_url, "redirect SSRF blocked: {e}");
                     return Err(FetchError::Ssrf(e));
                 }

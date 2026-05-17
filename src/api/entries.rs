@@ -77,7 +77,14 @@ pub async fn create_entry(
 
     // Union-merge tags (single transaction, batch insert).
     if !req.tag.is_empty() {
-        tag::ensure_and_link(&state.pool, &state.caches, auth.user_id, &[r.entry.id], &req.tag).await?;
+        tag::ensure_and_link(
+            &state.pool,
+            &state.caches,
+            auth.user_id,
+            &[r.entry.id],
+            &req.tag,
+        )
+        .await?;
     }
 
     // Fetch tag labels for response
@@ -199,7 +206,11 @@ pub async fn list_entries(
     if let Some(ref query) = params.inner.search
         && !query.is_empty()
     {
-        let ids = match state.search_index.search(query, Some(auth.user_id), 100).await {
+        let ids = match state
+            .search_index
+            .search(query, Some(auth.user_id), 100)
+            .await
+        {
             Ok(ids) => ids,
             Err(e) => {
                 tracing::warn!("Search query {:?} failed: {e}", query);

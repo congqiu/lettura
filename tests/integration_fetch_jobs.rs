@@ -36,7 +36,10 @@ async fn enqueue_same_entry_pending_upserts_max_priority() {
         .unwrap();
 
     assert_eq!(id1, id2, "ON CONFLICT should target same row");
-    let row = fetch_job::find_by_id(&app.pool, id1).await.unwrap().unwrap();
+    let row = fetch_job::find_by_id(&app.pool, id1)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(row.priority, 10);
     assert!(
         row.refetch_requested_at.is_none(),
@@ -197,7 +200,10 @@ async fn dequeue_orders_by_priority_then_run_after() {
         .await
         .unwrap();
 
-    let picked = fetch_job::dequeue_one(&app.pool, "w").await.unwrap().unwrap();
+    let picked = fetch_job::dequeue_one(&app.pool, "w")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(picked.id, id2, "higher priority dequeued first");
 
     app.cleanup().await;
@@ -250,11 +256,19 @@ async fn complete_without_refetch_deletes_row() {
     let id = fetch_job::enqueue(&app.pool, entry_id, user_id, "https://x.test/", 0)
         .await
         .unwrap();
-    let _ = fetch_job::dequeue_one(&app.pool, "w-1").await.unwrap().unwrap();
+    let _ = fetch_job::dequeue_one(&app.pool, "w-1")
+        .await
+        .unwrap()
+        .unwrap();
 
     fetch_job::complete(&app.pool, id, "w-1").await.unwrap();
 
-    assert!(fetch_job::find_by_id(&app.pool, id).await.unwrap().is_none());
+    assert!(
+        fetch_job::find_by_id(&app.pool, id)
+            .await
+            .unwrap()
+            .is_none()
+    );
     app.cleanup().await;
 }
 
@@ -314,7 +328,10 @@ async fn fail_under_max_uses_60s_min_backoff() {
     let id = fetch_job::enqueue(&app.pool, entry_id, user_id, "https://x.test/", 0)
         .await
         .unwrap();
-    let job = fetch_job::dequeue_one(&app.pool, "w-1").await.unwrap().unwrap();
+    let job = fetch_job::dequeue_one(&app.pool, "w-1")
+        .await
+        .unwrap()
+        .unwrap();
 
     let before = chrono::Utc::now();
     fetch_job::fail(&app.pool, id, "w-1", "boom", job.attempts, job.max_attempts)
@@ -347,7 +364,10 @@ async fn fail_at_max_attempts_promotes_to_dead() {
             .execute(&app.pool)
             .await
             .unwrap();
-        let job = fetch_job::dequeue_one(&app.pool, "w-1").await.unwrap().unwrap();
+        let job = fetch_job::dequeue_one(&app.pool, "w-1")
+            .await
+            .unwrap()
+            .unwrap();
         fetch_job::fail(&app.pool, id, "w-1", "boom", job.attempts, job.max_attempts)
             .await
             .unwrap();
@@ -366,7 +386,10 @@ async fn release_restores_to_pending_without_consuming_attempt() {
     let id = fetch_job::enqueue(&app.pool, entry_id, user_id, "https://x.test/", 0)
         .await
         .unwrap();
-    let job = fetch_job::dequeue_one(&app.pool, "w-1").await.unwrap().unwrap();
+    let job = fetch_job::dequeue_one(&app.pool, "w-1")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(job.attempts, 1);
 
     fetch_job::release(&app.pool, id, "w-1").await.unwrap();
@@ -433,8 +456,13 @@ async fn lease_expired_job_taken_over_by_another_worker() {
     assert_eq!(job_b.attempts, 2);
 
     // worker-a tries to complete after losing lease — must be no-op due to leased_by check.
-    fetch_job::complete(&app.pool, job_a.id, "worker-a").await.unwrap();
-    let row = fetch_job::find_by_id(&app.pool, job_a.id).await.unwrap().unwrap();
+    fetch_job::complete(&app.pool, job_a.id, "worker-a")
+        .await
+        .unwrap();
+    let row = fetch_job::find_by_id(&app.pool, job_a.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(row.status, FetchJobStatus::Running);
     assert_eq!(row.leased_by.as_deref(), Some("worker-b"));
 
@@ -648,12 +676,13 @@ async fn cancel_during_processing_releases_job() {
     let mut picked = false;
     for _ in 0..80 {
         tokio::time::sleep(Duration::from_millis(100)).await;
-        let status: Option<FetchJobStatus> =
-            sqlx::query_scalar::<_, FetchJobStatus>("SELECT status FROM fetch_jobs WHERE entry_id=$1")
-                .bind(entry_id)
-                .fetch_optional(&app.pool)
-                .await
-                .unwrap();
+        let status: Option<FetchJobStatus> = sqlx::query_scalar::<_, FetchJobStatus>(
+            "SELECT status FROM fetch_jobs WHERE entry_id=$1",
+        )
+        .bind(entry_id)
+        .fetch_optional(&app.pool)
+        .await
+        .unwrap();
         if matches!(status, Some(FetchJobStatus::Running)) {
             picked = true;
             break;

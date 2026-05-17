@@ -380,9 +380,7 @@ impl TagStats {
         }
 
         let stats = Self::list(pool, user_id).await?;
-        caches.tag_stats
-            .insert(user_id, stats.clone())
-            .await;
+        caches.tag_stats.insert(user_id, stats.clone()).await;
         Ok(stats)
     }
 }

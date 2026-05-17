@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::page::{self, Page, CreatePageParams, UpdatePageParams};
+use crate::models::page::{self, CreatePageParams, Page, UpdatePageParams};
 use crate::storage::ImageStorage;
 
 // ---------------------------------------------------------------------------
@@ -180,8 +180,7 @@ type DirResult =
 
 pub fn count_files_recursive(
     dir: PathBuf,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize, std::io::Error>> + Send>>
-{
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize, std::io::Error>> + Send>> {
     Box::pin(async move {
         let mut count = 0;
         let mut entries = tokio::fs::read_dir(&dir).await?;
@@ -506,9 +505,7 @@ pub async fn update_page(
         Some(s) if s == "none" => Some(None),
         Some(s) => {
             let dt = chrono::DateTime::parse_from_rfc3339(&s).map_err(|_| {
-                ServiceError::BadRequest(
-                    "invalid expires_at format, expected ISO 8601".to_string(),
-                )
+                ServiceError::BadRequest("invalid expires_at format, expected ISO 8601".to_string())
             })?;
             Some(Some(dt.to_utc()))
         }

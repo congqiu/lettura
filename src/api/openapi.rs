@@ -207,20 +207,34 @@ mod tests {
     fn schema_includes_registered_paths() {
         let doc = ApiDoc::openapi();
         let paths = doc.paths.paths.keys().cloned().collect::<Vec<_>>();
-        assert!(paths.contains(&"/api/health".to_string()),
-                "/api/health missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/tags".to_string()),
-                "/api/v1/tags missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/entries".to_string()),
-                "/api/v1/entries missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/entries/{id}".to_string()),
-                "/api/v1/entries/{{id}} missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/entries/{id}/refetch".to_string()),
-                "/api/v1/entries/{{id}}/refetch missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/entries/{id}/restore".to_string()),
-                "/api/v1/entries/{{id}}/restore missing from OpenAPI schema, got: {paths:?}");
-        assert!(paths.contains(&"/api/v1/entries/{id}/permanent".to_string()),
-                "/api/v1/entries/{{id}}/permanent missing from OpenAPI schema, got: {paths:?}");
+        assert!(
+            paths.contains(&"/api/health".to_string()),
+            "/api/health missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/tags".to_string()),
+            "/api/v1/tags missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/entries".to_string()),
+            "/api/v1/entries missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/entries/{id}".to_string()),
+            "/api/v1/entries/{{id}} missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/entries/{id}/refetch".to_string()),
+            "/api/v1/entries/{{id}}/refetch missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/entries/{id}/restore".to_string()),
+            "/api/v1/entries/{{id}}/restore missing from OpenAPI schema, got: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"/api/v1/entries/{id}/permanent".to_string()),
+            "/api/v1/entries/{{id}}/permanent missing from OpenAPI schema, got: {paths:?}"
+        );
     }
 
     /// Schema serializes to valid JSON — what the /api/openapi.json endpoint

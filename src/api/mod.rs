@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use axum::{
     Router,
     http::{HeaderValue, Method},
     routing::{delete, get, patch, post},
 };
 use sqlx::PgPool;
+use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};

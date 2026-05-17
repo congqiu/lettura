@@ -37,7 +37,8 @@ impl TestApp {
 
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
 
-        let search_index: Arc<LocalTantivyBackend> = Arc::new(LocalTantivyBackend::in_memory().unwrap());
+        let search_index: Arc<LocalTantivyBackend> =
+            Arc::new(LocalTantivyBackend::in_memory().unwrap());
 
         let config = Config {
             database_url: test_db_url,
@@ -87,11 +88,8 @@ impl TestApp {
         };
 
         let backend: Arc<dyn SearchBackend> = search_index.clone();
-        let (app, _, _, _, caches) = lettura::api::router_with_search(
-            pool.clone(),
-            config.clone(),
-            Some(backend),
-        );
+        let (app, _, _, _, caches) =
+            lettura::api::router_with_search(pool.clone(), config.clone(), Some(backend));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = format!("http://{}", listener.local_addr().unwrap());
 

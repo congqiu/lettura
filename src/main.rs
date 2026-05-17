@@ -190,12 +190,8 @@ async fn main() {
                 .await;
                 match r {
                     Ok(r) if r.rows_affected() > 0 => {
-                        tracing::info!(
-                            deleted = r.rows_affected(),
-                            "cleaned up dead fetch jobs"
-                        );
-                        metrics::counter!("fetch_jobs_purged_total")
-                            .increment(r.rows_affected());
+                        tracing::info!(deleted = r.rows_affected(), "cleaned up dead fetch jobs");
+                        metrics::counter!("fetch_jobs_purged_total").increment(r.rows_affected());
                     }
                     Err(e) => tracing::warn!("dead fetch_jobs cleanup failed: {e}"),
                     _ => {}

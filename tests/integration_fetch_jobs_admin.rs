@@ -35,15 +35,9 @@ async fn admin_list_dead_jobs() {
     let uid = admin_uid(&app).await;
 
     let entry_id = app.create_entry(uid, "https://x.test/").await;
-    let id = lettura::models::fetch_job::enqueue(
-        &app.pool,
-        entry_id,
-        uid,
-        "https://x.test/",
-        0,
-    )
-    .await
-    .unwrap();
+    let id = lettura::models::fetch_job::enqueue(&app.pool, entry_id, uid, "https://x.test/", 0)
+        .await
+        .unwrap();
     sqlx::query("UPDATE fetch_jobs SET status='dead', last_error='boom' WHERE id=$1")
         .bind(id)
         .execute(&app.pool)
@@ -77,15 +71,9 @@ async fn admin_retry_dead_resets_to_pending() {
     let uid = admin_uid(&app).await;
 
     let entry_id = app.create_entry(uid, "https://x.test/").await;
-    let id = lettura::models::fetch_job::enqueue(
-        &app.pool,
-        entry_id,
-        uid,
-        "https://x.test/",
-        0,
-    )
-    .await
-    .unwrap();
+    let id = lettura::models::fetch_job::enqueue(&app.pool, entry_id, uid, "https://x.test/", 0)
+        .await
+        .unwrap();
     sqlx::query("UPDATE fetch_jobs SET status='dead', attempts=5 WHERE id=$1")
         .bind(id)
         .execute(&app.pool)
@@ -105,7 +93,10 @@ async fn admin_retry_dead_resets_to_pending() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(row.status, lettura::models::fetch_job::FetchJobStatus::Pending);
+    assert_eq!(
+        row.status,
+        lettura::models::fetch_job::FetchJobStatus::Pending
+    );
     assert_eq!(row.attempts, 0);
     assert!(row.last_error.is_none());
 
@@ -179,7 +170,10 @@ async fn non_admin_forbidden() {
     assert_eq!(res.status(), 403);
     let body: serde_json::Value = res.json().await.unwrap();
     let msg = body["message"].as_str().unwrap();
-    assert!(msg.contains("PAT"), "message should explain PAT limitation: {msg}");
+    assert!(
+        msg.contains("PAT"),
+        "message should explain PAT limitation: {msg}"
+    );
 
     app.cleanup().await;
 }

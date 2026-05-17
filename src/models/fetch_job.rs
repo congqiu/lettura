@@ -133,10 +133,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for LeasedJob {
 /// 'running'`, `leased_until = NOW() + 5 minutes`, and `attempts` is bumped.
 ///
 /// Returns `None` if no job is currently runnable.
-pub async fn dequeue_one(
-    pool: &PgPool,
-    worker_id: &str,
-) -> Result<Option<LeasedJob>, ModelError> {
+pub async fn dequeue_one(pool: &PgPool, worker_id: &str) -> Result<Option<LeasedJob>, ModelError> {
     let row = sqlx::query_as::<_, LeasedJob>(
         r#"
         WITH next_job AS (

@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::extract::multipart::MultipartError;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::Json;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
@@ -133,12 +133,8 @@ pub async fn upload_files(
         raw_files.push((filename, data.to_vec()));
     }
 
-    let staged = svc::stage_upload(
-        &temp_base,
-        raw_files,
-        state.config.pages_max_upload_bytes,
-    )
-    .await?;
+    let staged =
+        svc::stage_upload(&temp_base, raw_files, state.config.pages_max_upload_bytes).await?;
 
     audit_log::log_success(
         &state.pool,
@@ -474,7 +470,10 @@ mod tests {
 
     #[test]
     fn sanitize_filename_filters_empty_and_dot_prefixed() {
-        assert_eq!(svc::sanitize_filename("../.hidden/./file.html"), "file.html");
+        assert_eq!(
+            svc::sanitize_filename("../.hidden/./file.html"),
+            "file.html"
+        );
     }
 
     #[test]
@@ -641,7 +640,10 @@ mod tests {
 
     #[test]
     fn mime_for_path_unknown() {
-        assert_eq!(svc::mime_for_path("archive.zip"), "application/octet-stream");
+        assert_eq!(
+            svc::mime_for_path("archive.zip"),
+            "application/octet-stream"
+        );
     }
 
     // ── extract_zip ────────────────────────────────────────────────
@@ -670,7 +672,10 @@ mod tests {
         let result = svc::extract_zip(&data);
         match result {
             Err(ServiceError::BadRequest(msg)) => {
-                assert!(msg.contains("too many zip entries"), "unexpected msg: {msg}");
+                assert!(
+                    msg.contains("too many zip entries"),
+                    "unexpected msg: {msg}"
+                );
             }
             other => panic!("expected BadRequest, got: {other:?}"),
         }

@@ -292,8 +292,7 @@ async fn import_lettura_cross_account_migration() {
     // Imported annotation must NOT keep A's original UUID (preserving the
     // source id would collide with A's row on a multi-tenant instance).
     assert_ne!(
-        annotations_b[0]["id"],
-        export_data["annotations"][0]["id"],
+        annotations_b[0]["id"], export_data["annotations"][0]["id"],
         "annotation id should be regenerated, not copied from the source"
     );
 

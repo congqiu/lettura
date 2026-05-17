@@ -262,8 +262,26 @@ mod tests {
         let id2 = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id1, uid, "Rust Ownership", "Learn about ownership and borrowing in Rust", "https://example.com/rust", "example.com").await.unwrap();
-        idx.upsert(id2, uid, "Python Guide", "A beginner guide to Python programming", "https://example.com/python", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid,
+            "Rust Ownership",
+            "Learn about ownership and borrowing in Rust",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid,
+            "Python Guide",
+            "A beginner guide to Python programming",
+            "https://example.com/python",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
 
@@ -282,8 +300,26 @@ mod tests {
         let id = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id, uid, "Old Title", "old content", "https://example.com", "example.com").await.unwrap();
-        idx.upsert(id, uid, "New Title", "new content about Rust", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "Old Title",
+            "old content",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "New Title",
+            "new content about Rust",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
 
@@ -301,15 +337,30 @@ mod tests {
         let id = Uuid::new_v4();
         let uid = test_user_id();
 
-        idx.upsert(id, uid, "Title", "searchable content", "https://example.com", "example.com").await.unwrap();
+        idx.upsert(
+            id,
+            uid,
+            "Title",
+            "searchable content",
+            "https://example.com",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
-        assert_eq!(idx.search("searchable", Some(uid), 10).await.unwrap().len(), 1);
+        assert_eq!(
+            idx.search("searchable", Some(uid), 10).await.unwrap().len(),
+            1
+        );
 
         idx.delete(id).await.unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
-        assert_eq!(idx.search("searchable", Some(uid), 10).await.unwrap().len(), 0);
+        assert_eq!(
+            idx.search("searchable", Some(uid), 10).await.unwrap().len(),
+            0
+        );
     }
 
     #[tokio::test]
@@ -320,8 +371,26 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        idx.upsert(id1, uid1, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
-        idx.upsert(id2, uid2, "Rust Guide", "Another Rust tutorial", "https://example.com/rust2", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid1,
+            "Rust Guide",
+            "Learn Rust programming",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid2,
+            "Rust Guide",
+            "Another Rust tutorial",
+            "https://example.com/rust2",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
 
@@ -344,21 +413,55 @@ mod tests {
         let id1 = Uuid::new_v4();
         let id2 = Uuid::new_v4();
 
-        idx.upsert(id1, uid, "n8n workflow automation", "Automate tasks with n8n", "https://n8n.io", "n8n.io").await.unwrap();
-        idx.upsert(id2, uid, "Rust Guide", "Learn Rust programming", "https://example.com/rust", "example.com").await.unwrap();
+        idx.upsert(
+            id1,
+            uid,
+            "n8n workflow automation",
+            "Automate tasks with n8n",
+            "https://n8n.io",
+            "n8n.io",
+        )
+        .await
+        .unwrap();
+        idx.upsert(
+            id2,
+            uid,
+            "Rust Guide",
+            "Learn Rust programming",
+            "https://example.com/rust",
+            "example.com",
+        )
+        .await
+        .unwrap();
         idx.commit().await.unwrap();
         idx.reload_reader().await.unwrap();
 
         let results = idx.search("n", Some(uid), 10).await.unwrap();
-        assert!(results.contains(&id1), "'n' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         let results = idx.search("n8", Some(uid), 10).await.unwrap();
-        assert!(results.contains(&id1), "'n8' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n8' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         let results = idx.search("n8n", Some(uid), 10).await.unwrap();
-        assert!(results.contains(&id1), "'n8n' should match 'n8n' entry, got {:?}", results);
+        assert!(
+            results.contains(&id1),
+            "'n8n' should match 'n8n' entry, got {:?}",
+            results
+        );
 
         let results = idx.search("Rus", Some(uid), 10).await.unwrap();
-        assert!(results.contains(&id2), "'Rus' should match 'Rust' entry, got {:?}", results);
+        assert!(
+            results.contains(&id2),
+            "'Rus' should match 'Rust' entry, got {:?}",
+            results
+        );
     }
 }

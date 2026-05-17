@@ -144,7 +144,10 @@ pub struct BackupSiteRule {
 #[serde(tag = "type")]
 enum NdjsonLine {
     #[serde(rename = "metadata")]
-    Metadata { version: String, created_at: DateTime<Utc> },
+    Metadata {
+        version: String,
+        created_at: DateTime<Utc>,
+    },
     #[serde(rename = "user")]
     User(BackupUser),
     #[serde(rename = "entry")]
@@ -478,10 +481,10 @@ pub async fn restore(
         // Could be old-format JSON bundle (BackupData) or NDJSON starting with metadata object
         // Peek at the first line to decide
         let first_line = trimmed.lines().next().unwrap_or("");
-        if let Ok(typed) = serde_json::from_str::<NdjsonLineIn>(first_line) {
-            if typed.line_type == "metadata" {
-                return restore_ndjson(&state, &text, &auth).await;
-            }
+        if let Ok(typed) = serde_json::from_str::<NdjsonLineIn>(first_line)
+            && typed.line_type == "metadata"
+        {
+            return restore_ndjson(&state, &text, &auth).await;
         }
         // Fall through to old format
         return restore_legacy_json(&state, &text, &auth).await;
@@ -577,18 +580,22 @@ async fn restore_ndjson(
         )));
     }
 
-    do_restore(state, auth, &BackupData {
-        version,
-        created_at: Utc::now(),
-        users,
-        entries,
-        tags,
-        entry_tags,
-        annotations,
-        memos,
-        tagging_rules,
-        site_rules,
-    })
+    do_restore(
+        state,
+        auth,
+        &BackupData {
+            version,
+            created_at: Utc::now(),
+            users,
+            entries,
+            tags,
+            entry_tags,
+            annotations,
+            memos,
+            tagging_rules,
+            site_rules,
+        },
+    )
     .await
 }
 

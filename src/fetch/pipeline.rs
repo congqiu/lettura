@@ -404,7 +404,15 @@ async fn save(
         tracing::error!("Failed to index entry {}: {e}", job.entry_id);
     }
 
-    apply_tagging_rules(&ctx.pool, &ctx.caches, job.user_id, job.entry_id, &job.url, result).await;
+    apply_tagging_rules(
+        &ctx.pool,
+        &ctx.caches,
+        job.user_id,
+        job.entry_id,
+        &job.url,
+        result,
+    )
+    .await;
 
     tracing::debug!(
         entry_id = %job.entry_id,
@@ -441,8 +449,10 @@ async fn apply_tagging_rules(
             for tag_label in &rule.tags {
                 if let Ok(tag) =
                     crate::models::tag::find_or_create_tag(pool, caches, user_id, tag_label).await
-                    && let Err(e) =
-                        crate::models::tag::add_tag_to_entry(pool, caches, user_id, entry_id, tag.id).await
+                    && let Err(e) = crate::models::tag::add_tag_to_entry(
+                        pool, caches, user_id, entry_id, tag.id,
+                    )
+                    .await
                 {
                     tracing::warn!(entry_id = %entry_id, tag_id = %tag.id, "failed to apply auto-tag: {e}");
                 }

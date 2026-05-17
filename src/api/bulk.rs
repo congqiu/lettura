@@ -347,7 +347,14 @@ pub async fn bulk_tag_by_ids(
     if req.tags.is_empty() {
         return Err(ApiError::BadRequest("tags cannot be empty".into()));
     }
-    tag::ensure_and_link(&state.pool, &state.caches, auth.user_id, &req.entry_ids, &req.tags).await?;
+    tag::ensure_and_link(
+        &state.pool,
+        &state.caches,
+        auth.user_id,
+        &req.entry_ids,
+        &req.tags,
+    )
+    .await?;
     let count = req.entry_ids.len();
 
     // Invalidate tag stats cache since tag counts may have changed

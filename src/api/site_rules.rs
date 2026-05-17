@@ -82,7 +82,8 @@ pub async fn update_rule(
     Path(rule_id): Path<Uuid>,
     Json(params): Json<UpdateSiteRule>,
 ) -> Result<Json<site_rule::SiteRule>, ApiError> {
-    let updated = site_rule::update_rule(&state.pool, &state.caches, auth.user_id, rule_id, &params).await?;
+    let updated =
+        site_rule::update_rule(&state.pool, &state.caches, auth.user_id, rule_id, &params).await?;
     audit_log::log_success(
         &state.pool,
         Some(auth.user_id),

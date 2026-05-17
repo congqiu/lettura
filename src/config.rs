@@ -104,37 +104,93 @@ pub struct Config {
 }
 
 // Default value functions
-fn default_listen_addr() -> String { "0.0.0.0:3330".to_string() }
-fn default_index_path() -> String { "/data/tantivy".to_string() }
-fn default_storage_type() -> String { "local".to_string() }
-fn default_storage_local_path() -> String { "/data/storage".to_string() }
-fn default_pages_storage_path() -> String { "/data/pages".to_string() }
-fn default_oss_region() -> String { "auto".to_string() }
-fn default_db_max_connections() -> u32 { 10 }
-fn default_db_min_connections() -> u32 { 2 }
-fn default_db_acquire_timeout_secs() -> u64 { 30 }
-fn default_cors_origins() -> String { "*".to_string() }
-fn default_true() -> bool { true }
+fn default_listen_addr() -> String {
+    "0.0.0.0:3330".to_string()
+}
+fn default_index_path() -> String {
+    "/data/tantivy".to_string()
+}
+fn default_storage_type() -> String {
+    "local".to_string()
+}
+fn default_storage_local_path() -> String {
+    "/data/storage".to_string()
+}
+fn default_pages_storage_path() -> String {
+    "/data/pages".to_string()
+}
+fn default_oss_region() -> String {
+    "auto".to_string()
+}
+fn default_db_max_connections() -> u32 {
+    10
+}
+fn default_db_min_connections() -> u32 {
+    2
+}
+fn default_db_acquire_timeout_secs() -> u64 {
+    30
+}
+fn default_cors_origins() -> String {
+    "*".to_string()
+}
+fn default_true() -> bool {
+    true
+}
 fn default_user_agent() -> String {
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36".to_string()
 }
-fn default_fetch_timeout_secs() -> u64 { 30 }
-fn default_fetch_max_retries() -> u32 { 3 }
-fn default_fetch_concurrency() -> usize { 5 }
-fn default_fetch_max_attempts() -> i16 { 5 }
-fn default_fetch_lease_secs() -> u64 { 300 }
-fn default_fetch_dead_ttl_days() -> i64 { 30 }
-fn default_rendering_enabled() -> String { "auto".to_string() }
-fn default_render_concurrency() -> usize { 2 }
-fn default_render_timeout_ms() -> u64 { 15000 }
-fn default_import_max_body_bytes() -> usize { 50 * 1024 * 1024 }
-fn default_pages_max_upload_bytes() -> usize { 10 * 1024 * 1024 }
-fn default_max_image_size() -> usize { 10 * 1024 * 1024 }
-fn default_auth_rate_limit() -> u32 { 10 }
-fn default_global_rate_limit() -> u32 { 100 }
-fn default_search_commit_interval_secs() -> u64 { 3 }
-fn default_token_cleanup_interval_secs() -> u64 { 3600 }
-fn default_metrics_interval_secs() -> u64 { 15 }
+fn default_fetch_timeout_secs() -> u64 {
+    30
+}
+fn default_fetch_max_retries() -> u32 {
+    3
+}
+fn default_fetch_concurrency() -> usize {
+    5
+}
+fn default_fetch_max_attempts() -> i16 {
+    5
+}
+fn default_fetch_lease_secs() -> u64 {
+    300
+}
+fn default_fetch_dead_ttl_days() -> i64 {
+    30
+}
+fn default_rendering_enabled() -> String {
+    "auto".to_string()
+}
+fn default_render_concurrency() -> usize {
+    2
+}
+fn default_render_timeout_ms() -> u64 {
+    15000
+}
+fn default_import_max_body_bytes() -> usize {
+    50 * 1024 * 1024
+}
+fn default_pages_max_upload_bytes() -> usize {
+    10 * 1024 * 1024
+}
+fn default_max_image_size() -> usize {
+    10 * 1024 * 1024
+}
+fn default_auth_rate_limit() -> u32 {
+    10
+}
+fn default_global_rate_limit() -> u32 {
+    100
+}
+fn default_search_commit_interval_secs() -> u64 {
+    3
+}
+fn default_token_cleanup_interval_secs() -> u64 {
+    3600
+}
+fn default_metrics_interval_secs() -> u64 {
+    15
+}
 
 impl Config {
     pub fn from_env() -> Result<Self, String> {
@@ -165,10 +221,15 @@ impl Config {
 
         // Validation: JWT_SECRET
         if config.jwt_secret == "change-me-in-production" {
-            return Err("JWT_SECRET must not be the default value 'change-me-in-production'".to_string());
+            return Err(
+                "JWT_SECRET must not be the default value 'change-me-in-production'".to_string(),
+            );
         }
         if config.jwt_secret.len() < 32 {
-            return Err(format!("JWT_SECRET must be at least 32 characters (got {})", config.jwt_secret.len()));
+            return Err(format!(
+                "JWT_SECRET must be at least 32 characters (got {})",
+                config.jwt_secret.len()
+            ));
         }
         if config.jwt_secret == "change-me-to-a-random-secret-at-least-32-characters-long" {
             return Err("JWT_SECRET must be changed from the default value".to_string());
@@ -187,7 +248,7 @@ impl Config {
     pub fn rendering_runtime_enabled(&self) -> bool {
         #[cfg(not(feature = "rendering"))]
         {
-            return false;
+            false
         }
         #[cfg(feature = "rendering")]
         {
@@ -222,12 +283,17 @@ mod tests {
     fn cleanup_env() {
         // Only clean up vars that tests actually set
         let vars = [
-            "DATABASE_URL", "JWT_SECRET",
-            "LETTURA_RENDER_CONCURRENCY", "LETTURA_RENDERING_ENABLED",
-            "LETTURA_PRODUCTION", "CORS_ORIGINS",
+            "DATABASE_URL",
+            "JWT_SECRET",
+            "LETTURA_RENDER_CONCURRENCY",
+            "LETTURA_RENDERING_ENABLED",
+            "LETTURA_PRODUCTION",
+            "CORS_ORIGINS",
         ];
         unsafe {
-            for v in &vars { env::remove_var(v); }
+            for v in &vars {
+                env::remove_var(v);
+            }
         }
     }
 

@@ -60,9 +60,7 @@ pub async fn list_rules_cached(
     let rules = list_rules(pool, user_id).await?;
 
     // Update cache
-    caches.tagging_rules
-        .insert(user_id, rules.clone())
-        .await;
+    caches.tagging_rules.insert(user_id, rules.clone()).await;
 
     Ok(rules)
 }

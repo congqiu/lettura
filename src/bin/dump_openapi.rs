@@ -12,7 +12,6 @@ use utoipa::OpenApi;
 
 fn main() {
     let doc = lettura::api::openapi::ApiDoc::openapi();
-    let json = serde_json::to_string_pretty(&doc)
-        .expect("OpenAPI schema must serialize as JSON");
+    let json = serde_json::to_string_pretty(&doc).expect("OpenAPI schema must serialize as JSON");
     println!("{json}");
 }
