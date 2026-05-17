@@ -46,6 +46,11 @@ thiserror = "2"
 
 # Web framework
 axum = { version = "0.8", features = ["macros", "multipart"] }
+# OpenAPI schema generation. Each #[utoipa::path] handler annotation gets
+# collected into the ApiDoc struct (src/api/openapi.rs) and served at
+# /api/openapi.json. The frontend consumes that via openapi-typescript to
+# generate src/api/schema.ts — see web/package.json `codegen` script.
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "set-header"] }

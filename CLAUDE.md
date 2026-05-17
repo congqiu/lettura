@@ -169,6 +169,25 @@ docker compose up -d
 
 `fetch_jobs` 表保留，下次再上线时未消费的 job 继续被处理（schema 完全向下兼容）。
 
+## API Codegen
+
+后端用 `utoipa` 生成 OpenAPI 3.1 schema，前端用 `openapi-typescript` 把 schema 编译成 `web/src/api/schema.ts`。新写或改 handler 时按以下流程同步：
+
+1. handler 上加 `#[utoipa::path(get, path = "...", responses(...), tag = "...")]`
+2. handler 用到的 request/response 类型加 `#[derive(utoipa::ToSchema)]`
+3. 在 `src/api/openapi.rs::ApiDoc` 的 `paths(...)` 列出 handler、`components(schemas(...))` 列出新类型
+4. 跑 `./dev.sh codegen` 重新生成 `web/src/api/openapi.json` + `web/src/api/schema.ts`
+5. commit 这两个生成文件（schema.ts 进 git 让 PR 能看到 API 变更）
+
+前端用法：
+```ts
+import type { paths, components } from '@/api/schema';
+type HealthResponse = components['schemas']['HealthResponse'];
+type ListTagsResp = paths['/api/v1/tags']['get']['responses']['200']['content']['application/json'];
+```
+
+**Incremental adoption**：未加 `#[utoipa::path]` 注解的 handler 不出现在 schema，但 server 正常 work。修动旧 handler 时顺手补注解。Schema 也通过 `GET /api/openapi.json` 在线暴露。
+
 ## CLI (`lettura-cli`)
 
 新增的 `lettura-cli` 面向 AI agent，位于 `cli/` 子 crate 中。

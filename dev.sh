@@ -26,6 +26,7 @@ ${B}Commands:${N}
   cache-stats  Show sccache stats + build volume sizes
   clean-inc    Prune cargo incremental caches (keeps deps + sccache)
   clean-cache  Wipe ALL build caches (target, sccache, registry) — slow next build
+  codegen      Regenerate web/src/api/schema.ts from utoipa OpenAPI schema
   clean        Remove containers, images, and volumes
 EOF
 }
@@ -94,6 +95,24 @@ cmd_status() {
 
 cmd_psql() {
   docker compose exec postgres psql -U lettura -d lettura
+}
+
+# Regenerate the frontend OpenAPI types. Uses the offline path (no running
+# server required): cargo dumps the schema to JSON in the builder container,
+# openapi-typescript reads the file. Run this whenever a #[utoipa::path]
+# handler annotation changes or a #[derive(ToSchema)] type is touched.
+cmd_codegen() {
+  log "Dumping OpenAPI schema from Rust..."
+  docker run --rm \
+    -v "$(pwd)":/app \
+    -v lettura-target:/app/target \
+    -v lettura-cargo-registry:/usr/local/cargo/registry \
+    -w /app lettura-bb-sccache \
+    cargo run --bin dump_openapi --no-default-features --quiet \
+    > web/src/api/openapi.json
+  log "Generating web/src/api/schema.ts..."
+  (cd web && pnpm codegen)
+  log "Done. Commit web/src/api/openapi.json + web/src/api/schema.ts."
 }
 
 cmd_clean() {
@@ -185,6 +204,7 @@ case "${1:-build}" in
   cache-stats) cmd_cache_stats ;;
   clean-inc)   cmd_clean_inc   ;;
   clean-cache) cmd_clean_cache ;;
+  codegen)     cmd_codegen     ;;
   clean)       cmd_clean       ;;
   -h|--help|help) usage ;;
   *)       err "Unknown command: $1"; usage; exit 1 ;;

@@ -37,6 +37,7 @@ pub mod fetch_jobs;
 pub mod health;
 pub mod import;
 pub mod memos;
+pub mod openapi;
 pub mod pages;
 pub mod pages_public;
 pub mod site_rules;
@@ -140,6 +141,9 @@ pub fn router_with_search(
     let router = Router::new()
         // Health (no auth required, no version prefix)
         .route("/api/health", get(health::health_check))
+        // OpenAPI schema. Public — describes shapes only, no data leaked.
+        // Frontend regenerates web/src/api/schema.ts from this via `pnpm codegen`.
+        .route("/api/openapi.json", get(openapi::openapi_json))
         // Skills (no auth required)
         .route("/skills/lettura.md", get(skills::skill_lettura))
         // Auth (other endpoints — normal rate limit)

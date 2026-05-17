@@ -2,16 +2,29 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::state::AppState;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
+    /// Overall service status: "ok" | "degraded" | "error".
     pub status: String,
+    /// Database probe result.
     pub db: String,
+    /// Search index probe result.
     pub search: String,
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/health",
+    tag = "health",
+    responses(
+        (status = 200, description = "Service is healthy or degraded (DB up)", body = HealthResponse),
+        (status = 503, description = "Database unreachable", body = HealthResponse),
+    ),
+)]
 pub async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<HealthResponse>) {
     let db_result = sqlx::query_scalar::<_, i32>("SELECT 1")
         .fetch_one(&state.pool)

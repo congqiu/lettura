@@ -13,6 +13,16 @@ use crate::models::audit_log::{self, AuditAction, AuditResourceType};
 use crate::models::{entry, tag};
 use crate::state::AppState;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tags",
+    tag = "tags",
+    responses(
+        (status = 200, description = "All tags the user has created", body = Vec<tag::Tag>),
+        (status = 401, description = "Missing or invalid auth"),
+    ),
+    security(("bearer" = [])),
+)]
 pub async fn list_tags(
     State(state): State<AppState>,
     auth: AuthUser,

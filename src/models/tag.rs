@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use super::error::ModelError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct Tag {
     pub id: Uuid,
     pub user_id: Uuid,
